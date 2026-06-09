@@ -22,6 +22,8 @@ def migrate(conn):
 
     don = {r[1] for r in c.execute("PRAGMA table_info(donatur)")}
     for col, defn in [
+        ('nik',          'TEXT'),
+        ('aktif',        'INTEGER DEFAULT 1'),
         ('sumber_infaq', "TEXT DEFAULT 'tunai'"),
         ('area',         'TEXT'),
         ('lokasi_nama',  'TEXT'),

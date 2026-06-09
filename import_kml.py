@@ -87,8 +87,8 @@ if __name__ == '__main__':
     print(f"Ditemukan {len(rows)} titik:")
     for folder, n in Counter(d['folder'] for d in rows).items():
         sumber = LAYER_MAP.get(folder.lower(), 'kotak_infaq')
-        print(f"  [{folder}] → {sumber}: {n} titik")
+        print(f"  [{folder}] -> {sumber}: {n} titik")
 
     ok, skip = import_to_db(rows)
     print(f"\nSelesai: {ok} diimport, {skip} dilewati (sudah ada).")
-    print("Buka Admin → Master → Donatur untuk melengkapi kolom Area.")
+    print("Buka Admin > Master > Donatur untuk melengkapi kolom Area.")
