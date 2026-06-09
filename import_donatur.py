@@ -20,7 +20,8 @@ import os
 import csv
 
 DB_PATH  = os.path.join('data', 'keuangan.db')
-TSV_PATH = 'donatur_list.tsv'
+# Coba data_donatur.txt dulu, fallback ke donatur_list.tsv
+TSV_PATH = 'data_donatur.txt' if os.path.exists('data_donatur.txt') else 'donatur_list.tsv'
 
 KODE_SUMBER = {
     'KC': 'kencleng',
@@ -64,8 +65,16 @@ def run():
 
     inserted = updated = skipped = empty = 0
 
-    with open(TSV_PATH, encoding='utf-8') as f:
-        reader = csv.DictReader(f, delimiter='\t')
+    with open(TSV_PATH, encoding='utf-8', errors='replace') as f:
+        # Deteksi apakah ada header row
+        first = f.readline()
+        f.seek(0)
+        has_header = first.strip().lower().startswith('nama')
+        if has_header:
+            reader = csv.DictReader(f, delimiter='\t')
+        else:
+            reader = csv.DictReader(f, delimiter='\t',
+                                    fieldnames=['Nama','Alamat','NoHP','Kode'])
         for row in reader:
             nama   = (row.get('Nama') or '').strip()
             alamat = (row.get('Alamat') or '').strip()
