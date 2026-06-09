@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-import sqlite3, hashlib, os, re, json
+import sqlite3, hashlib, os, re, json, calendar as cal_mod
 from datetime import datetime, date
 from functools import wraps
 
@@ -47,7 +47,17 @@ LABEL_DANA  = {'zakat':'Zakat','infak_sedekah':'Infak/Sedekah','amil':'Amil','wa
 LABEL_ASNAF = {'fakir':'Fakir','miskin':'Miskin','amil':'Amil','muallaf':'Muallaf',
                'riqab':'Riqab','gharim':'Gharim','fisabilillah':'Fisabilillah','ibnu_sabil':'Ibnu Sabil'}
 LABEL_SUMBER = {'tunai':'Tunai','kencleng':'Kencleng','kotak_infaq':'Kotak Infaq'}
+BULAN_IND   = {1:'Januari',2:'Februari',3:'Maret',4:'April',5:'Mei',6:'Juni',
+               7:'Juli',8:'Agustus',9:'September',10:'Oktober',11:'November',12:'Desember'}
 
+def format_bulan(b):
+    try:
+        y, m = b.split('-')
+        return f"{BULAN_IND[int(m)]} {y}"
+    except:
+        return b
+
+app.jinja_env.filters['bulan_label'] = format_bulan
 app.jinja_env.globals.update(LABEL_DANA=LABEL_DANA, LABEL_ASNAF=LABEL_ASNAF,
                               LABEL_SUMBER=LABEL_SUMBER)
 
@@ -219,27 +229,131 @@ def hapus_transaksi(id):
 @app.route('/admin/laporan')
 @admin_required
 def admin_laporan():
-    conn = get_db()
-    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
-    rekap = conn.execute('''
-        SELECT c.kode, c.nama, c.jenis_dana, t.jenis,
-               SUM(t.jumlah) as total, COUNT(*) as jumlah_transaksi
+    return render_template('admin/laporan.html')
+
+
+def _last_day(bulan):
+    y, m = map(int, bulan.split('-'))
+    return f"{bulan}-{cal_mod.monthrange(y, m)[1]:02d}"
+
+def _prev_last_day(bulan):
+    y, m = map(int, bulan.split('-'))
+    if m == 1: py, pm = y-1, 12
+    else:      py, pm = y,   m-1
+    return f"{py}-{pm:02d}-{cal_mod.monthrange(py, pm)[1]:02d}"
+
+def _dana_summary(conn, bulan):
+    """Hitung saldo awal, penerimaan, penyaluran, saldo akhir per jenis dana."""
+    dana_types = ['zakat', 'infak_sedekah', 'amil', 'wakaf']
+
+    rows_awal = conn.execute("""
+        SELECT jenis_dana,
+               COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo
+        FROM transaksi WHERE strftime('%Y-%m',tanggal) < ? AND jenis_dana IS NOT NULL
+        GROUP BY jenis_dana
+    """, (bulan,)).fetchall()
+    saldo_awal = {r['jenis_dana']: r['saldo'] for r in rows_awal}
+
+    masuk_rows = conn.execute("""
+        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
-        WHERE strftime('%Y-%m',t.tanggal)=?
+        WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?
         GROUP BY c.id ORDER BY c.kode
-    ''', (bulan,)).fetchall()
-    total_masuk  = sum(r['total'] for r in rekap if r['jenis']=='masuk')
-    total_keluar = sum(r['total'] for r in rekap if r['jenis']=='keluar')
-    rekap_per_dana = {}
-    for r in rekap:
-        dana = r['jenis_dana'] or 'umum'
-        if dana not in rekap_per_dana:
-            rekap_per_dana[dana] = {'masuk':0,'keluar':0,'items':[]}
-        rekap_per_dana[dana][r['jenis']] += r['total']
-        rekap_per_dana[dana]['items'].append(r)
+    """, (bulan,)).fetchall()
+
+    keluar_rows = conn.execute("""
+        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?
+        GROUP BY c.id ORDER BY c.kode
+    """, (bulan,)).fetchall()
+
+    data = {}
+    for dana in dana_types:
+        masuk  = [r for r in masuk_rows  if r['jenis_dana'] == dana]
+        keluar = [r for r in keluar_rows if r['jenis_dana'] == dana]
+        tm = sum(r['total'] for r in masuk)
+        tk = sum(r['total'] for r in keluar)
+        sa = saldo_awal.get(dana, 0)
+        data[dana] = {
+            'masuk': masuk, 'keluar': keluar,
+            'total_masuk': tm, 'total_keluar': tk,
+            'saldo_awal': sa, 'saldo_akhir': sa + tm - tk,
+        }
+    return data
+
+
+@app.route('/admin/laporan/neraca')
+@admin_required
+def laporan_neraca():
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    ld    = _last_day(bulan)
+    conn  = get_db()
+
+    rows = conn.execute("""
+        SELECT jenis_dana,
+               COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo
+        FROM transaksi WHERE tanggal <= ? AND jenis_dana IS NOT NULL
+        GROUP BY jenis_dana
+    """, (ld,)).fetchall()
+    kas = {r['jenis_dana']: r['saldo'] for r in rows}
+
+    dana_types = ['zakat', 'infak_sedekah', 'amil', 'wakaf']
+    total_aset = sum(kas.get(d, 0) for d in dana_types)
     conn.close()
-    return render_template('admin/laporan.html', rekap=rekap, total_masuk=total_masuk,
-        total_keluar=total_keluar, rekap_per_dana=rekap_per_dana, bulan=bulan)
+
+    return render_template('admin/laporan_neraca.html',
+        kas=kas, dana_types=dana_types, total_aset=total_aset,
+        bulan=bulan, last_day=ld)
+
+
+@app.route('/admin/laporan/dana')
+@admin_required
+def laporan_dana():
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    conn  = get_db()
+    data  = _dana_summary(conn, bulan)
+    conn.close()
+    return render_template('admin/laporan_dana.html',
+        data=data, bulan=bulan,
+        dana_types=['zakat', 'infak_sedekah', 'amil', 'wakaf'])
+
+
+@app.route('/admin/laporan/arus-kas')
+@admin_required
+def laporan_arus_kas():
+    bulan    = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    prev_ld  = _prev_last_day(bulan)
+    conn     = get_db()
+
+    saldo_awal = conn.execute("""
+        SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0)
+        FROM transaksi WHERE tanggal <= ?
+    """, (prev_ld,)).fetchone()[0]
+
+    masuk = conn.execute("""
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?
+        GROUP BY c.id ORDER BY c.kode
+    """, (bulan,)).fetchall()
+
+    keluar = conn.execute("""
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?
+        GROUP BY c.id ORDER BY c.kode
+    """, (bulan,)).fetchall()
+
+    total_masuk  = sum(r['total'] for r in masuk)
+    total_keluar = sum(r['total'] for r in keluar)
+    conn.close()
+
+    return render_template('admin/laporan_arus_kas.html',
+        masuk=masuk, keluar=keluar,
+        total_masuk=total_masuk, total_keluar=total_keluar,
+        saldo_awal=saldo_awal, saldo_akhir=saldo_awal + total_masuk - total_keluar,
+        bulan=bulan)
 
 # ── Admin Koleksi ─────────────────────────────────────────────────────────────
 

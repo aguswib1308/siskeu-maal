@@ -1,0 +1,166 @@
+{% extends 'admin/base.html' %}
+{% block title %}Laporan Arus Kas{% endblock %}
+{% block page_title %}<i class="bi bi-arrow-left-right"></i> Laporan Arus Kas{% endblock %}
+
+{% set dana_color = {
+  'zakat':        '#27ae60',
+  'infak_sedekah':'#2980b9',
+  'amil':         '#8e44ad',
+  'wakaf':        '#e67e22',
+} %}
+
+{% block content %}
+{# ── Filter ───────────────────────────────────────────── #}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <form class="d-flex gap-2">
+    <input type="month" name="bulan" value="{{ bulan }}"
+           class="form-control form-control-sm" style="width:180px">
+    <button class="btn btn-sm btn-primary">Tampilkan</button>
+  </form>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-printer"></i> Cetak
+  </button>
+</div>
+
+{# ── Header ───────────────────────────────────────────── #}
+<div class="text-center mb-3 no-print">
+  <div class="fw-bold fs-5">BAITUL MAAL BMT</div>
+  <div class="fw-bold fs-4">LAPORAN ARUS KAS</div>
+  <div class="text-muted">Periode: {{ bulan | bulan_label }}</div>
+</div>
+
+{# ── Saldo Kas Awal ───────────────────────────────────── #}
+<div class="card mb-3 p-3 d-flex flex-row justify-content-between align-items-center"
+     style="border-left:4px solid #64748b">
+  <div class="fw-semibold text-secondary">
+    <i class="bi bi-wallet2"></i> Saldo Kas Awal Periode
+  </div>
+  <div class="fw-bold fs-5">{{ saldo_awal|rupiah }}</div>
+</div>
+
+<div class="row g-3 mb-3">
+
+  {# ── Arus Kas Masuk ───────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-bold text-success"
+           style="background:#e8f8f0;border-radius:12px 12px 0 0">
+        <i class="bi bi-arrow-down-circle-fill"></i> Arus Kas Masuk
+      </div>
+      <table class="table table-sm mb-0">
+        <tbody>
+          {% set ns_dana = namespace(cur='') %}
+          {% for r in masuk %}
+            {% set d = r.jenis_dana or 'umum' %}
+            {% if d != ns_dana.cur %}
+              {% set ns_dana.cur = d %}
+              <tr class="table-light">
+                <td colspan="2" class="ps-3 fw-semibold small"
+                    style="color:{{ dana_color.get(d,'#aaa') }}">
+                  Dana {{ LABEL_DANA.get(d, d) }}
+                </td>
+              </tr>
+            {% endif %}
+            <tr>
+              <td class="ps-4" style="font-size:.82rem">{{ r.nama }}</td>
+              <td class="text-end pe-3 text-success fw-semibold" style="font-size:.82rem;white-space:nowrap">
+                {{ r.total|rupiah }}
+              </td>
+            </tr>
+          {% else %}
+          <tr><td colspan="2" class="text-muted text-center py-3 small fst-italic">
+            Tidak ada arus kas masuk
+          </td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="table-success fw-bold">
+            <td class="ps-3">Total Arus Masuk</td>
+            <td class="text-end pe-3">{{ total_masuk|rupiah }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  {# ── Arus Kas Keluar ──────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-bold text-danger"
+           style="background:#fde8e6;border-radius:12px 12px 0 0">
+        <i class="bi bi-arrow-up-circle-fill"></i> Arus Kas Keluar
+      </div>
+      <table class="table table-sm mb-0">
+        <tbody>
+          {% set ns_dana2 = namespace(cur='') %}
+          {% for r in keluar %}
+            {% set d = r.jenis_dana or 'umum' %}
+            {% if d != ns_dana2.cur %}
+              {% set ns_dana2.cur = d %}
+              <tr class="table-light">
+                <td colspan="2" class="ps-3 fw-semibold small"
+                    style="color:{{ dana_color.get(d,'#aaa') }}">
+                  Dana {{ LABEL_DANA.get(d, d) }}
+                </td>
+              </tr>
+            {% endif %}
+            <tr>
+              <td class="ps-4" style="font-size:.82rem">{{ r.nama }}</td>
+              <td class="text-end pe-3 text-danger fw-semibold" style="font-size:.82rem;white-space:nowrap">
+                {{ r.total|rupiah }}
+              </td>
+            </tr>
+          {% else %}
+          <tr><td colspan="2" class="text-muted text-center py-3 small fst-italic">
+            Tidak ada arus kas keluar
+          </td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="table-danger fw-bold">
+            <td class="ps-3">Total Arus Keluar</td>
+            <td class="text-end pe-3">{{ total_keluar|rupiah }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{# ── Ringkasan ─────────────────────────────────────────── #}
+<div class="card p-3">
+  <div class="row text-center g-3">
+    <div class="col">
+      <div class="small text-muted mb-1">Saldo Kas Awal</div>
+      <div class="fw-bold fs-5">{{ saldo_awal|rupiah }}</div>
+    </div>
+    <div class="col-auto d-flex align-items-center text-muted fs-4">+</div>
+    <div class="col">
+      <div class="small text-muted mb-1">Arus Masuk</div>
+      <div class="fw-bold fs-5 text-success">{{ total_masuk|rupiah }}</div>
+    </div>
+    <div class="col-auto d-flex align-items-center text-muted fs-4">−</div>
+    <div class="col">
+      <div class="small text-muted mb-1">Arus Keluar</div>
+      <div class="fw-bold fs-5 text-danger">{{ total_keluar|rupiah }}</div>
+    </div>
+    <div class="col-auto d-flex align-items-center text-muted fs-4">=</div>
+    <div class="col">
+      <div class="small text-muted mb-1">Saldo Kas Akhir</div>
+      <div class="fw-bold fs-4 {{ 'text-success' if saldo_akhir >= 0 else 'text-danger' }}">
+        {{ saldo_akhir|rupiah }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .sidebar, .topbar { display: none !important; }
+  .main { margin-left: 0 !important; padding: 1rem !important; }
+  .card { box-shadow: none !important; }
+}
+</style>
+{% endblock %}

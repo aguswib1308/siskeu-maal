@@ -51,8 +51,20 @@
     <a href="/admin/peta" class="nav-link {% if request.path == '/admin/peta' %}active{% endif %}">
       <i class="bi bi-map"></i> Peta
     </a>
-    <a href="/admin/laporan" class="nav-link {% if '/laporan' in request.path %}active{% endif %}">
+    <a href="/admin/laporan" class="nav-link {% if request.path == '/admin/laporan' %}active{% endif %}">
       <i class="bi bi-file-earmark-bar-graph"></i> Laporan
+    </a>
+    <a href="/admin/laporan/neraca" class="nav-link ps-4 {% if '/laporan/neraca' in request.path %}active{% endif %}"
+       style="font-size:.82rem">
+      <i class="bi bi-bank2"></i> Neraca
+    </a>
+    <a href="/admin/laporan/dana" class="nav-link ps-4 {% if '/laporan/dana' in request.path %}active{% endif %}"
+       style="font-size:.82rem">
+      <i class="bi bi-journal-text"></i> Sumber & Penggunaan Dana
+    </a>
+    <a href="/admin/laporan/arus-kas" class="nav-link ps-4 {% if '/laporan/arus-kas' in request.path %}active{% endif %}"
+       style="font-size:.82rem">
+      <i class="bi bi-arrow-left-right"></i> Arus Kas
     </a>
 
     <div style="padding:.6rem 1rem .2rem; font-size:.7rem; opacity:.5; letter-spacing:.08em; text-transform:uppercase;">

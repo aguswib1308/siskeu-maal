@@ -1,0 +1,127 @@
+{% extends 'admin/base.html' %}
+{% block title %}Neraca{% endblock %}
+{% block page_title %}<i class="bi bi-bank2"></i> Neraca{% endblock %}
+
+{% block content %}
+{# ── Filter ───────────────────────────────────────────── #}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <form class="d-flex gap-2">
+    <input type="month" name="bulan" value="{{ bulan }}"
+           class="form-control form-control-sm" style="width:180px">
+    <button class="btn btn-sm btn-primary">Tampilkan</button>
+  </form>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-printer"></i> Cetak
+  </button>
+</div>
+
+{# ── Header laporan ───────────────────────────────────── #}
+<div class="card p-4">
+  <div class="text-center mb-4">
+    <div class="fw-bold fs-5">BAITUL MAAL BMT</div>
+    <div class="fw-bold fs-4 mt-1">NERACA</div>
+    <div class="text-muted">Per {{ last_day | replace('-', ' ') }} — {{ bulan | bulan_label }}</div>
+    <hr>
+  </div>
+
+  <div class="row g-4">
+
+    {# ── ASET ──────────────────────────────────────────── #}
+    <div class="col-md-6">
+      <table class="table table-sm">
+        <thead>
+          <tr style="background:#1a5276;color:#fff">
+            <th colspan="2" class="ps-3">ASET</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="table-light">
+            <td colspan="2" class="fw-semibold ps-3">Aset Lancar</td>
+          </tr>
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Zakat</td>
+            <td class="text-end">{{ kas.get('zakat', 0)|rupiah }}</td>
+          </tr>
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Infak/Sedekah</td>
+            <td class="text-end">{{ kas.get('infak_sedekah', 0)|rupiah }}</td>
+          </tr>
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Amil</td>
+            <td class="text-end">{{ kas.get('amil', 0)|rupiah }}</td>
+          </tr>
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Wakaf</td>
+            <td class="text-end">{{ kas.get('wakaf', 0)|rupiah }}</td>
+          </tr>
+          <tr class="table-light fw-bold border-top">
+            <td class="ps-3">TOTAL ASET</td>
+            <td class="text-end text-primary">{{ total_aset|rupiah }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# ── LIABILITAS + SALDO DANA ───────────────────────── #}
+    <div class="col-md-6">
+      <table class="table table-sm">
+        <thead>
+          <tr style="background:#1a5276;color:#fff">
+            <th colspan="2" class="ps-3">LIABILITAS &amp; SALDO DANA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="table-light">
+            <td colspan="2" class="fw-semibold ps-3">Liabilitas</td>
+          </tr>
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">Titipan / Hutang Dana Zakat</td>
+            <td class="text-end">Rp 0</td>
+          </tr>
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">Titipan / Hutang Dana Infak</td>
+            <td class="text-end">Rp 0</td>
+          </tr>
+          <tr class="fw-semibold" style="border-top:1px solid #dee2e6">
+            <td class="ps-3">Total Liabilitas</td>
+            <td class="text-end">Rp 0</td>
+          </tr>
+
+          <tr class="table-light" style="border-top:2px solid #dee2e6">
+            <td colspan="2" class="fw-semibold ps-3">Saldo Dana</td>
+          </tr>
+          {% for dana in dana_types %}
+          {% set sal = kas.get(dana, 0) %}
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:.85rem">
+              Saldo Dana {{ LABEL_DANA.get(dana, dana) }}
+            </td>
+            <td class="text-end {% if sal < 0 %}text-danger{% endif %}">
+              {{ sal|rupiah }}
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="table-light fw-bold border-top">
+            <td class="ps-3">TOTAL LIABILITAS &amp; SALDO DANA</td>
+            <td class="text-end text-primary">{{ total_aset|rupiah }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="text-muted small text-end mt-3 no-print">
+    Dicetak: {{ now if now else '' }} · Sistem Keuangan Baitul Maal
+  </div>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .sidebar, .topbar { display: none !important; }
+  .main { margin-left: 0 !important; padding: 1rem !important; }
+  .card { box-shadow: none !important; border: none !important; }
+}
+</style>
+{% endblock %}

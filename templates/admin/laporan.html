@@ -1,89 +1,76 @@
 {% extends 'admin/base.html' %}
 {% block title %}Laporan{% endblock %}
-{% block page_title %}<i class="bi bi-file-earmark-bar-graph"></i> Laporan{% endblock %}
+{% block page_title %}<i class="bi bi-file-earmark-bar-graph"></i> Laporan Keuangan{% endblock %}
 
 {% block content %}
-<div class="row mb-3 align-items-center">
-  <div class="col">
-    <form class="d-flex gap-2">
-      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:180px">
-      <button class="btn btn-sm btn-primary">Tampilkan</button>
-    </form>
-  </div>
-  <div class="col-auto">
-    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-printer"></i> Cetak
-    </button>
-  </div>
-</div>
+<div class="row g-4 mt-1">
 
-<div class="row g-3 mb-4">
   <div class="col-md-4">
-    <div class="card stat-card masuk p-3">
-      <div class="text-muted small">Total Pemasukan</div>
-      <div class="fs-4 fw-bold text-success">{{ total_masuk|rupiah }}</div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card stat-card keluar p-3">
-      <div class="text-muted small">Total Pengeluaran</div>
-      <div class="fs-4 fw-bold text-danger">{{ total_keluar|rupiah }}</div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card stat-card saldo p-3">
-      <div class="text-muted small">Selisih Bulan Ini</div>
-      <div class="fs-4 fw-bold {% if total_masuk >= total_keluar %}text-success{% else %}text-danger{% endif %}">
-        {{ (total_masuk - total_keluar)|rupiah }}
+    <a href="/admin/laporan/neraca" class="text-decoration-none">
+      <div class="card p-4 h-100" style="border-left:4px solid #2980b9;transition:box-shadow .2s"
+           onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.12)'"
+           onmouseout="this.style.boxShadow=''">
+        <div style="font-size:2.5rem;color:#2980b9;margin-bottom:.75rem">
+          <i class="bi bi-bank2"></i>
+        </div>
+        <div class="fw-bold fs-5 mb-1">Neraca</div>
+        <div class="text-muted small">
+          Posisi aset, liabilitas, dan saldo dana per akhir periode.
+          Sesuai format PSAK 109.
+        </div>
+        <div class="mt-3">
+          <span class="badge" style="background:#eaf4fb;color:#1a5276">Aset</span>
+          <span class="badge" style="background:#fef3e2;color:#d35400">Liabilitas</span>
+          <span class="badge" style="background:#e8f8f0;color:#1e8449">Saldo Dana</span>
+        </div>
       </div>
-    </div>
+    </a>
   </div>
-</div>
 
-<div class="row g-3">
-  <div class="col-md-6">
-    <div class="card p-3">
-      <div class="fw-semibold mb-3 text-success"><i class="bi bi-arrow-down-circle"></i> Pemasukan</div>
-      <table class="table table-sm">
-        <thead class="table-light"><tr><th>Kategori</th><th class="text-end">Jumlah Transaksi</th><th class="text-end">Total</th></tr></thead>
-        <tbody>
-          {% for r in rekap if r.jenis == 'masuk' %}
-          <tr>
-            <td>{{ r.nama }}</td>
-            <td class="text-end text-muted small">{{ r.jumlah_transaksi }}x</td>
-            <td class="text-end fw-semibold text-success">{{ r.total|rupiah }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="text-muted text-center">Tidak ada data</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot class="table-light fw-bold">
-          <tr><td>TOTAL</td><td></td><td class="text-end text-success">{{ total_masuk|rupiah }}</td></tr>
-        </tfoot>
-      </table>
-    </div>
+  <div class="col-md-4">
+    <a href="/admin/laporan/dana" class="text-decoration-none">
+      <div class="card p-4 h-100" style="border-left:4px solid #27ae60;transition:box-shadow .2s"
+           onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.12)'"
+           onmouseout="this.style.boxShadow=''">
+        <div style="font-size:2.5rem;color:#27ae60;margin-bottom:.75rem">
+          <i class="bi bi-journal-text"></i>
+        </div>
+        <div class="fw-bold fs-5 mb-1">Sumber &amp; Penggunaan Dana</div>
+        <div class="text-muted small">
+          Laporan perubahan dana ZIS per periode: penerimaan, penyaluran,
+          saldo awal dan akhir per jenis dana.
+        </div>
+        <div class="mt-3">
+          <span class="badge" style="background:#e8f8f0;color:#1e8449">Zakat</span>
+          <span class="badge" style="background:#eaf4fb;color:#1a5276">Infak/Sedekah</span>
+          <span class="badge" style="background:#f4eafb;color:#6c3483">Amil</span>
+          <span class="badge" style="background:#fef3e2;color:#d35400">Wakaf</span>
+        </div>
+      </div>
+    </a>
   </div>
-  <div class="col-md-6">
-    <div class="card p-3">
-      <div class="fw-semibold mb-3 text-danger"><i class="bi bi-arrow-up-circle"></i> Pengeluaran</div>
-      <table class="table table-sm">
-        <thead class="table-light"><tr><th>Kategori</th><th class="text-end">Jumlah Transaksi</th><th class="text-end">Total</th></tr></thead>
-        <tbody>
-          {% for r in rekap if r.jenis == 'keluar' %}
-          <tr>
-            <td>{{ r.nama }}</td>
-            <td class="text-end text-muted small">{{ r.jumlah_transaksi }}x</td>
-            <td class="text-end fw-semibold text-danger">{{ r.total|rupiah }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="text-muted text-center">Tidak ada data</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot class="table-light fw-bold">
-          <tr><td>TOTAL</td><td></td><td class="text-end text-danger">{{ total_keluar|rupiah }}</td></tr>
-        </tfoot>
-      </table>
-    </div>
+
+  <div class="col-md-4">
+    <a href="/admin/laporan/arus-kas" class="text-decoration-none">
+      <div class="card p-4 h-100" style="border-left:4px solid #8e44ad;transition:box-shadow .2s"
+           onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.12)'"
+           onmouseout="this.style.boxShadow=''">
+        <div style="font-size:2.5rem;color:#8e44ad;margin-bottom:.75rem">
+          <i class="bi bi-arrow-left-right"></i>
+        </div>
+        <div class="fw-bold fs-5 mb-1">Arus Kas</div>
+        <div class="text-muted small">
+          Aliran kas masuk dan keluar selama periode berjalan,
+          saldo kas awal dan akhir seluruh dana.
+        </div>
+        <div class="mt-3">
+          <span class="badge" style="background:#d5f5e3;color:#1e8449">Arus Masuk</span>
+          <span class="badge" style="background:#fadbd8;color:#922b21">Arus Keluar</span>
+          <span class="badge" style="background:#f0f4f8;color:#64748b">Saldo Kas</span>
+        </div>
+      </div>
+    </a>
   </div>
+
 </div>
 {% endblock %}
