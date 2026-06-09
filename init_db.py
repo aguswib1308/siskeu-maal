@@ -218,6 +218,13 @@ def init():
         coa
     )
 
+    # ── Produk Fundrising & Pentasharufan ─────────────────────────────────────
+    from add_produk_coa import ENTRIES as produk_entries
+    c.executemany(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)",
+        produk_entries
+    )
+
     conn.commit()
     conn.close()
     print("Database berhasil diinisialisasi.")

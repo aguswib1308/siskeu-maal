@@ -768,10 +768,13 @@ def marketing_catat():
     coa_list      = conn.execute("SELECT * FROM chart_of_accounts WHERE jenis_transaksi IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
     donatur_list  = conn.execute("SELECT * FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list = conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
+    # Map parent_kode → nama untuk optgroup label
+    parents = conn.execute("SELECT kode, nama FROM chart_of_accounts WHERE jenis_transaksi IS NULL").fetchall()
+    coa_group = {p['kode']: p['nama'] for p in parents}
     conn.close()
     return render_template('marketing/catat.html', coa_list=coa_list,
         donatur_list=donatur_list, penerima_list=penerima_list,
-        hari_ini=date.today().isoformat())
+        coa_group=coa_group, hari_ini=date.today().isoformat())
 
 @app.route('/marketing/riwayat')
 @login_required

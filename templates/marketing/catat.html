@@ -36,16 +36,25 @@
 
   {# ── Akun / COA ──────────────────────────────────────── #}
   <div class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">Akun</label>
+    <label class="form-label fw-semibold" style="font-size:.85rem">Produk / Akun</label>
     <select name="coa_id" id="selCoa" required
             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
             class="form-select">
-      <option value="">— Pilih Akun —</option>
+      <option value="">— Pilih Produk —</option>
+      {% set ns = namespace(grp='') %}
       {% for c in coa_list %}
-      <option value="{{ c.id }}" data-jenis="{{ c.jenis_transaksi }}">
-        {{ c.nama }}{% if c.jenis_dana %} · {{ LABEL_DANA.get(c.jenis_dana,'') }}{% endif %}
-      </option>
+        {# Tentukan label grup dari parent_kode #}
+        {% set pg = coa_group.get(c.parent_kode, c.parent_kode or '') %}
+        {% if pg != ns.grp %}
+          {% if ns.grp %}</optgroup>{% endif %}
+          {% set ns.grp = pg %}
+          <optgroup label="{{ pg }}">
+        {% endif %}
+        <option value="{{ c.id }}" data-jenis="{{ c.jenis_transaksi }}">
+          {{ c.nama }}
+        </option>
       {% endfor %}
+      {% if ns.grp %}</optgroup>{% endif %}
     </select>
   </div>
 
