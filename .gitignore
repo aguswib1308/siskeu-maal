@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+data/keuangan.db
+data/*.db
+.env
+*.backup
+venv/
+.venv/
