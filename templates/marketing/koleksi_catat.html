@@ -2,111 +2,170 @@
 {% block title %}Catat Koleksi{% endblock %}
 
 {% block content %}
-<!-- Info donatur -->
-<div class="card p-3 mb-3" style="border-left:4px solid
-  {% if koleksi.sumber_infaq=='kencleng' %}#27ae60{% else %}#2980b9{% endif %}">
-  <div class="d-flex justify-content-between align-items-start">
-    <div>
-      <div class="fw-bold fs-6">{{ koleksi.donatur_nama }}</div>
+
+{# ── Info donatur ──────────────────────────────────────── #}
+<div class="card mb-3 p-3">
+  <div class="d-flex align-items-center gap-3">
+    <div style="width:44px;height:44px;border-radius:50%;
+                background:linear-gradient(135deg,#1a5276,#2e86c1);
+                display:flex;align-items:center;justify-content:center;
+                font-size:1.2rem;color:#fff;flex-shrink:0">
+      {% if koleksi.sumber_infaq == 'kencleng' %}🏠{% else %}🕌{% endif %}
+    </div>
+    <div style="min-width:0;flex:1">
+      <div class="fw-bold text-truncate">{{ koleksi.donatur_nama }}</div>
       {% if koleksi.lokasi_nama and koleksi.lokasi_nama != koleksi.donatur_nama %}
-      <div class="small text-muted">{{ koleksi.lokasi_nama }}</div>
+      <div class="text-muted text-truncate" style="font-size:.78rem">{{ koleksi.lokasi_nama }}</div>
       {% endif %}
-      <div class="small text-muted mt-1">
-        <i class="bi bi-geo-alt"></i> {{ koleksi.area or '—' }}
+      <div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap">
+        <span style="font-size:.72rem">
+          <i class="bi bi-geo-alt" style="color:#94a3b8"></i>
+          <span style="color:#64748b">{{ koleksi.area or '—' }}</span>
+        </span>
+        {% if koleksi.jumlah_kunjungan > 0 %}
+        <span style="background:#fef3e2;color:#d35400;border-radius:6px;
+                     padding:1px 7px;font-size:.67rem;font-weight:600">
+          ⚠ {{ koleksi.jumlah_kunjungan }}x dikunjungi
+        </span>
+        {% endif %}
       </div>
-      {% if koleksi.jumlah_kunjungan > 0 %}
-      <div class="small text-warning mt-1">
-        ⚠ Sudah {{ koleksi.jumlah_kunjungan }}x dikunjungi, belum ada
-      </div>
-      {% endif %}
     </div>
     {% if koleksi.lat and koleksi.lng %}
     <a href="https://www.google.com/maps?q={{ koleksi.lat }},{{ koleksi.lng }}"
-       target="_blank" class="btn btn-sm btn-outline-success">
-      <i class="bi bi-geo-alt-fill"></i> Maps
+       target="_blank"
+       style="width:40px;height:40px;border-radius:10px;background:#f0f4f8;
+              color:#1a5276;display:flex;align-items:center;justify-content:center;
+              text-decoration:none;font-size:1.15rem;flex-shrink:0">
+      <i class="bi bi-geo-alt-fill"></i>
     </a>
     {% endif %}
   </div>
 </div>
 
-<!-- Riwayat singkat -->
+{# ── Riwayat terakhir ──────────────────────────────────── #}
 {% if riwayat %}
-<div class="card p-3 mb-3">
-  <div class="small fw-semibold text-muted mb-2">Riwayat Koleksi Sebelumnya</div>
-  {% for r in riwayat %}
-  <div class="d-flex justify-content-between small py-1 border-bottom">
-    <span class="text-muted">{{ r.bulan }} · {{ r.marketing_nama or '—' }}</span>
-    <span class="fw-semibold text-success">{{ r.jumlah | rupiah }}</span>
+<div class="section-label">Riwayat Terakhir</div>
+<div class="card mb-3" style="overflow:hidden">
+  {% for r in riwayat[:3] %}
+  <div class="px-3 py-2 d-flex justify-content-between align-items-center
+              {% if not loop.last %}border-bottom{% endif %}"
+       style="border-color:#f0f4f8!important">
+    <div>
+      <div style="font-size:.82rem;font-weight:600">
+        {% if r.jumlah and r.jumlah > 0 %}
+          <span class="text-success">✓ {{ r.jumlah|rupiah }}</span>
+        {% else %}
+          <span style="color:#d35400">⚠ Tidak ada</span>
+        {% endif %}
+      </div>
+      {% if r.keterangan %}
+      <div class="text-muted" style="font-size:.72rem">{{ r.keterangan }}</div>
+      {% endif %}
+    </div>
+    <div class="text-muted" style="font-size:.72rem">{{ r.bulan }}</div>
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- Form catat -->
-<div class="card p-3">
-  <div class="fw-semibold mb-3">Hasil Kunjungan</div>
+{# ── Tombol pilih aksi ─────────────────────────────────── #}
+<div class="section-label">Hasil Kunjungan</div>
 
-  <!-- Tombol pilih aksi -->
-  <div class="d-flex gap-2 mb-3" id="btnAksi">
-    <button type="button" class="btn btn-success flex-fill fw-semibold" onclick="pilihAksi('terkumpul')">
-      <i class="bi bi-check-circle"></i> Berhasil Dikoleksi
-    </button>
-    <button type="button" class="btn btn-outline-warning flex-fill fw-semibold" onclick="pilihAksi('tidak_ada')">
-      <i class="bi bi-x-circle"></i> Tidak Ada / Kosong
-    </button>
-  </div>
-
-  <!-- Form terkumpul -->
-  <form method="POST" action="/marketing/koleksi/{{ koleksi.id }}/catat" id="formTerkumpul" style="display:none">
-    <input type="hidden" name="aksi" value="terkumpul">
-    <div class="mb-3">
-      <label class="form-label fw-semibold">Nominal (Rp)</label>
-      <input type="number" name="jumlah" class="form-control form-control-lg text-center fw-bold"
-             placeholder="0" min="0" value="0" required>
-      <div class="form-text">Isi 0 jika kencleng kosong</div>
-    </div>
-    <div class="mb-3">
-      <label class="form-label fw-semibold">Keterangan</label>
-      <input type="text" name="keterangan" class="form-control" placeholder="Opsional">
-    </div>
-    <div class="d-flex gap-2">
-      <button type="button" class="btn btn-outline-secondary flex-fill" onclick="resetAksi()">Batal</button>
-      <button type="submit" class="btn btn-success flex-fill fw-semibold">
-        <i class="bi bi-check-lg"></i> Simpan
-      </button>
-    </div>
-  </form>
-
-  <!-- Form tidak ada -->
-  <form method="POST" action="/marketing/koleksi/{{ koleksi.id }}/catat" id="formTidakAda" style="display:none">
-    <input type="hidden" name="aksi" value="tidak_ada">
-    <div class="mb-3">
-      <label class="form-label fw-semibold">Keterangan</label>
-      <input type="text" name="keterangan" class="form-control" placeholder="cth: rumah kosong, terkunci, dsb.">
-    </div>
-    <div class="d-flex gap-2">
-      <button type="button" class="btn btn-outline-secondary flex-fill" onclick="resetAksi()">Batal</button>
-      <button type="submit" class="btn btn-warning flex-fill fw-semibold text-dark">
-        <i class="bi bi-clock"></i> Catat & Coba Lagi
-      </button>
-    </div>
-  </form>
+<div id="wrapBtn" class="d-flex gap-2 mb-3">
+  <button type="button" onclick="pilihAksi('terkumpul')" style="
+      flex:1;padding:.85rem .5rem;border-radius:12px;border:none;
+      background:#e8f8f0;color:#1e8449;font-weight:700;font-size:.88rem;cursor:pointer">
+    <i class="bi bi-check-circle d-block fs-4 mb-1"></i>
+    Berhasil
+  </button>
+  <button type="button" onclick="pilihAksi('tidak_ada')" style="
+      flex:1;padding:.85rem .5rem;border-radius:12px;border:none;
+      background:#fef3e2;color:#d35400;font-weight:700;font-size:.88rem;cursor:pointer">
+    <i class="bi bi-x-circle d-block fs-4 mb-1"></i>
+    Tidak Ada
+  </button>
 </div>
 
-<a href="/marketing/koleksi" class="btn btn-outline-secondary w-100 mt-3">
-  <i class="bi bi-arrow-left"></i> Kembali ke Daftar
-</a>
+{# ── Form terkumpul ────────────────────────────────────── #}
+<form id="formTerkumpul" method="POST"
+      action="/marketing/koleksi/{{ koleksi.id }}/catat" style="display:none">
+  <input type="hidden" name="aksi" value="terkumpul">
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold" style="font-size:.85rem">Jumlah (Rp)</label>
+    <div class="input-group">
+      <span class="input-group-text"
+            style="border-radius:10px 0 0 10px;background:#f0f4f8;
+                   border-color:#d0dde8;color:#64748b;font-weight:600">Rp</span>
+      <input type="number" name="jumlah" required
+             inputmode="numeric" pattern="[0-9]*"
+             placeholder="0" value="0"
+             style="border-radius:0 10px 10px 0;border-color:#d0dde8;
+                    font-size:1.2rem;font-weight:700;padding:.7rem .9rem"
+             class="form-control">
+    </div>
+    <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Isi 0 jika kencleng/kotak kosong</div>
+  </div>
+
+  <div class="mb-4">
+    <label class="form-label fw-semibold" style="font-size:.85rem">Keterangan <span class="text-muted fw-normal">(opsional)</span></label>
+    <input type="text" name="keterangan" placeholder="Opsional…"
+           style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+           class="form-control">
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="button" onclick="resetAksi()"
+            style="flex:1;padding:.7rem;border-radius:10px;border:1.5px solid #d0dde8;
+                   background:#fff;color:#64748b;font-weight:600;font-size:.88rem;cursor:pointer">
+      Batal
+    </button>
+    <button type="submit"
+            style="flex:2;padding:.7rem;border-radius:10px;border:none;
+                   background:#1e8449;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer">
+      <i class="bi bi-check2"></i> Simpan
+    </button>
+  </div>
+</form>
+
+{# ── Form tidak ada ────────────────────────────────────── #}
+<form id="formTidakAda" method="POST"
+      action="/marketing/koleksi/{{ koleksi.id }}/catat" style="display:none">
+  <input type="hidden" name="aksi" value="tidak_ada">
+
+  <div class="mb-4">
+    <label class="form-label fw-semibold" style="font-size:.85rem">Keterangan</label>
+    <input type="text" name="keterangan"
+           placeholder="cth: rumah kosong, terkunci, dsb."
+           style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+           class="form-control">
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="button" onclick="resetAksi()"
+            style="flex:1;padding:.7rem;border-radius:10px;border:1.5px solid #d0dde8;
+                   background:#fff;color:#64748b;font-weight:600;font-size:.88rem;cursor:pointer">
+      Batal
+    </button>
+    <button type="submit"
+            style="flex:2;padding:.7rem;border-radius:10px;border:none;
+                   background:#e67e22;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer">
+      <i class="bi bi-clock"></i> Catat & Coba Lagi
+    </button>
+  </div>
+</form>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 function pilihAksi(aksi) {
-  document.getElementById('btnAksi').style.display = 'none';
+  document.getElementById('wrapBtn').style.display = 'none';
   document.getElementById('formTerkumpul').style.display = aksi==='terkumpul' ? '' : 'none';
   document.getElementById('formTidakAda').style.display  = aksi==='tidak_ada'  ? '' : 'none';
 }
 function resetAksi() {
-  document.getElementById('btnAksi').style.display = '';
+  document.getElementById('wrapBtn').style.display = '';
   document.getElementById('formTerkumpul').style.display = 'none';
   document.getElementById('formTidakAda').style.display  = 'none';
 }

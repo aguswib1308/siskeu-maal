@@ -2,32 +2,58 @@
 {% block title %}Koleksi{% endblock %}
 
 {% block content %}
+
+{# ── Header + progress ─────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <div class="fw-bold fs-5">Koleksi Bulan Ini</div>
+  <div>
+    <div class="fw-bold" style="font-size:1.05rem">Koleksi Bulan Ini</div>
+    <div class="text-muted" style="font-size:.78rem">{{ bulan }}</div>
+  </div>
   {% if stats %}
-  <div class="text-end small text-muted">
-    <span class="badge bg-success">{{ stats.terkumpul }}</span>/{{ stats.total }} selesai
+  <div style="text-align:center">
+    <div style="font-size:1.3rem;font-weight:800;color:#1e8449">{{ stats.terkumpul }}</div>
+    <div style="font-size:.68rem;color:#94a3b8">dari {{ stats.total }}</div>
   </div>
   {% endif %}
 </div>
 
-<!-- Filter area -->
-<div class="d-flex gap-2 mb-3 flex-wrap">
+{% if stats and stats.total > 0 %}
+<div style="height:6px;background:#e9eef4;border-radius:99px;margin-bottom:1.1rem;overflow:hidden">
+  <div style="height:100%;width:{{ (stats.terkumpul / stats.total * 100)|int }}%;
+              background:linear-gradient(90deg,#27ae60,#1e8449);border-radius:99px;
+              transition:width .4s"></div>
+</div>
+{% endif %}
+
+{# ── Filter area chips ─────────────────────────────────── #}
+<div style="overflow-x:auto;white-space:nowrap;margin:0 -1rem .9rem;padding:0 1rem">
   <a href="/marketing/koleksi?bulan={{ bulan }}"
-     class="btn btn-sm {% if not area %}btn-primary{% else %}btn-outline-secondary{% endif %}">Semua</a>
+     class="d-inline-block me-2" style="
+       padding:.35rem .85rem;border-radius:99px;font-size:.8rem;font-weight:600;
+       text-decoration:none;border:1.5px solid;
+       {% if not area %}background:#1a5276;color:#fff;border-color:#1a5276
+       {% else %}background:#fff;color:#64748b;border-color:#d0dde8{% endif %}">
+    Semua
+  </a>
   {% for a in areas %}
   <a href="/marketing/koleksi?bulan={{ bulan }}&area={{ a.area }}"
-     class="btn btn-sm {% if area == a.area %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+     class="d-inline-block me-2" style="
+       padding:.35rem .85rem;border-radius:99px;font-size:.8rem;font-weight:600;
+       text-decoration:none;border:1.5px solid;
+       {% if area == a.area %}background:#1a5276;color:#fff;border-color:#1a5276
+       {% else %}background:#fff;color:#64748b;border-color:#d0dde8{% endif %}">
     {{ a.area }}
   </a>
   {% endfor %}
 </div>
 
 {% if not koleksi %}
-<div class="card p-4 text-center text-muted">
-  <i class="bi bi-check-circle fs-2 d-block mb-2 text-success"></i>
-  {% if area %}Area {{ area }} sudah selesai semua!
-  {% else %}Semua koleksi bulan ini sudah selesai!{% endif %}
+<div class="card p-4 text-center" style="margin-top:2rem">
+  <i class="bi bi-check-circle-fill fs-1 d-block mb-2" style="color:#27ae60;opacity:.6"></i>
+  <div class="fw-semibold text-muted">
+    {% if area %}Area {{ area }} sudah selesai!
+    {% else %}Semua koleksi sudah selesai!{% endif %}
+  </div>
 </div>
 {% else %}
 
@@ -36,45 +62,58 @@
   {% if k.area != ns.current_area %}
     {% if ns.current_area != '__unset__' %}</div>{% endif %}
     {% set ns.current_area = k.area %}
-    <div class="fw-semibold text-secondary small text-uppercase mb-2 mt-3">
+    <div class="section-label mt-3">
       <i class="bi bi-geo-alt"></i> {{ k.area or 'Tanpa Area' }}
     </div>
     <div>
   {% endif %}
 
-  <div class="card mb-2">
+  <div class="card mb-2" style="overflow:hidden">
     <div class="d-flex align-items-stretch">
-      <!-- Warna strip kiri -->
-      <div style="width:5px;border-radius:8px 0 0 8px;background:
-        {% if k.status=='tidak_ada' %}#e67e22{% else %}#3498db{% endif %}"></div>
-
+      {# strip warna kiri #}
+      <div style="width:4px;flex-shrink:0;background:
+        {% if k.status=='tidak_ada' %}#e67e22{% elif k.status=='terkumpul' %}#27ae60{% else %}#3498db{% endif %}">
+      </div>
       <div class="p-3 flex-grow-1">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="fw-semibold">{{ k.donatur_nama }}</div>
-            <div class="small text-muted">{{ k.lokasi_nama or '' }}</div>
-            <div class="d-flex gap-1 mt-1">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div style="min-width:0;flex:1">
+            <div class="fw-semibold text-truncate" style="font-size:.9rem">{{ k.donatur_nama }}</div>
+            {% if k.lokasi_nama and k.lokasi_nama != k.donatur_nama %}
+            <div class="text-muted text-truncate" style="font-size:.75rem">{{ k.lokasi_nama }}</div>
+            {% endif %}
+            <div class="d-flex gap-1 mt-1 flex-wrap">
               {% if k.sumber_infaq == 'kencleng' %}
-                <span class="badge" style="background:#27ae60;font-size:.65rem">🏠 Kencleng</span>
+              <span style="background:#e8f8f0;color:#1e8449;border-radius:6px;
+                           padding:2px 7px;font-size:.67rem;font-weight:600">🏠 Kencleng</span>
               {% else %}
-                <span class="badge" style="background:#2980b9;font-size:.65rem">🕌 Kotak Infaq</span>
+              <span style="background:#eaf4fb;color:#1a5276;border-radius:6px;
+                           padding:2px 7px;font-size:.67rem;font-weight:600">🕌 Kotak</span>
               {% endif %}
               {% if k.status == 'tidak_ada' %}
-                <span class="badge bg-warning text-dark" style="font-size:.65rem">
-                  ⚠ Tidak Ada ({{ k.jumlah_kunjungan }}x)
-                </span>
+              <span style="background:#fef3e2;color:#d35400;border-radius:6px;
+                           padding:2px 7px;font-size:.67rem;font-weight:600">
+                ⚠ {{ k.jumlah_kunjungan }}x
+              </span>
               {% endif %}
             </div>
           </div>
-          <div class="d-flex gap-1">
+          <div class="d-flex gap-1 flex-shrink-0">
             {% if k.lat and k.lng %}
             <a href="https://www.google.com/maps?q={{ k.lat }},{{ k.lng }}"
-               target="_blank" class="btn btn-sm btn-outline-secondary py-1 px-2">
+               target="_blank"
+               style="width:36px;height:36px;border-radius:9px;background:#f0f4f8;
+                      color:#64748b;display:flex;align-items:center;justify-content:center;
+                      text-decoration:none;font-size:1rem">
               <i class="bi bi-geo-alt"></i>
             </a>
             {% endif %}
             <a href="/marketing/koleksi/{{ k.id }}"
-               class="btn btn-sm btn-primary py-1 px-2">Catat</a>
+               style="height:36px;padding:0 .75rem;border-radius:9px;
+                      background:#1a5276;color:#fff;display:flex;align-items:center;
+                      text-decoration:none;font-size:.82rem;font-weight:600;
+                      white-space:nowrap">
+              Catat
+            </a>
           </div>
         </div>
       </div>
@@ -83,4 +122,5 @@
 {% endfor %}
 </div>
 {% endif %}
+
 {% endblock %}

@@ -1,52 +1,83 @@
 {% extends 'marketing/base.html' %}
 {% block title %}Beranda{% endblock %}
 
-{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2980b9','amil':'#8e44ad','wakaf':'#e67e22'} %}
+{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2e86c1','amil':'#8e44ad','wakaf':'#e67e22'} %}
 
 {% block content %}
-<div class="card p-3 mb-3" style="background:linear-gradient(135deg,#1a5276,#2980b9);color:#fff">
-  <div class="small opacity-75">Total Koleksi Bulan Ini</div>
-  <div class="fs-3 fw-bold">{{ total_masuk_bulan|rupiah }}</div>
-  <div class="small opacity-75 mt-1"><i class="bi bi-calendar3"></i> {{ hari_ini }}</div>
+
+{# ── Hero card ─────────────────────────────────────────── #}
+<div class="mb-3" style="
+  background: linear-gradient(135deg,#1a5276,#2e86c1);
+  border-radius:18px; color:#fff; padding:1.25rem 1.25rem 1rem;
+  box-shadow:0 4px 16px rgba(26,82,118,.3)">
+  <div style="font-size:.75rem;opacity:.8;margin-bottom:.2rem">
+    <i class="bi bi-calendar3"></i> {{ hari_ini }}
+  </div>
+  <div style="font-size:.8rem;opacity:.75;margin-bottom:.15rem">Total Koleksi Bulan Ini</div>
+  <div style="font-size:1.9rem;font-weight:800;letter-spacing:-.02em">
+    {{ total_masuk_bulan|rupiah }}
+  </div>
 </div>
 
-<div class="d-flex gap-2 mb-3">
-  <a href="/marketing/catat" class="btn btn-success flex-fill fw-semibold">
-    <i class="bi bi-plus-lg"></i> Catat
+{# ── Quick actions ─────────────────────────────────────── #}
+<div class="d-flex gap-2 mb-4">
+  <a href="/marketing/catat"
+     style="flex:1;background:#1e8449;color:#fff;border-radius:12px;
+            padding:.75rem;text-align:center;text-decoration:none;font-weight:600">
+    <i class="bi bi-plus-circle d-block fs-4 mb-1"></i>
+    <span style="font-size:.8rem">Catat</span>
   </a>
-  <a href="/marketing/riwayat" class="btn btn-outline-primary flex-fill fw-semibold">
-    <i class="bi bi-clock-history"></i> Riwayat
+  <a href="/marketing/koleksi"
+     style="flex:1;background:#fff;color:#1a5276;border:1.5px solid #d0dde8;
+            border-radius:12px;padding:.75rem;text-align:center;
+            text-decoration:none;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+    <i class="bi bi-basket d-block fs-4 mb-1"></i>
+    <span style="font-size:.8rem">Koleksi</span>
+  </a>
+  <a href="/marketing/peta"
+     style="flex:1;background:#fff;color:#1a5276;border:1.5px solid #d0dde8;
+            border-radius:12px;padding:.75rem;text-align:center;
+            text-decoration:none;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+    <i class="bi bi-map d-block fs-4 mb-1"></i>
+    <span style="font-size:.8rem">Peta</span>
   </a>
 </div>
 
-<div class="fw-semibold mb-2 text-secondary small text-uppercase">Transaksi Hari Ini</div>
+{# ── Transaksi hari ini ────────────────────────────────── #}
+<div class="section-label">Transaksi Hari Ini</div>
 
 {% for t in transaksi_hari %}
-<div class="card p-3 mb-2">
-  <div class="d-flex justify-content-between align-items-start">
-    <div>
+<div class="card mb-2 px-3 py-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div style="flex:1;min-width:0">
       <div class="d-flex gap-1 mb-1 flex-wrap">
-        <span class="badge {% if t.jenis=='masuk' %}badge-masuk{% else %}badge-keluar{% endif %}">
-          {{ t.jenis }}
+        <span class="badge rounded-pill badge-{{ t.jenis }}" style="font-size:.65rem">
+          {{ 'Masuk' if t.jenis=='masuk' else 'Keluar' }}
         </span>
         {% if t.jenis_dana %}
-        <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }};font-size:.65rem">
+        <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }};color:#fff;font-size:.65rem">
           {{ LABEL_DANA.get(t.jenis_dana,'') }}
         </span>
         {% endif %}
       </div>
-      <div class="fw-semibold">{{ t.coa_nama or '—' }}</div>
-      <div class="small text-muted">{{ t.donatur_nama or t.keterangan or '' }}</div>
+      <div class="fw-semibold text-truncate" style="font-size:.9rem">{{ t.coa_nama or '—' }}</div>
+      {% if t.donatur_nama or t.keterangan %}
+      <div class="text-muted text-truncate" style="font-size:.78rem">
+        {{ t.donatur_nama or t.keterangan }}
+      </div>
+      {% endif %}
     </div>
-    <div class="fw-bold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %} text-end">
-      {% if t.jenis=='keluar' %}-{% endif %}{{ t.jumlah|rupiah }}
+    <div class="fw-bold ms-2 text-end {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %}"
+         style="font-size:.95rem;white-space:nowrap">
+      {% if t.jenis=='keluar' %}−{% endif %}{{ t.jumlah|rupiah }}
     </div>
   </div>
 </div>
 {% else %}
 <div class="card p-4 text-center text-muted">
-  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-  Belum ada transaksi hari ini
+  <i class="bi bi-moon-stars fs-1 d-block mb-2 text-secondary" style="opacity:.3"></i>
+  <div style="font-size:.9rem">Belum ada transaksi hari ini</div>
 </div>
 {% endfor %}
+
 {% endblock %}
