@@ -1,9 +1,10 @@
 __pycache__/
 *.pyc
 *.pyo
-data/keuangan.db
-data/*.db
+data/
 .env
 *.backup
 venv/
 .venv/
+donatur_list.tsv
+donatur_map.kml

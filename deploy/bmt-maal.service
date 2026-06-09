@@ -1,0 +1,21 @@
+[Unit]
+Description=BMT Keuangan Maal Flask App
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/bmt-maal
+Environment="SECRET_KEY=MaalBmt@2026!"
+ExecStart=/var/www/bmt-maal/venv/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:5001 \
+    --timeout 60 \
+    --access-logfile /var/log/bmt-maal/access.log \
+    --error-logfile /var/log/bmt-maal/error.log \
+    app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
