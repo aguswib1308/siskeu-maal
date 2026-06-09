@@ -1,0 +1,157 @@
+{% extends 'admin/base.html' %}
+{% block title %}Transaksi{% endblock %}
+{% block page_title %}<i class="bi bi-arrow-left-right"></i> Transaksi{% endblock %}
+
+{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2980b9','amil':'#8e44ad','wakaf':'#e67e22'} %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2 flex-wrap">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:160px">
+      <select name="jenis" class="form-select form-select-sm" style="width:140px">
+        <option value="">Semua Jenis</option>
+        <option value="masuk" {% if jenis=='masuk' %}selected{% endif %}>Penerimaan</option>
+        <option value="keluar" {% if jenis=='keluar' %}selected{% endif %}>Penyaluran</option>
+      </select>
+      <select name="jenis_dana" class="form-select form-select-sm" style="width:160px">
+        <option value="">Semua Dana</option>
+        {% for kode, label in [('zakat','Zakat'),('infak_sedekah','Infak/Sedekah'),('amil','Amil'),('wakaf','Wakaf')] %}
+        <option value="{{ kode }}" {% if jenis_dana==kode %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm btn-primary">Filter</button>
+    </form>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
+      <i class="bi bi-plus-lg"></i> Tambah Transaksi
+    </button>
+  </div>
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Tanggal</th><th>Jenis</th><th>Dana</th><th>Akun (CoA)</th><th>Donatur / Penerima</th><th>Keterangan</th><th>Petugas</th><th class="text-end">Jumlah</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for t in transaksi %}
+        <tr>
+          <td class="small text-muted">{{ t.tanggal }}</td>
+          <td><span class="badge {% if t.jenis=='masuk' %}badge-masuk{% else %}badge-keluar{% endif %}">{{ t.jenis }}</span></td>
+          <td>
+            {% if t.jenis_dana %}
+            <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }}; font-size:.65rem">
+              {{ LABEL_DANA.get(t.jenis_dana,'') }}
+            </span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if t.coa_kode %}<code class="me-1" style="font-size:.75rem">{{ t.coa_kode }}</code>{% endif %}
+            {{ t.coa_nama or '—' }}
+          </td>
+          <td class="small">{{ t.donatur_nama or t.penerima_nama or '—' }}</td>
+          <td class="small text-muted">{{ t.keterangan or '—' }}</td>
+          <td class="small">{{ t.petugas }}</td>
+          <td class="text-end fw-semibold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %}">
+            {% if t.jenis=='keluar' %}-{% endif %}{{ t.jumlah|rupiah }}
+          </td>
+          <td>
+            <form method="POST" action="/admin/transaksi/hapus/{{ t.id }}"
+                  onsubmit="return confirm('Hapus transaksi ini?')">
+              <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">Belum ada transaksi</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalTambah" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="/admin/transaksi/tambah">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Tambah Transaksi</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jenis</label>
+          <select name="jenis" class="form-select" required id="selJenis" onchange="filterCoa()">
+            <option value="masuk">Penerimaan</option>
+            <option value="keluar">Penyaluran / Beban</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Tanggal</label>
+          <input type="date" name="tanggal" class="form-control" required value="{{ bulan }}-01">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Akun (Chart of Accounts)</label>
+          <select name="coa_id" class="form-select" required id="selCoa">
+            <option value="">— Pilih Akun —</option>
+            {% for c in coa_list %}
+            <option value="{{ c.id }}" data-jenis="{{ c.jenis_transaksi }}" data-dana="{{ c.jenis_dana }}">
+              [{{ c.kode }}] {{ c.nama }}
+              {% if c.jenis_dana %}({{ LABEL_DANA.get(c.jenis_dana,'') }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Donatur <span class="text-muted fw-normal">(untuk penerimaan)</span></label>
+          <select name="donatur_id" class="form-select">
+            <option value="">— Pilih atau kosongkan —</option>
+            {% for d in donatur_list %}
+            <option value="{{ d.id }}">{{ d.nama }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Penerima Manfaat <span class="text-muted fw-normal">(untuk penyaluran)</span></label>
+          <select name="penerima_id" class="form-select">
+            <option value="">— Pilih atau kosongkan —</option>
+            {% for p in penerima_list %}
+            <option value="{{ p.id }}">{{ p.nama }}
+              {% if p.asnaf %}({{ LABEL_ASNAF.get(p.asnaf,'') }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jumlah (Rp)</label>
+          <input type="text" name="jumlah" class="form-control" placeholder="contoh: 500000" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Keterangan</label>
+          <input type="text" name="keterangan" class="form-control" placeholder="Opsional">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterCoa() {
+  const jenis = document.getElementById('selJenis').value;
+  const opts = document.querySelectorAll('#selCoa option[data-jenis]');
+  opts.forEach(o => { o.style.display = (o.dataset.jenis === jenis) ? '' : 'none'; });
+  const first = [...opts].find(o => o.dataset.jenis === jenis);
+  document.getElementById('selCoa').value = first ? first.value : '';
+}
+filterCoa();
+</script>
+{% endblock %}

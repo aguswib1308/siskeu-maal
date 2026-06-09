@@ -1,0 +1,132 @@
+{% extends 'admin/base.html' %}
+{% block title %}Master Pengguna{% endblock %}
+{% block page_title %}<i class="bi bi-person-gear"></i> Master Pengguna{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col-auto ms-auto">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
+      <i class="bi bi-plus-lg"></i> Tambah Pengguna
+    </button>
+  </div>
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Nama</th><th>Username</th><th>No HP</th><th>Role</th><th>Status</th><th>Aksi</th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="text-muted small">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ u.nama }}</td>
+          <td class="small text-muted">{{ u.username }}</td>
+          <td class="small">{{ u.no_hp or '—' }}</td>
+          <td>
+            <span class="badge {% if u.role=='admin' %}bg-primary{% else %}bg-secondary{% endif %}">{{ u.role }}</span>
+          </td>
+          <td>
+            <span class="badge {% if u.aktif %}bg-success{% else %}bg-danger{% endif %}">
+              {% if u.aktif %}Aktif{% else %}Nonaktif{% endif %}
+            </span>
+          </td>
+          <td class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-primary py-0"
+              data-bs-toggle="modal" data-bs-target="#modalEdit{{ u.id }}">Edit</button>
+            {% if u.username != session.username %}
+            <form method="POST" action="/admin/master/users/toggle/{{ u.id }}" class="d-inline">
+              <button class="btn btn-sm btn-outline-{% if u.aktif %}warning{% else %}success{% endif %} py-0">
+                {% if u.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalTambah" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="/admin/master/users/tambah">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Tambah Pengguna</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-12">
+          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <input type="text" name="nama" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Username</label>
+          <input type="text" name="username" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Password</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No HP</label>
+          <input type="text" name="no_hp" class="form-control" placeholder="628xxx">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Role</label>
+          <select name="role" class="form-select">
+            <option value="marketing">Marketing</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Modal Edit per user -->
+{% for u in users %}
+<div class="modal fade" id="modalEdit{{ u.id }}" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="/admin/master/users/edit/{{ u.id }}">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Edit: {{ u.nama }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-12">
+          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <input type="text" name="nama" class="form-control" value="{{ u.nama }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No HP</label>
+          <input type="text" name="no_hp" class="form-control" value="{{ u.no_hp or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Role</label>
+          <select name="role" class="form-select">
+            <option value="marketing" {% if u.role=='marketing' %}selected{% endif %}>Marketing</option>
+            <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Password Baru <span class="text-muted fw-normal">(kosongkan jika tidak diganti)</span></label>
+          <input type="password" name="password" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Riwayat{% endblock %}
+
+{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2980b9','amil':'#8e44ad','wakaf':'#e67e22'} %}
+
+{% block content %}
+<div class="fw-bold fs-5 mb-3">Riwayat Transaksi</div>
+
+<form class="d-flex gap-2 mb-3">
+  <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm">
+  <button class="btn btn-sm btn-primary px-3">Cari</button>
+</form>
+
+{% if transaksi %}
+<div class="card p-3 mb-3" style="background:#eaf4fb">
+  <div class="small text-muted">Total Penerimaan Bulan Ini</div>
+  <div class="fw-bold text-success fs-5">{{ total|rupiah }}</div>
+</div>
+{% endif %}
+
+{% for t in transaksi %}
+<div class="card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="d-flex gap-1 mb-1 flex-wrap">
+        <span class="badge {% if t.jenis=='masuk' %}badge-masuk{% else %}badge-keluar{% endif %}">
+          {{ t.jenis }}
+        </span>
+        {% if t.jenis_dana %}
+        <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }};font-size:.65rem">
+          {{ LABEL_DANA.get(t.jenis_dana,'') }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="fw-semibold">{{ t.coa_nama or '—' }}</div>
+      <div class="small text-muted">{{ t.donatur_nama or t.keterangan or '' }}</div>
+      <div class="small text-muted"><i class="bi bi-calendar3"></i> {{ t.tanggal }}</div>
+    </div>
+    <div class="fw-bold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %} text-end">
+      {% if t.jenis=='keluar' %}-{% endif %}{{ t.jumlah|rupiah }}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card p-4 text-center text-muted">
+  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+  Belum ada transaksi bulan ini
+</div>
+{% endfor %}
+{% endblock %}

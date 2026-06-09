@@ -1,0 +1,147 @@
+{% extends 'admin/base.html' %}
+{% block title %}Chart of Accounts{% endblock %}
+{% block page_title %}<i class="bi bi-diagram-3"></i> Chart of Accounts{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <small class="text-muted">Struktur akun berdasarkan <strong>PSAK 109</strong> (Zakat/Infak/Sedekah) & <strong>PSAK 112</strong> (Wakaf)</small>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
+      <i class="bi bi-plus-lg"></i> Tambah Akun
+    </button>
+  </div>
+</div>
+
+{% set kelompok_list = [
+  ('aset','Aset','bg-info'),
+  ('liabilitas','Liabilitas','bg-warning'),
+  ('dana','Saldo Dana','bg-primary'),
+  ('penerimaan','Penerimaan','bg-success'),
+  ('penyaluran_beban','Penyaluran & Beban','bg-danger')
+] %}
+{% set dana_warna = {'zakat':'#2ecc71','infak_sedekah':'#3498db','amil':'#9b59b6','wakaf':'#e67e22','umum':'#95a5a6'} %}
+
+{% for kode_kelompok, label_kelompok, badge_class in kelompok_list %}
+{% set akun_kelompok = coa | selectattr('kelompok','equalto',kode_kelompok) | list %}
+{% if akun_kelompok %}
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center gap-2 py-2">
+    <span class="badge {{ badge_class }}">{{ label_kelompok }}</span>
+    <small class="text-muted">{{ akun_kelompok | length }} akun</small>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th style="width:130px">Kode</th><th>Nama Akun</th><th>Jenis Dana</th><th>Transaksi</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in akun_kelompok | sort(attribute='kode') %}
+        {% set level = a.kode.split('.') | length %}
+        <tr class="{% if not a.aktif %}table-secondary text-muted{% endif %}">
+          <td>
+            <code style="font-size:.8rem">{{ a.kode }}</code>
+          </td>
+          <td style="padding-left: {{ (level - 1) * 20 }}px">
+            {% if level == 1 %}<strong>{{ a.nama }}</strong>
+            {% elif level == 2 %}<span class="text-secondary">{{ a.nama }}</span>
+            {% else %}{{ a.nama }}
+            {% endif %}
+          </td>
+          <td>
+            {% if a.jenis_dana %}
+            <span class="badge" style="background:{{ dana_warna.get(a.jenis_dana,'#aaa') }}">
+              {{ LABEL_DANA.get(a.jenis_dana, a.jenis_dana) }}
+            </span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            {% if a.jenis_transaksi == 'masuk' %}
+              <span class="badge badge-masuk">Penerimaan</span>
+            {% elif a.jenis_transaksi == 'keluar' %}
+              <span class="badge badge-keluar">Penyaluran</span>
+            {% else %}
+              <span class="text-muted small">Induk</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge {% if a.aktif %}bg-success{% else %}bg-secondary{% endif %}">
+              {% if a.aktif %}Aktif{% else %}Nonaktif{% endif %}
+            </span>
+          </td>
+          <td>
+            <form method="POST" action="/admin/master/coa/toggle/{{ a.id }}" class="d-inline">
+              <button class="btn btn-sm btn-link py-0 text-{% if a.aktif %}warning{% else %}success{% endif %}">
+                {% if a.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalTambah" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="/admin/master/coa/tambah">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Tambah Akun</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Kode Akun</label>
+          <input type="text" name="kode" class="form-control" placeholder="cth: 4.1.6" required>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label fw-semibold">Nama Akun</label>
+          <input type="text" name="nama" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Kelompok</label>
+          <select name="kelompok" class="form-select" required>
+            <option value="aset">Aset</option>
+            <option value="liabilitas">Liabilitas</option>
+            <option value="dana">Saldo Dana</option>
+            <option value="penerimaan">Penerimaan</option>
+            <option value="penyaluran_beban">Penyaluran & Beban</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jenis Dana</label>
+          <select name="jenis_dana" class="form-select">
+            <option value="">— Pilih —</option>
+            <option value="zakat">Zakat</option>
+            <option value="infak_sedekah">Infak/Sedekah</option>
+            <option value="amil">Amil</option>
+            <option value="wakaf">Wakaf</option>
+            <option value="umum">Umum</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Kode Induk</label>
+          <input type="text" name="parent_kode" class="form-control" placeholder="cth: 4.1">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jenis Transaksi</label>
+          <select name="jenis_transaksi" class="form-select">
+            <option value="">Akun Induk (tidak bisa dipakai transaksi)</option>
+            <option value="masuk">Penerimaan (masuk)</option>
+            <option value="keluar">Penyaluran/Beban (keluar)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endblock %}

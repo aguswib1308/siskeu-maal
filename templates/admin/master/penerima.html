@@ -1,0 +1,201 @@
+{% extends 'admin/base.html' %}
+{% block title %}Master Penerima Manfaat{% endblock %}
+{% block page_title %}<i class="bi bi-heart"></i> Master Penerima Manfaat{% endblock %}
+
+{% set asnaf_list = [
+  ('fakir','Fakir','#e74c3c'),
+  ('miskin','Miskin','#e67e22'),
+  ('amil','Amil','#9b59b6'),
+  ('muallaf','Muallaf','#3498db'),
+  ('riqab','Riqab','#1abc9c'),
+  ('gharim','Gharim','#f39c12'),
+  ('fisabilillah','Fisabilillah','#27ae60'),
+  ('ibnu_sabil','Ibnu Sabil','#7f8c8d')
+] %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2 flex-wrap">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+             placeholder="Cari nama / NIK / HP..." style="width:220px">
+      <select name="asnaf" class="form-select form-select-sm" style="width:170px">
+        <option value="">Semua Asnaf</option>
+        {% for kode, label, warna in asnaf_list %}
+        <option value="{{ kode }}" {% if asnaf == kode %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm btn-primary">Cari</button>
+      {% if q or asnaf %}
+      <a href="/admin/master/penerima" class="btn btn-sm btn-outline-secondary">Reset</a>
+      {% endif %}
+    </form>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
+      <i class="bi bi-plus-lg"></i> Tambah Penerima
+    </button>
+  </div>
+</div>
+
+<!-- Ringkasan per Asnaf -->
+<div class="row g-2 mb-3">
+  {% for kode, label, warna in asnaf_list %}
+  {% set jml = penerima | selectattr('asnaf','equalto',kode) | selectattr('aktif','equalto',1) | list | length %}
+  {% if jml > 0 %}
+  <div class="col-auto">
+    <span class="badge rounded-pill px-3 py-2" style="background:{{ warna }}; font-size:.8rem">
+      {{ label }}: {{ jml }}
+    </span>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Nama</th><th>NIK</th><th>No HP</th><th>Alamat</th><th>Asnaf</th><th>Keterangan</th><th>Status</th><th>Aksi</th></tr>
+      </thead>
+      <tbody>
+        {% for p in penerima %}
+        <tr class="{% if not p.aktif %}table-secondary text-muted{% endif %}">
+          <td class="small">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ p.nama }}</td>
+          <td class="small font-monospace">{{ p.nik or '—' }}</td>
+          <td class="small">{{ p.no_hp or '—' }}</td>
+          <td class="small">{{ p.alamat or '—' }}</td>
+          <td>
+            {% if p.asnaf %}
+            {% set warna_asnaf = dict(asnaf_list).get(p.asnaf, '#aaa') if false else '' %}
+            {% for kode, label, warna in asnaf_list if kode == p.asnaf %}
+            <span class="badge" style="background:{{ warna }}">{{ label }}</span>
+            {% endfor %}
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ p.keterangan or '—' }}</td>
+          <td>
+            <span class="badge {% if p.aktif %}bg-success{% else %}bg-secondary{% endif %}">
+              {% if p.aktif %}Aktif{% else %}Nonaktif{% endif %}
+            </span>
+          </td>
+          <td class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-primary py-0"
+              data-bs-toggle="modal" data-bs-target="#modalEdit{{ p.id }}">Edit</button>
+            <form method="POST" action="/admin/master/penerima/toggle/{{ p.id }}" class="d-inline">
+              <button class="btn btn-sm btn-outline-{% if p.aktif %}warning{% else %}success{% endif %} py-0">
+                {% if p.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">
+          {% if q or asnaf %}Tidak ada hasil pencarian{% else %}Belum ada data penerima manfaat{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="text-muted small mt-2">Total: {{ penerima | length }} penerima manfaat</div>
+</div>
+
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalTambah" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="/admin/master/penerima/tambah">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Tambah Penerima Manfaat</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <input type="text" name="nama" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">NIK</label>
+          <input type="text" name="nik" class="form-control" placeholder="16 digit" maxlength="16">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No HP</label>
+          <input type="text" name="no_hp" class="form-control" placeholder="628xxx">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Kategori Asnaf</label>
+          <select name="asnaf" class="form-select" required>
+            <option value="">— Pilih Asnaf —</option>
+            {% for kode, label, warna in asnaf_list %}
+            <option value="{{ kode }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Alamat</label>
+          <textarea name="alamat" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Keterangan</label>
+          <input type="text" name="keterangan" class="form-control" placeholder="Kondisi, kebutuhan, dsb.">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Modal Edit per penerima -->
+{% for p in penerima %}
+<div class="modal fade" id="modalEdit{{ p.id }}" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="/admin/master/penerima/edit/{{ p.id }}">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Edit: {{ p.nama }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <input type="text" name="nama" class="form-control" value="{{ p.nama }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">NIK</label>
+          <input type="text" name="nik" class="form-control" value="{{ p.nik or '' }}" maxlength="16">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No HP</label>
+          <input type="text" name="no_hp" class="form-control" value="{{ p.no_hp or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Kategori Asnaf</label>
+          <select name="asnaf" class="form-select">
+            <option value="">— Pilih Asnaf —</option>
+            {% for kode, label, warna in asnaf_list %}
+            <option value="{{ kode }}" {% if p.asnaf == kode %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Alamat</label>
+          <textarea name="alamat" class="form-control" rows="2">{{ p.alamat or '' }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Keterangan</label>
+          <input type="text" name="keterangan" class="form-control" value="{{ p.keterangan or '' }}">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+{% endblock %}

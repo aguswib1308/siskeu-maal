@@ -1,0 +1,89 @@
+{% extends 'admin/base.html' %}
+{% block title %}Laporan{% endblock %}
+{% block page_title %}<i class="bi bi-file-earmark-bar-graph"></i> Laporan{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:180px">
+      <button class="btn btn-sm btn-primary">Tampilkan</button>
+    </form>
+  </div>
+  <div class="col-auto">
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak
+    </button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card stat-card masuk p-3">
+      <div class="text-muted small">Total Pemasukan</div>
+      <div class="fs-4 fw-bold text-success">{{ total_masuk|rupiah }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card keluar p-3">
+      <div class="text-muted small">Total Pengeluaran</div>
+      <div class="fs-4 fw-bold text-danger">{{ total_keluar|rupiah }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card saldo p-3">
+      <div class="text-muted small">Selisih Bulan Ini</div>
+      <div class="fs-4 fw-bold {% if total_masuk >= total_keluar %}text-success{% else %}text-danger{% endif %}">
+        {{ (total_masuk - total_keluar)|rupiah }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="fw-semibold mb-3 text-success"><i class="bi bi-arrow-down-circle"></i> Pemasukan</div>
+      <table class="table table-sm">
+        <thead class="table-light"><tr><th>Kategori</th><th class="text-end">Jumlah Transaksi</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+          {% for r in rekap if r.jenis == 'masuk' %}
+          <tr>
+            <td>{{ r.nama }}</td>
+            <td class="text-end text-muted small">{{ r.jumlah_transaksi }}x</td>
+            <td class="text-end fw-semibold text-success">{{ r.total|rupiah }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-muted text-center">Tidak ada data</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-bold">
+          <tr><td>TOTAL</td><td></td><td class="text-end text-success">{{ total_masuk|rupiah }}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="fw-semibold mb-3 text-danger"><i class="bi bi-arrow-up-circle"></i> Pengeluaran</div>
+      <table class="table table-sm">
+        <thead class="table-light"><tr><th>Kategori</th><th class="text-end">Jumlah Transaksi</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+          {% for r in rekap if r.jenis == 'keluar' %}
+          <tr>
+            <td>{{ r.nama }}</td>
+            <td class="text-end text-muted small">{{ r.jumlah_transaksi }}x</td>
+            <td class="text-end fw-semibold text-danger">{{ r.total|rupiah }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-muted text-center">Tidak ada data</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-bold">
+          <tr><td>TOTAL</td><td></td><td class="text-end text-danger">{{ total_keluar|rupiah }}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

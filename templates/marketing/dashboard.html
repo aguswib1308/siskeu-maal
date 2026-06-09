@@ -1,0 +1,52 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Beranda{% endblock %}
+
+{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2980b9','amil':'#8e44ad','wakaf':'#e67e22'} %}
+
+{% block content %}
+<div class="card p-3 mb-3" style="background:linear-gradient(135deg,#1a5276,#2980b9);color:#fff">
+  <div class="small opacity-75">Total Koleksi Bulan Ini</div>
+  <div class="fs-3 fw-bold">{{ total_masuk_bulan|rupiah }}</div>
+  <div class="small opacity-75 mt-1"><i class="bi bi-calendar3"></i> {{ hari_ini }}</div>
+</div>
+
+<div class="d-flex gap-2 mb-3">
+  <a href="/marketing/catat" class="btn btn-success flex-fill fw-semibold">
+    <i class="bi bi-plus-lg"></i> Catat
+  </a>
+  <a href="/marketing/riwayat" class="btn btn-outline-primary flex-fill fw-semibold">
+    <i class="bi bi-clock-history"></i> Riwayat
+  </a>
+</div>
+
+<div class="fw-semibold mb-2 text-secondary small text-uppercase">Transaksi Hari Ini</div>
+
+{% for t in transaksi_hari %}
+<div class="card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="d-flex gap-1 mb-1 flex-wrap">
+        <span class="badge {% if t.jenis=='masuk' %}badge-masuk{% else %}badge-keluar{% endif %}">
+          {{ t.jenis }}
+        </span>
+        {% if t.jenis_dana %}
+        <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }};font-size:.65rem">
+          {{ LABEL_DANA.get(t.jenis_dana,'') }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="fw-semibold">{{ t.coa_nama or '—' }}</div>
+      <div class="small text-muted">{{ t.donatur_nama or t.keterangan or '' }}</div>
+    </div>
+    <div class="fw-bold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %} text-end">
+      {% if t.jenis=='keluar' %}-{% endif %}{{ t.jumlah|rupiah }}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card p-4 text-center text-muted">
+  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+  Belum ada transaksi hari ini
+</div>
+{% endfor %}
+{% endblock %}

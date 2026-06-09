@@ -1,0 +1,100 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Catat Transaksi{% endblock %}
+
+{% block content %}
+<div class="fw-bold mb-3 fs-5">Catat Transaksi</div>
+
+<div class="card p-3">
+  <form method="POST" action="/marketing/catat">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Jenis</label>
+      <div class="d-flex gap-2">
+        <div class="form-check flex-fill border rounded p-2 text-center">
+          <input class="form-check-input" type="radio" name="jenis" value="masuk" id="jenisMasuk"
+                 checked onchange="filterCoa()">
+          <label class="form-check-label fw-semibold text-success w-100" for="jenisMasuk">
+            <i class="bi bi-arrow-down-circle"></i> Penerimaan
+          </label>
+        </div>
+        <div class="form-check flex-fill border rounded p-2 text-center">
+          <input class="form-check-input" type="radio" name="jenis" value="keluar" id="jenisKeluar"
+                 onchange="filterCoa()">
+          <label class="form-check-label fw-semibold text-danger w-100" for="jenisKeluar">
+            <i class="bi bi-arrow-up-circle"></i> Penyaluran
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Tanggal</label>
+      <input type="date" name="tanggal" class="form-control" required value="{{ hari_ini }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Akun</label>
+      <select name="coa_id" class="form-select" required id="selCoa">
+        <option value="">— Pilih Akun —</option>
+        {% for c in coa_list %}
+        <option value="{{ c.id }}" data-jenis="{{ c.jenis_transaksi }}">
+          {{ c.nama }}
+          {% if c.jenis_dana %}· {{ LABEL_DANA.get(c.jenis_dana,'') }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3" id="wrapDonatur">
+      <label class="form-label fw-semibold">Donatur</label>
+      <select name="donatur_id" class="form-select">
+        <option value="">— Pilih atau kosongkan —</option>
+        {% for d in donatur_list %}
+        <option value="{{ d.id }}">{{ d.nama }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3" id="wrapPenerima" style="display:none">
+      <label class="form-label fw-semibold">Penerima Manfaat</label>
+      <select name="penerima_id" class="form-select">
+        <option value="">— Pilih atau kosongkan —</option>
+        {% for p in penerima_list %}
+        <option value="{{ p.id }}">{{ p.nama }}
+          {% if p.asnaf %}({{ LABEL_ASNAF.get(p.asnaf,'') }}){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Jumlah (Rp)</label>
+      <input type="number" name="jumlah" class="form-control form-control-lg"
+             placeholder="0" required min="1">
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label fw-semibold">Keterangan</label>
+      <input type="text" name="keterangan" class="form-control" placeholder="Opsional">
+    </div>
+
+    <button type="submit" class="btn btn-success w-100 fw-semibold btn-lg">
+      <i class="bi bi-check-lg"></i> Simpan Transaksi
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterCoa() {
+  const jenis = document.querySelector('input[name="jenis"]:checked').value;
+  const opts = document.querySelectorAll('#selCoa option[data-jenis]');
+  opts.forEach(o => { o.style.display = (o.dataset.jenis === jenis) ? '' : 'none'; });
+  const first = [...opts].find(o => o.dataset.jenis === jenis);
+  document.getElementById('selCoa').value = first ? first.value : '';
+  document.getElementById('wrapDonatur').style.display  = jenis === 'masuk'  ? '' : 'none';
+  document.getElementById('wrapPenerima').style.display = jenis === 'keluar' ? '' : 'none';
+}
+filterCoa();
+</script>
+{% endblock %}

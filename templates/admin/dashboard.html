@@ -1,0 +1,135 @@
+{% extends 'admin/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}<i class="bi bi-speedometer2"></i> Dashboard{% endblock %}
+
+{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2980b9','amil':'#8e44ad','wakaf':'#e67e22'} %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:180px">
+      <button class="btn btn-sm btn-primary">Tampilkan</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card stat-card masuk p-3">
+      <div class="text-muted small">Total Penerimaan</div>
+      <div class="fs-4 fw-bold text-success">{{ total_masuk|rupiah }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card keluar p-3">
+      <div class="text-muted small">Total Penyaluran</div>
+      <div class="fs-4 fw-bold text-danger">{{ total_keluar|rupiah }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card saldo p-3">
+      <div class="text-muted small">Saldo Kas</div>
+      <div class="fs-4 fw-bold text-primary">{{ saldo|rupiah }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  {% for dana, info in [('zakat','Zakat'),('infak_sedekah','Infak/Sedekah'),('amil','Amil'),('wakaf','Wakaf')] %}
+  {% set masuk = namespace(v=0) %}{% set keluar = namespace(v=0) %}
+  {% for r in rekap_dana %}
+    {% if r.jenis_dana == dana %}
+      {% if r.jenis == 'masuk' %}{% set masuk.v = r.total %}{% endif %}
+      {% if r.jenis == 'keluar' %}{% set keluar.v = r.total %}{% endif %}
+    {% endif %}
+  {% endfor %}
+  <div class="col-md-3">
+    <div class="card p-3" style="border-left:4px solid {{ dana_warna[dana] }}">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="fw-semibold small">Dana {{ info }}</span>
+        <span class="badge rounded-pill" style="background:{{ dana_warna[dana] }}; font-size:.65rem">
+          {{ LABEL_DANA[dana] }}
+        </span>
+      </div>
+      <div class="small text-success">▲ {{ masuk.v|rupiah }}</div>
+      <div class="small text-danger">▼ {{ keluar.v|rupiah }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-md-8">
+    <div class="card p-3">
+      <div class="fw-semibold mb-3">Transaksi Terakhir</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light"><tr>
+            <th>Tanggal</th><th>Akun</th><th>Dana</th><th>Keterangan</th><th class="text-end">Jumlah</th>
+          </tr></thead>
+          <tbody>
+            {% for t in transaksi_terakhir %}
+            <tr>
+              <td class="text-muted small">{{ t.tanggal }}</td>
+              <td class="small">
+                <span class="badge {% if t.jenis=='masuk' %}badge-masuk{% else %}badge-keluar{% endif %}">
+                  {{ t.jenis }}
+                </span>
+                {{ t.coa_nama or '—' }}
+              </td>
+              <td>
+                {% if t.jenis_dana %}
+                <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }}; font-size:.65rem">
+                  {{ LABEL_DANA.get(t.jenis_dana,'') }}
+                </span>
+                {% endif %}
+              </td>
+              <td class="small text-muted">{{ t.keterangan or t.donatur_nama or '—' }}</td>
+              <td class="text-end fw-semibold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %}">
+                {% if t.jenis=='keluar' %}-{% endif %}{{ t.jumlah|rupiah }}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted">Belum ada transaksi</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <a href="/admin/transaksi" class="btn btn-sm btn-outline-primary mt-2">Lihat Semua</a>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card p-3 h-100">
+      <div class="fw-semibold mb-3">Rekap per Dana ({{ bulan }})</div>
+      {% for dana, info in [('zakat','Zakat'),('infak_sedekah','Infak/Sedekah'),('amil','Amil'),('wakaf','Wakaf')] %}
+      {% set masuk = namespace(v=0) %}{% set keluar = namespace(v=0) %}
+      {% for r in rekap_dana %}
+        {% if r.jenis_dana == dana %}
+          {% if r.jenis == 'masuk' %}{% set masuk.v = r.total %}{% endif %}
+          {% if r.jenis == 'keluar' %}{% set keluar.v = r.total %}{% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if masuk.v > 0 or keluar.v > 0 %}
+      <div class="mb-2 pb-2 border-bottom">
+        <div class="d-flex justify-content-between">
+          <span class="fw-semibold small" style="color:{{ dana_warna[dana] }}">● {{ info }}</span>
+          <span class="small fw-semibold {% if masuk.v >= keluar.v %}text-success{% else %}text-danger{% endif %}">
+            {{ (masuk.v - keluar.v)|rupiah }}
+          </span>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span class="small text-muted">Masuk: {{ masuk.v|rupiah }}</span>
+          <span class="small text-muted">Keluar: {{ keluar.v|rupiah }}</span>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+      {% if not rekap_dana %}
+      <div class="text-muted text-center small mt-3">Belum ada data bulan ini</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

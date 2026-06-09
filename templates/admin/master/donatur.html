@@ -1,0 +1,145 @@
+{% extends 'admin/base.html' %}
+{% block title %}Master Donatur{% endblock %}
+{% block page_title %}<i class="bi bi-people"></i> Master Donatur{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Cari nama / no HP..." style="width:220px">
+      <button class="btn btn-sm btn-primary">Cari</button>
+      {% if q %}<a href="/admin/master/donatur" class="btn btn-sm btn-outline-secondary">Reset</a>{% endif %}
+    </form>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
+      <i class="bi bi-plus-lg"></i> Tambah Donatur
+    </button>
+  </div>
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Nama</th><th>NIK</th><th>No HP</th><th>Alamat</th><th>Jenis</th><th>Status</th><th>Aksi</th></tr>
+      </thead>
+      <tbody>
+        {% for d in donatur %}
+        <tr class="{% if not d.aktif %}table-secondary text-muted{% endif %}">
+          <td class="small">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ d.nama }}</td>
+          <td class="small font-monospace">{{ d.nik or '—' }}</td>
+          <td class="small">{{ d.no_hp or '—' }}</td>
+          <td class="small">{{ d.alamat or '—' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ d.jenis }}</span></td>
+          <td>
+            <span class="badge {% if d.aktif %}bg-success{% else %}bg-secondary{% endif %}">
+              {% if d.aktif %}Aktif{% else %}Nonaktif{% endif %}
+            </span>
+          </td>
+          <td class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-primary py-0"
+              data-bs-toggle="modal" data-bs-target="#modalEdit{{ d.id }}">Edit</button>
+            <form method="POST" action="/admin/master/donatur/toggle/{{ d.id }}" class="d-inline">
+              <button class="btn btn-sm btn-outline-{% if d.aktif %}warning{% else %}success{% endif %} py-0">
+                {% if d.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          {% if q %}Tidak ada donatur dengan kata kunci "{{ q }}"{% else %}Belum ada data donatur{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="text-muted small mt-2">Total: {{ donatur | length }} donatur</div>
+</div>
+
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalTambah" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="/admin/master/donatur/tambah">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Tambah Donatur</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <input type="text" name="nama" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">NIK</label>
+          <input type="text" name="nik" class="form-control" placeholder="16 digit" maxlength="16">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No HP</label>
+          <input type="text" name="no_hp" class="form-control" placeholder="628xxx">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jenis</label>
+          <select name="jenis" class="form-select">
+            <option value="perorangan">Perorangan</option>
+            <option value="lembaga">Lembaga / Organisasi</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Alamat</label>
+          <textarea name="alamat" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Modal Edit per donatur -->
+{% for d in donatur %}
+<div class="modal fade" id="modalEdit{{ d.id }}" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="/admin/master/donatur/edit/{{ d.id }}">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Edit: {{ d.nama }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <input type="text" name="nama" class="form-control" value="{{ d.nama }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">NIK</label>
+          <input type="text" name="nik" class="form-control" value="{{ d.nik or '' }}" maxlength="16">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No HP</label>
+          <input type="text" name="no_hp" class="form-control" value="{{ d.no_hp or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jenis</label>
+          <select name="jenis" class="form-select">
+            <option value="perorangan" {% if d.jenis=='perorangan' %}selected{% endif %}>Perorangan</option>
+            <option value="lembaga" {% if d.jenis=='lembaga' %}selected{% endif %}>Lembaga / Organisasi</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Alamat</label>
+          <textarea name="alamat" class="form-control" rows="2">{{ d.alamat or '' }}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
+{% endblock %}
