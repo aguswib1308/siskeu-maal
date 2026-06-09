@@ -45,6 +45,12 @@
     <a href="/admin/transaksi" class="nav-link {% if '/transaksi' in request.path %}active{% endif %}">
       <i class="bi bi-arrow-left-right"></i> Transaksi
     </a>
+    <a href="/admin/koleksi" class="nav-link {% if '/koleksi' in request.path %}active{% endif %}">
+      <i class="bi bi-basket"></i> Koleksi
+    </a>
+    <a href="/admin/peta" class="nav-link {% if request.path == '/admin/peta' %}active{% endif %}">
+      <i class="bi bi-map"></i> Peta
+    </a>
     <a href="/admin/laporan" class="nav-link {% if '/laporan' in request.path %}active{% endif %}">
       <i class="bi bi-file-earmark-bar-graph"></i> Laporan
     </a>

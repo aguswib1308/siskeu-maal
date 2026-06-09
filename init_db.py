@@ -10,13 +10,28 @@ def hash_pw(pw):
 def migrate(conn):
     """Tambah kolom baru jika belum ada (safe migration)."""
     c = conn.cursor()
-    existing = {r[1] for r in c.execute("PRAGMA table_info(transaksi)")}
-    if 'coa_id' not in existing:
-        c.execute("ALTER TABLE transaksi ADD COLUMN coa_id INTEGER REFERENCES chart_of_accounts(id)")
-    if 'penerima_id' not in existing:
-        c.execute("ALTER TABLE transaksi ADD COLUMN penerima_id INTEGER REFERENCES penerima_manfaat(id)")
-    if 'jenis_dana' not in existing:
-        c.execute("ALTER TABLE transaksi ADD COLUMN jenis_dana TEXT")
+
+    trx = {r[1] for r in c.execute("PRAGMA table_info(transaksi)")}
+    for col, defn in [
+        ('coa_id',      'INTEGER REFERENCES chart_of_accounts(id)'),
+        ('penerima_id', 'INTEGER REFERENCES penerima_manfaat(id)'),
+        ('jenis_dana',  'TEXT'),
+    ]:
+        if col not in trx:
+            c.execute(f"ALTER TABLE transaksi ADD COLUMN {col} {defn}")
+
+    don = {r[1] for r in c.execute("PRAGMA table_info(donatur)")}
+    for col, defn in [
+        ('sumber_infaq', "TEXT DEFAULT 'tunai'"),
+        ('area',         'TEXT'),
+        ('lokasi_nama',  'TEXT'),
+        ('lat',          'REAL'),
+        ('lng',          'REAL'),
+        ('aktif_infaq',  'INTEGER DEFAULT 1'),
+    ]:
+        if col not in don:
+            c.execute(f"ALTER TABLE donatur ADD COLUMN {col} {defn}")
+
     conn.commit()
 
 def init():
@@ -53,8 +68,31 @@ def init():
             nik TEXT,
             alamat TEXT,
             jenis TEXT DEFAULT 'perorangan',
+            sumber_infaq TEXT DEFAULT 'tunai',
+            area TEXT,
+            lokasi_nama TEXT,
+            lat REAL,
+            lng REAL,
             aktif INTEGER DEFAULT 1,
+            aktif_infaq INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS koleksi_bulanan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            donatur_id INTEGER NOT NULL REFERENCES donatur(id),
+            bulan TEXT NOT NULL,
+            status TEXT DEFAULT 'terjadwal' CHECK(status IN ('terjadwal','tidak_ada','terkumpul')),
+            marketing_id INTEGER REFERENCES users(id),
+            tanggal_koleksi TEXT,
+            jumlah REAL,
+            jumlah_kunjungan INTEGER DEFAULT 0,
+            kunjungan_terakhir TEXT,
+            marketing_kunjungi_terakhir INTEGER REFERENCES users(id),
+            keterangan TEXT,
+            transaksi_id INTEGER REFERENCES transaksi(id),
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(donatur_id, bulan)
         );
 
         CREATE TABLE IF NOT EXISTS penerima_manfaat (

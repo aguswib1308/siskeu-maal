@@ -1,0 +1,79 @@
+{% extends 'admin/base.html' %}
+{% block title %}Capaian Marketing{% endblock %}
+{% block page_title %}<i class="bi bi-trophy"></i> Capaian Marketing{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:180px">
+      <button class="btn btn-sm btn-primary">Tampilkan</button>
+    </form>
+  </div>
+  <div class="col-auto">
+    <a href="/admin/koleksi/{{ bulan }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Detail Koleksi
+    </a>
+  </div>
+</div>
+
+{% if capaian %}
+<!-- Podium top 3 -->
+{% if capaian | length >= 1 %}
+<div class="row g-3 mb-4 justify-content-center">
+  {% for c in capaian[:3] %}
+  {% set colors = ['#f39c12','#95a5a6','#cd7f32'] %}
+  {% set icons  = ['🥇','🥈','🥉'] %}
+  <div class="col-md-3">
+    <div class="card p-3 text-center" style="border-top:4px solid {{ colors[loop.index0] }}">
+      <div style="font-size:2rem">{{ icons[loop.index0] }}</div>
+      <div class="fw-bold mt-1">{{ c.nama }}</div>
+      <div class="fs-5 fw-bold text-success mt-1">{{ c.total_nominal | rupiah }}</div>
+      <div class="small text-muted">{{ c.jumlah_koleksi }} koleksi
+        ({{ c.kencleng }} kencleng, {{ c.kotak }} kotak)
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Tabel lengkap -->
+<div class="card p-3">
+  <div class="fw-semibold mb-3">Semua Marketing — {{ bulan }}</div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Nama</th><th class="text-center">Kencleng</th><th class="text-center">Kotak Infaq</th><th class="text-center">Total Koleksi</th><th class="text-end">Total Nominal</th></tr>
+      </thead>
+      <tbody>
+        {% for c in capaian %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ c.nama }}
+            {% if loop.index == 1 %}<span class="ms-1">🥇</span>{% endif %}
+          </td>
+          <td class="text-center">{{ c.kencleng }}</td>
+          <td class="text-center">{{ c.kotak }}</td>
+          <td class="text-center"><span class="badge bg-primary">{{ c.jumlah_koleksi }}</span></td>
+          <td class="text-end fw-bold text-success">{{ c.total_nominal | rupiah }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="4">TOTAL</td>
+          <td class="text-center">{{ capaian | sum(attribute='jumlah_koleksi') }}</td>
+          <td class="text-end text-success">{{ capaian | sum(attribute='total_nominal') | rupiah }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card p-5 text-center text-muted">
+  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+  Belum ada koleksi yang tercatat untuk bulan {{ bulan }}
+</div>
+{% endif %}
+{% endblock %}

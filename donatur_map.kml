@@ -1,0 +1,2118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name><![CDATA[KOTAK & KENCLENG]]></name>
+    <description/>
+    <Style id="icon-1607-0F9D58-nodesc-normal">
+      <IconStyle>
+        <color>ff589d0f</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1607-0F9D58-nodesc-highlight">
+      <IconStyle>
+        <color>ff589d0f</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1607-0F9D58-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1607-0F9D58-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1607-0F9D58-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1607-3949AB-nodesc-normal">
+      <IconStyle>
+        <color>ffab4939</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1607-3949AB-nodesc-highlight">
+      <IconStyle>
+        <color>ffab4939</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1607-3949AB-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1607-3949AB-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1607-3949AB-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1673-9C27B0-nodesc-normal">
+      <IconStyle>
+        <color>ffb0279c</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1673-9C27B0-nodesc-highlight">
+      <IconStyle>
+        <color>ffb0279c</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1673-9C27B0-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1673-9C27B0-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1673-9C27B0-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1725-3949AB-nodesc-normal">
+      <IconStyle>
+        <color>ffab4939</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1725-3949AB-nodesc-highlight">
+      <IconStyle>
+        <color>ffab4939</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1725-3949AB-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1725-3949AB-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1725-3949AB-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-1878-880E4F-nodesc-normal">
+      <IconStyle>
+        <color>ff4f0e88</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1878-880E4F-nodesc-highlight">
+      <IconStyle>
+        <color>ff4f0e88</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1878-880E4F-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1878-880E4F-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1878-880E4F-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>Kencleng</name>
+      <Placemark>
+        <name>Anny Sutarni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9358001,-7.8141349,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Dwi Hartanti</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9555721,-7.8370459,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Retno </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9521684,-7.8364783,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Warsito</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9370637,-7.8196796,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Harni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9567701,-7.8294294,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Ndari Rahayu</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9558351,-7.8301139,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Bu Rosita</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9605437,-7.8306434,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Kembar</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.958888,-7.8304955,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Bu Win</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9595658,-7.8308441,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Via Vio</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.959638,-7.8313306,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Sri Wahyuni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9586812,-7.8316188,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Kasinah</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.961022,-7.832599,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Eni Yakult</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9558741,-7.8232524,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Nanik </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9558849,-7.8228117,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Warung Dandang</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9342208,-7.7834009,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mie Ayam Tarni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9389961,-7.8087357,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Warmi</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.958471,-7.8244913,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Saminah </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9570709,-7.823399,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Fani </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9600163,-7.8245005,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Siti</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9612797,-7.8245854,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Samini</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9588234,-7.8239613,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Waginah </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9595596,-7.824012,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name><![CDATA[Bu Lilis Nur'aini]]></name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9439895,-7.811918,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Warung Rere Klasik </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9451627,-7.8119727,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sri Sumarni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8711218,-7.7752986,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Hadmini</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8711593,-7.7753664,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Suyatno </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8712076,-7.7752043,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Wiwik Wiyatni </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.87093,-7.7757245,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Sri Wahyuni </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8713924,-7.775779,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Tuti </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8715372,-7.7758135,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Radin </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8714879,-7.7766777,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Dani </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.920867,-7.805468,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Sukamto </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9210111,-7.818552,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sugiyatni </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9209681,-7.8185321,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Nurhayati </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9219865,-7.8168435,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Naryo </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9216804,-7.8173111,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Nunuk </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9209604,-7.8192153,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sri Suyani </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9218245,-7.8194455,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Renyta Adelia </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9212854,-7.8193883,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sri Latifah</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9192576,-7.8190637,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Dr. Bu Tuti</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9184212,-7.8303402,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Dr. Pak Martanto</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9184534,-7.8303542,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Tahu Kupat</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9185512,-7.8313346,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Conter Pradana Cell</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9174033,-7.831038,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Sederhana Bu Nuri</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9166087,-7.8312903,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mie Ayam. Anugrah</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9174902,-7.8310429,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Mariyem Kribo</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9222213,-7.8160197,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Deny Nurhayati</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9123645,-7.8120493,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Sartono</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9117157,-7.8137779,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mie Ayam Pancasila </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9009322,-7.7879081,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Eni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9417823,-7.8048073,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Tanikem </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9414517,-7.804485,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Paryati</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9420951,-7.8052839,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sriyatmi</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9427227,-7.8049747,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Nanik Yuliati </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9220234,-7.8141662,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Ani</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9220381,-7.8141478,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Suparmi </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.920826,-7.8139671,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Endang</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9209925,-7.8139689,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Lasmi</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9213755,-7.8144314,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Marni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.921365,-7.8148721,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Ibrahim </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9222621,-7.8136357,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Wahyudi </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9218538,-7.8145662,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Gelintong </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9235217,-7.814857,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Es Asem</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9250757,-7.813197,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Conter Ton Phone</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9222823,-7.8149012,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Tanti</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9208254,-7.8134503,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Eko Anak Naga</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9253638,-7.8115316,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Kentaki</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9134284,-7.8073656,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Koperasi SMK IT</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9157963,-7.811954,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Bu Sugeng Win</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.922637,-7.8197183,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Jawa</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9226738,-7.8197232,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Makanan</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9226454,-7.8197461,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Yuli</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9142563,-7.8099486,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Cilok Bu Wilis</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9104903,-7.8115571,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Sdr. Nawab</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9168056,-7.8064219,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Sederhana Hidayah </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9145504,-7.8046142,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Ninik </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9168373,-7.8064105,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Ahmad Yusuf </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9168382,-7.8064384,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu erni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.914556,-7.8077005,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Warmi</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9159507,-7.8082742,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Ririn</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9579313,-7.8387321,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Purwanti </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.959956,-7.8379489,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Kani</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.959618,-7.8373402,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Dwi Pratiani</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9596675,-7.8375985,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak BM</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9617732,-7.8374206,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sunarni</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.960561,-7.8373336,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Marti Ningsih</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9263974,-7.8189556,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Suwarti </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9581384,-7.8366419,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Siti Rahayu </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9265641,-7.818753,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Piah</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9269616,-7.8172852,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Karibian</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9240444,-7.8163503,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Bokir</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9284095,-7.8161442,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Fitrah</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8903051,-7.7551097,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Suparti</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8903039,-7.7556557,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sriwati </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8903161,-7.756295,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Eka </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9264158,-7.8219477,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Siti Suyani </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9272602,-7.8181665,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Raya Berkah Jaya</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9236827,-7.8080551,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Desi </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9229485,-7.8161679,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Lili</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9228412,-7.8164921,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Tukiyo</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.95623,-7.8098118,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Madun </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9565167,-7.8098598,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Supri </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9563015,-7.8095256,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Lariyem </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9567241,-7.8078658,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Tuginem </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9611206,-7.8051745,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Yosi </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9592532,-7.8048472,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Meisuri </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9558836,-7.8043462,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Asalma Still</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9020163,-7.7985259,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Sofa Sofi </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.899095,-7.7943469,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Dwi Palupi</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9069478,-7.800006,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Agus Widada</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9546257,-7.8265884,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Yanto</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9622822,-7.8248308,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Asih </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9594445,-7.8246401,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sytha Lucitasari </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9586689,-7.8249198,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sri Rejeki </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9581811,-7.8257141,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sri Jamu </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9579907,-7.8257831,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sikem </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9583054,-7.8253309,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Purwanti </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9562573,-7.8259213,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Naufal Warnet </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9564105,-7.8245455,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mas Widi </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            111.0360092,-7.8530321,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Conter SBR 1 </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9996697,-7.8142878,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Maryanti</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9639324,-7.8249527,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Anis </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9663993,-7.8242387,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Nanik </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9658757,-7.8235125,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Ana</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9671281,-7.8246483,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Zulaikha</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9333707,-7.8156213,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mie Ayam Econe</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9365416,-7.8178165,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mie Ayam Bakso Mas Junaedi</name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9364186,-7.8078381,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Martin </name>
+        <styleUrl>#icon-1607-0F9D58-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.930179,-7.8137052,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>MKU</name>
+      <Placemark>
+        <name>masjid gerdu MKU</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9215208,-7.8146337,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Banjardowo MKU</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9575589,-7.8244007,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Ar Rohmat Geneng MKU</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9422535,-7.8048129,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Al Ikhlas Barengan MKU</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8711667,-7.775766,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Al Ikhlas Bauresan </name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9216767,-7.8183883,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Al Ikhlas Keblokan</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.890349,-7.7553784,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Nurul Hidayah </name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.926429,-7.8231854,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid An Nur Gandul</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9104349,-7.8146388,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Masjid Luluah Klemut</name>
+        <styleUrl>#icon-1673-9C27B0-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9574919,-7.8059503,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Kotak Infaq</name>
+      <Placemark>
+        <name>W.M Hj. Mukinah </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8985351,-7.7953657,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Lanny </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9073041,-7.7970036,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Al Madina </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9381313,-7.8138426,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mutiara Juice</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.994407,-7.8144684,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO PAK SABAR</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9532115,-7.8366689,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO MARGI RAHAYU</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9543432,-7.8363021,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO TENIS</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9248732,-7.8048688,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO PAK MAN </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9391184,-7.8079876,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>SOTO BU SUNARNI</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9380948,-7.8113204,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Labiq Store</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9060025,-7.7955072,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Adiba </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9071846,-7.797004,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Giri Tani </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9468012,-7.8109808,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Rumah Somay </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9481568,-7.8119087,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Lestari </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9417338,-7.8132011,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Dwi Mulya </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9508774,-7.8112826,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Kantin Dinas Pendidikan </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9474177,-7.8140325,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Padang </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9483404,-7.8119123,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO WAJAN MAS HERI </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9571729,-7.8129984,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO DEROGAB </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.960775,-7.8142036,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Ayam Kremes Bu Wiji</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9219095,-7.8228665,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Pecel Bu Nardi </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9208663,-7.8289056,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Lombok Ijo </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9195969,-7.8313535,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Conter Grend Phone</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9223098,-7.821096,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO PAK MAN</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9131512,-7.8092084,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Soto Tengah Gunung</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9083562,-7.8276519,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Seblak Mbak Rani</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9139559,-7.8063023,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Oseng Kepala Kambing </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9135784,-7.8034779,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Toko Nyoto ROSO Roti</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9257075,-7.8185498,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO NUGROHO </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8827356,-7.7584006,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Ubu Parani </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9436948,-7.806296,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Kristiani</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9438185,-7.8063851,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M Bu Tinah</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9458253,-7.8059431,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Sam</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9460851,-7.8059985,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bu Suminem</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9471791,-7.8072149,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>KANTIN BU SUM</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9264293,-7.8148914,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>RUMAH CERDAS </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9235139,-7.8064641,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>PETSHOP RAYA</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9231049,-7.8069872,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>TOKO TIGA DARA</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            111.0247264,-7.8164371,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>BAKSO BMW </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            111.0216482,-7.8187402,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>HAFIDZ PHONE </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            111.0249764,-7.8162658,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MIE AYAM BAKSO GAPURO TARE</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            111.0299266,-7.8177927,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Parji </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.901104,-7.7967182,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Al Maidah</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8984615,-7.7955274,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MIE AYAM BAKSO MORO SENENG</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.8961003,-7.80091,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>TOKO BANGUNAN TITO</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9555939,-7.822025,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M BU NUNIK </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9625384,-7.787335,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MIE AYAM BAKSO MAS BENDE</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9627933,-7.7858993,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>FOTO COPY MAP COM </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9718785,-7.7789223,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M PAK RT</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9078092,-7.7968289,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>TOKO BU IKA </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9545539,-7.8244381,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rosi Cell</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9912684,-7.8140884,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Kedai Gemes</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9944738,-7.8180725,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bengkel Cat Pak Gatot</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9496006,-7.8001303,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Parfum Saa 1</name>
+        <styleUrl>#icon-1607-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9397972,-7.8119612,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pet Shop Zia</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9340495,-7.8156505,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Setyo Rahayu Motor</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9363651,-7.8172808,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Pak Sugiyarto Cukur</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.937094,-7.8127207,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>TOKO BANGUNAN UD MASA</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9370307,-7.8160458,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>TOKO PANDU </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9410178,-7.8119473,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M MAK ROH</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9271219,-7.8126942,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MIE AYAM SOR SAWO</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9270951,-7.8126291,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>JAMBE DIGITAL </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9266838,-7.8126634,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>RAYA PRINTING </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9271957,-7.8139794,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>ANISAH COM </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9271883,-7.8133841,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>ADEVA MART</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9272333,-7.8130106,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M ASEM GEDE</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.928952,-7.8136722,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>W.M MBAK FIKA</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9292961,-7.8131138,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>SATE PAK JAMAN </name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9271814,-7.8135454,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MAS GINO 1</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9299699,-7.813692,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>MAS GINO 2</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9295857,-7.8142996,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>PETSHOP 3 BERSAUDARA</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9290619,-7.8143054,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>SASINO CAFFE</name>
+        <styleUrl>#icon-1725-3949AB-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9295106,-7.8145796,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>KANTOR BMT AMAL MUSLIM</name>
+      <Placemark>
+        <name>.</name>
+        <styleUrl>#icon-1878-880E4F-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            110.9275879,-7.812446,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

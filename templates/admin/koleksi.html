@@ -1,0 +1,75 @@
+{% extends 'admin/base.html' %}
+{% block title %}Koleksi{% endblock %}
+{% block page_title %}<i class="bi bi-basket"></i> Kelola Koleksi Bulanan{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3" style="border-left:4px solid #2980b9">
+      <div class="text-muted small">Total Donatur Aktif</div>
+      <div class="fs-4 fw-bold text-primary">{{ total_donatur }}</div>
+      <div class="small text-muted">kencleng + kotak infaq</div>
+    </div>
+  </div>
+</div>
+
+<!-- Buka Periode Baru -->
+<div class="card p-3 mb-4">
+  <div class="fw-semibold mb-3"><i class="bi bi-plus-circle"></i> Buka Periode Koleksi</div>
+  <form method="POST" action="/admin/koleksi/buka" class="d-flex gap-2 align-items-end">
+    <div>
+      <label class="form-label fw-semibold small">Bulan</label>
+      <input type="month" name="bulan" value="{{ bulan_ini }}" class="form-control" style="width:180px" required>
+    </div>
+    <button type="submit" class="btn btn-success"
+            onclick="return confirm('Buka periode koleksi untuk bulan ini? Sistem akan generate record untuk semua donatur aktif.')">
+      <i class="bi bi-play-circle"></i> Buka Periode
+    </button>
+  </form>
+  <small class="text-muted mt-2 d-block">
+    Sistem akan membuat jadwal koleksi untuk semua <strong>{{ total_donatur }}</strong> donatur kencleng & kotak infaq aktif.
+  </small>
+</div>
+
+<!-- Daftar Periode -->
+<div class="card p-3">
+  <div class="fw-semibold mb-3">Riwayat Periode</div>
+  {% if periode %}
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Bulan</th><th class="text-center">Total</th><th class="text-center">Terkumpul</th><th class="text-center">Tidak Ada</th><th class="text-center">Belum</th><th class="text-end">Total Nominal</th><th class="text-center">Progress</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for p in periode %}
+        {% set pct = ((p.terkumpul / p.total) * 100) | int if p.total > 0 else 0 %}
+        <tr>
+          <td class="fw-semibold">{{ p.bulan }}</td>
+          <td class="text-center">{{ p.total }}</td>
+          <td class="text-center"><span class="badge bg-success">{{ p.terkumpul }}</span></td>
+          <td class="text-center"><span class="badge bg-warning text-dark">{{ p.tidak_ada }}</span></td>
+          <td class="text-center"><span class="badge bg-secondary">{{ p.terjadwal }}</span></td>
+          <td class="text-end fw-semibold text-success">{{ p.total_nominal | rupiah }}</td>
+          <td style="width:120px">
+            <div class="progress" style="height:8px">
+              <div class="progress-bar bg-success" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="text-center" style="font-size:.7rem">{{ pct }}%</div>
+          </td>
+          <td>
+            <a href="/admin/koleksi/{{ p.bulan }}" class="btn btn-sm btn-outline-primary py-0">Detail</a>
+            <a href="/admin/koleksi/capaian?bulan={{ p.bulan }}" class="btn btn-sm btn-outline-secondary py-0">Capaian</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-4">
+    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+    Belum ada periode koleksi. Klik "Buka Periode" untuk memulai.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

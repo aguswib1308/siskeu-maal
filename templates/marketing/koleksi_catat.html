@@ -1,0 +1,114 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Catat Koleksi{% endblock %}
+
+{% block content %}
+<!-- Info donatur -->
+<div class="card p-3 mb-3" style="border-left:4px solid
+  {% if koleksi.sumber_infaq=='kencleng' %}#27ae60{% else %}#2980b9{% endif %}">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="fw-bold fs-6">{{ koleksi.donatur_nama }}</div>
+      {% if koleksi.lokasi_nama and koleksi.lokasi_nama != koleksi.donatur_nama %}
+      <div class="small text-muted">{{ koleksi.lokasi_nama }}</div>
+      {% endif %}
+      <div class="small text-muted mt-1">
+        <i class="bi bi-geo-alt"></i> {{ koleksi.area or '—' }}
+      </div>
+      {% if koleksi.jumlah_kunjungan > 0 %}
+      <div class="small text-warning mt-1">
+        ⚠ Sudah {{ koleksi.jumlah_kunjungan }}x dikunjungi, belum ada
+      </div>
+      {% endif %}
+    </div>
+    {% if koleksi.lat and koleksi.lng %}
+    <a href="https://www.google.com/maps?q={{ koleksi.lat }},{{ koleksi.lng }}"
+       target="_blank" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-geo-alt-fill"></i> Maps
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Riwayat singkat -->
+{% if riwayat %}
+<div class="card p-3 mb-3">
+  <div class="small fw-semibold text-muted mb-2">Riwayat Koleksi Sebelumnya</div>
+  {% for r in riwayat %}
+  <div class="d-flex justify-content-between small py-1 border-bottom">
+    <span class="text-muted">{{ r.bulan }} · {{ r.marketing_nama or '—' }}</span>
+    <span class="fw-semibold text-success">{{ r.jumlah | rupiah }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Form catat -->
+<div class="card p-3">
+  <div class="fw-semibold mb-3">Hasil Kunjungan</div>
+
+  <!-- Tombol pilih aksi -->
+  <div class="d-flex gap-2 mb-3" id="btnAksi">
+    <button type="button" class="btn btn-success flex-fill fw-semibold" onclick="pilihAksi('terkumpul')">
+      <i class="bi bi-check-circle"></i> Berhasil Dikoleksi
+    </button>
+    <button type="button" class="btn btn-outline-warning flex-fill fw-semibold" onclick="pilihAksi('tidak_ada')">
+      <i class="bi bi-x-circle"></i> Tidak Ada / Kosong
+    </button>
+  </div>
+
+  <!-- Form terkumpul -->
+  <form method="POST" action="/marketing/koleksi/{{ koleksi.id }}/catat" id="formTerkumpul" style="display:none">
+    <input type="hidden" name="aksi" value="terkumpul">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Nominal (Rp)</label>
+      <input type="number" name="jumlah" class="form-control form-control-lg text-center fw-bold"
+             placeholder="0" min="0" value="0" required>
+      <div class="form-text">Isi 0 jika kencleng kosong</div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Keterangan</label>
+      <input type="text" name="keterangan" class="form-control" placeholder="Opsional">
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary flex-fill" onclick="resetAksi()">Batal</button>
+      <button type="submit" class="btn btn-success flex-fill fw-semibold">
+        <i class="bi bi-check-lg"></i> Simpan
+      </button>
+    </div>
+  </form>
+
+  <!-- Form tidak ada -->
+  <form method="POST" action="/marketing/koleksi/{{ koleksi.id }}/catat" id="formTidakAda" style="display:none">
+    <input type="hidden" name="aksi" value="tidak_ada">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Keterangan</label>
+      <input type="text" name="keterangan" class="form-control" placeholder="cth: rumah kosong, terkunci, dsb.">
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary flex-fill" onclick="resetAksi()">Batal</button>
+      <button type="submit" class="btn btn-warning flex-fill fw-semibold text-dark">
+        <i class="bi bi-clock"></i> Catat & Coba Lagi
+      </button>
+    </div>
+  </form>
+</div>
+
+<a href="/marketing/koleksi" class="btn btn-outline-secondary w-100 mt-3">
+  <i class="bi bi-arrow-left"></i> Kembali ke Daftar
+</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function pilihAksi(aksi) {
+  document.getElementById('btnAksi').style.display = 'none';
+  document.getElementById('formTerkumpul').style.display = aksi==='terkumpul' ? '' : 'none';
+  document.getElementById('formTidakAda').style.display  = aksi==='tidak_ada'  ? '' : 'none';
+}
+function resetAksi() {
+  document.getElementById('btnAksi').style.display = '';
+  document.getElementById('formTerkumpul').style.display = 'none';
+  document.getElementById('formTidakAda').style.display  = 'none';
+}
+</script>
+{% endblock %}

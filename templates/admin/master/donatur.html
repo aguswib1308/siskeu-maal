@@ -5,15 +5,30 @@
 {% block content %}
 <div class="row mb-3 align-items-center">
   <div class="col">
-    <form class="d-flex gap-2">
-      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Cari nama / no HP..." style="width:220px">
+    <form class="d-flex gap-2 flex-wrap">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+             placeholder="Cari nama / HP / lokasi..." style="width:200px">
+      <select name="sumber" class="form-select form-select-sm" style="width:150px">
+        <option value="">Semua Jenis</option>
+        <option value="tunai"       {% if sumber=='tunai'       %}selected{% endif %}>Tunai</option>
+        <option value="kencleng"    {% if sumber=='kencleng'    %}selected{% endif %}>Kencleng</option>
+        <option value="kotak_infaq" {% if sumber=='kotak_infaq' %}selected{% endif %}>Kotak Infaq</option>
+      </select>
+      <select name="area" class="form-select form-select-sm" style="width:150px">
+        <option value="">Semua Area</option>
+        {% for a in areas %}
+        <option value="{{ a.area }}" {% if area==a.area %}selected{% endif %}>{{ a.area }}</option>
+        {% endfor %}
+      </select>
       <button class="btn btn-sm btn-primary">Cari</button>
-      {% if q %}<a href="/admin/master/donatur" class="btn btn-sm btn-outline-secondary">Reset</a>{% endif %}
+      {% if q or sumber or area %}
+      <a href="/admin/master/donatur" class="btn btn-sm btn-outline-secondary">Reset</a>
+      {% endif %}
     </form>
   </div>
   <div class="col-auto">
     <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
-      <i class="bi bi-plus-lg"></i> Tambah Donatur
+      <i class="bi bi-plus-lg"></i> Tambah
     </button>
   </div>
 </div>
@@ -22,17 +37,45 @@
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>#</th><th>Nama</th><th>NIK</th><th>No HP</th><th>Alamat</th><th>Jenis</th><th>Status</th><th>Aksi</th></tr>
+        <tr><th>#</th><th>Nama / Lokasi</th><th>Area</th><th>Jenis</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
       </thead>
       <tbody>
         {% for d in donatur %}
         <tr class="{% if not d.aktif %}table-secondary text-muted{% endif %}">
           <td class="small">{{ loop.index }}</td>
-          <td class="fw-semibold">{{ d.nama }}</td>
-          <td class="small font-monospace">{{ d.nik or '—' }}</td>
+          <td>
+            <div class="fw-semibold">{{ d.nama }}</div>
+            {% if d.lokasi_nama and d.lokasi_nama != d.nama %}
+            <div class="small text-muted">{{ d.lokasi_nama }}</div>
+            {% endif %}
+          </td>
+          <td class="small">{{ d.area or '—' }}</td>
+          <td>
+            {% if d.sumber_infaq == 'kencleng' %}
+              <span class="badge" style="background:#27ae60">🏠 Kencleng</span>
+            {% elif d.sumber_infaq == 'kotak_infaq' %}
+              <span class="badge" style="background:#2980b9">🕌 Kotak Infaq</span>
+            {% else %}
+              <span class="badge bg-secondary">💵 Tunai</span>
+            {% endif %}
+            {% if d.sumber_infaq in ('kencleng','kotak_infaq') %}
+              <span class="badge {% if d.aktif_infaq %}bg-success{% else %}bg-danger{% endif %} ms-1" style="font-size:.65rem">
+                {% if d.aktif_infaq %}Aktif{% else %}Nonaktif{% endif %}
+              </span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if d.lat and d.lng %}
+            <a href="https://www.google.com/maps?q={{ d.lat }},{{ d.lng }}"
+               target="_blank" class="text-decoration-none">
+              <i class="bi bi-geo-alt text-success"></i>
+              <span class="font-monospace" style="font-size:.7rem">{{ '%.4f'|format(d.lat) }}, {{ '%.4f'|format(d.lng) }}</span>
+            </a>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
           <td class="small">{{ d.no_hp or '—' }}</td>
-          <td class="small">{{ d.alamat or '—' }}</td>
-          <td><span class="badge bg-light text-dark border">{{ d.jenis }}</span></td>
           <td>
             <span class="badge {% if d.aktif %}bg-success{% else %}bg-secondary{% endif %}">
               {% if d.aktif %}Aktif{% else %}Nonaktif{% endif %}
@@ -43,20 +86,18 @@
               data-bs-toggle="modal" data-bs-target="#modalEdit{{ d.id }}">Edit</button>
             <form method="POST" action="/admin/master/donatur/toggle/{{ d.id }}" class="d-inline">
               <button class="btn btn-sm btn-outline-{% if d.aktif %}warning{% else %}success{% endif %} py-0">
-                {% if d.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+                {% if d.aktif %}Off{% else %}On{% endif %}
               </button>
             </form>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">
-          {% if q %}Tidak ada donatur dengan kata kunci "{{ q }}"{% else %}Belum ada data donatur{% endif %}
-        </td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="text-muted small mt-2">Total: {{ donatur | length }} donatur</div>
+  <div class="text-muted small mt-2">{{ donatur|length }} donatur</div>
 </div>
 
 <!-- Modal Tambah -->
@@ -69,23 +110,46 @@
       </div>
       <div class="modal-body row g-3">
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <label class="form-label fw-semibold">Nama Lengkap / Nama Lokasi</label>
           <input type="text" name="nama" class="form-control" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">NIK</label>
-          <input type="text" name="nik" class="form-control" placeholder="16 digit" maxlength="16">
+          <label class="form-label fw-semibold">Jenis Infaq</label>
+          <select name="sumber_infaq" class="form-select" id="addSumber" onchange="toggleKoord('add')">
+            <option value="tunai">💵 Tunai</option>
+            <option value="kencleng">🏠 Kencleng</option>
+            <option value="kotak_infaq">🕌 Kotak Infaq</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Deskripsi Lokasi</label>
+          <input type="text" name="lokasi_nama" class="form-control" placeholder="cth: Toko Budi - Jl. Mawar 5">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Area / Kecamatan</label>
+          <input type="text" name="area" class="form-control" list="areaList" placeholder="cth: Wonogiri Kota">
+          <datalist id="areaList">{% for a in areas %}<option value="{{ a.area }}">{% endfor %}</datalist>
+        </div>
+        <div class="col-12" id="addKoord">
+          <label class="form-label fw-semibold">Koordinat <span class="text-muted fw-normal">(paste link Google Maps)</span></label>
+          <input type="text" name="gmaps_url" class="form-control mb-2"
+                 placeholder="https://maps.google.com/?q=-7.812,110.923 atau @lat,lng">
+          <div class="d-flex gap-2">
+            <input type="number" name="lat" class="form-control form-control-sm" placeholder="Latitude" step="any">
+            <input type="number" name="lng" class="form-control form-control-sm" placeholder="Longitude" step="any">
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="aktif_infaq" value="1" id="addAktif" checked>
+            <label class="form-check-label small" for="addAktif">Aktif dikoleksi</label>
+          </div>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">No HP</label>
           <input type="text" name="no_hp" class="form-control" placeholder="628xxx">
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Jenis</label>
-          <select name="jenis" class="form-select">
-            <option value="perorangan">Perorangan</option>
-            <option value="lembaga">Lembaga / Organisasi</option>
-          </select>
+          <label class="form-label fw-semibold">NIK</label>
+          <input type="text" name="nik" class="form-control" maxlength="16">
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold">Alamat</label>
@@ -111,23 +175,51 @@
       </div>
       <div class="modal-body row g-3">
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Nama Lengkap</label>
+          <label class="form-label fw-semibold">Nama / Lokasi</label>
           <input type="text" name="nama" class="form-control" value="{{ d.nama }}" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">NIK</label>
-          <input type="text" name="nik" class="form-control" value="{{ d.nik or '' }}" maxlength="16">
+          <label class="form-label fw-semibold">Jenis Infaq</label>
+          <select name="sumber_infaq" class="form-select">
+            <option value="tunai"       {% if d.sumber_infaq=='tunai'       %}selected{% endif %}>💵 Tunai</option>
+            <option value="kencleng"    {% if d.sumber_infaq=='kencleng'    %}selected{% endif %}>🏠 Kencleng</option>
+            <option value="kotak_infaq" {% if d.sumber_infaq=='kotak_infaq' %}selected{% endif %}>🕌 Kotak Infaq</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Deskripsi Lokasi</label>
+          <input type="text" name="lokasi_nama" class="form-control" value="{{ d.lokasi_nama or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Area / Kecamatan</label>
+          <input type="text" name="area" class="form-control" list="areaList" value="{{ d.area or '' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Update Koordinat <span class="text-muted fw-normal">(kosongkan untuk pertahankan)</span></label>
+          <input type="text" name="gmaps_url" class="form-control mb-2" placeholder="Paste link Google Maps baru...">
+          <div class="d-flex gap-2 align-items-center">
+            <input type="number" name="lat" class="form-control form-control-sm" placeholder="Latitude" step="any" value="{{ d.lat or '' }}">
+            <input type="number" name="lng" class="form-control form-control-sm" placeholder="Longitude" step="any" value="{{ d.lng or '' }}">
+            {% if d.lat and d.lng %}
+            <a href="https://www.google.com/maps?q={{ d.lat }},{{ d.lng }}" target="_blank"
+               class="btn btn-sm btn-outline-success text-nowrap">
+              <i class="bi bi-geo-alt"></i> Lihat
+            </a>
+            {% endif %}
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="aktif_infaq" value="1"
+                   id="editAktif{{ d.id }}" {% if d.aktif_infaq %}checked{% endif %}>
+            <label class="form-check-label small" for="editAktif{{ d.id }}">Aktif dikoleksi</label>
+          </div>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">No HP</label>
           <input type="text" name="no_hp" class="form-control" value="{{ d.no_hp or '' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Jenis</label>
-          <select name="jenis" class="form-select">
-            <option value="perorangan" {% if d.jenis=='perorangan' %}selected{% endif %}>Perorangan</option>
-            <option value="lembaga" {% if d.jenis=='lembaga' %}selected{% endif %}>Lembaga / Organisasi</option>
-          </select>
+          <label class="form-label fw-semibold">NIK</label>
+          <input type="text" name="nik" class="form-control" value="{{ d.nik or '' }}" maxlength="16">
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold">Alamat</label>
@@ -142,4 +234,15 @@
   </div></div>
 </div>
 {% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleKoord(prefix) {
+  const sumber = document.getElementById(prefix + 'Sumber').value;
+  const el = document.getElementById(prefix + 'Koord');
+  if (el) el.style.display = (sumber === 'tunai') ? 'none' : '';
+}
+toggleKoord('add');
+</script>
 {% endblock %}

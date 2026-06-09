@@ -1,0 +1,79 @@
+{% extends 'admin/base.html' %}
+{% block title %}Peta Donatur{% endblock %}
+{% block page_title %}<i class="bi bi-map"></i> Peta Donatur Kencleng & Kotak Infaq{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2">
+      <label class="form-label fw-semibold my-auto small">Status koleksi:</label>
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:170px">
+      <button class="btn btn-sm btn-primary">Tampilkan</button>
+    </form>
+  </div>
+  <div class="col-auto d-flex gap-3 align-items-center small">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#27ae60;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Kencleng</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2980b9;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Kotak Infaq</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e74c3c;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Belum/Tidak Ada</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#bdc3c7;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Terkumpul</span>
+  </div>
+</div>
+
+<div class="card p-0 overflow-hidden">
+  <div id="map" style="height:calc(100vh - 220px); min-height:500px"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const donatur = {{ donatur_json | safe }};
+
+const map = L.map('map').setView([-7.812, 110.923], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:${color};width:13px;height:13px;border-radius:50%;
+                border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    iconSize: [13,13], iconAnchor: [6,6], popupAnchor: [0,-8]
+  });
+}
+
+const WARNA = { kencleng: '#27ae60', kotak_infaq: '#2980b9' };
+const STATUS_WARNA = { terkumpul: '#bdc3c7', tidak_ada: '#e74c3c', terjadwal: '#e74c3c' };
+
+donatur.forEach(d => {
+  if (!d.lat || !d.lng) return;
+  const statusWarna = d.koleksi_status ? STATUS_WARNA[d.koleksi_status] : WARNA[d.sumber_infaq];
+  const icon = makeIcon(statusWarna || WARNA[d.sumber_infaq]);
+  const label = d.sumber_infaq === 'kencleng' ? '🏠 Kencleng' : '🕌 Kotak Infaq';
+  const statusBadge = d.koleksi_status === 'terkumpul'
+    ? `<span style="color:#27ae60;font-weight:600">✓ Terkumpul ${d.koleksi_jumlah ? 'Rp '+parseInt(d.koleksi_jumlah).toLocaleString('id') : ''}</span>`
+    : d.koleksi_status === 'tidak_ada'
+    ? `<span style="color:#e67e22">⚠ Tidak Ada</span>`
+    : d.koleksi_status === 'terjadwal'
+    ? `<span style="color:#e74c3c">● Belum Dikoleksi</span>`
+    : '<span style="color:#95a5a6">Tidak ada jadwal</span>';
+
+  L.marker([d.lat, d.lng], { icon }).bindPopup(`
+    <div style="min-width:180px">
+      <div style="font-weight:700;margin-bottom:4px">${d.nama}</div>
+      <div style="font-size:.8rem;color:#666;margin-bottom:2px">${d.lokasi_nama || ''}</div>
+      <div style="font-size:.8rem;color:#888;margin-bottom:6px">${d.area || ''}</div>
+      <div style="font-size:.8rem">${label}</div>
+      <div style="font-size:.8rem;margin-top:4px">${statusBadge}</div>
+    </div>
+  `).addTo(map);
+});
+
+if (donatur.filter(d=>d.lat&&d.lng).length > 0) {
+  const pts = donatur.filter(d=>d.lat&&d.lng).map(d=>[d.lat,d.lng]);
+  map.fitBounds(pts, { padding: [40,40] });
+}
+</script>
+{% endblock %}

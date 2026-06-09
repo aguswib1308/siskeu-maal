@@ -1,0 +1,61 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Peta Koleksi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="fw-bold fs-5">Peta Koleksi</div>
+  <div class="small text-muted">{{ bulan }}</div>
+</div>
+<div class="d-flex gap-2 mb-2 small">
+  <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3498db;border:2px solid #fff"></span> Belum</span>
+  <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e67e22;border:2px solid #fff"></span> Tidak Ada</span>
+</div>
+<div class="card p-0 overflow-hidden" style="border-radius:12px">
+  <div id="map" style="height:calc(100vh - 210px);min-height:400px"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const titik = {{ titik_json | safe }};
+const map = L.map('map').setView([-7.812, 110.923], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap'
+}).addTo(map);
+
+function makeIcon(color) {
+  return L.divIcon({
+    className:'',
+    html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    iconSize:[14,14],iconAnchor:[7,7],popupAnchor:[0,-10]
+  });
+}
+
+titik.forEach(t => {
+  const color = t.status === 'tidak_ada' ? '#e67e22' : '#3498db';
+  const label = t.sumber_infaq === 'kencleng' ? '🏠 Kencleng' : '🕌 Kotak';
+  const kunjungan = t.jumlah_kunjungan > 0
+    ? `<div style="font-size:.75rem;color:#e67e22">⚠ ${t.jumlah_kunjungan}x tidak ada</div>` : '';
+  L.marker([t.lat, t.lng], {icon: makeIcon(color)})
+   .bindPopup(`
+     <div style="min-width:160px">
+       <div style="font-weight:700">${t.nama}</div>
+       <div style="font-size:.8rem;color:#666">${t.lokasi_nama||''}</div>
+       <div style="font-size:.8rem;color:#888;margin-bottom:4px">${t.area||''}</div>
+       <div style="font-size:.8rem">${label}</div>
+       ${kunjungan}
+       <a href="/marketing/koleksi/${t.id}"
+          style="display:block;margin-top:8px;background:#2980b9;color:#fff;
+                 padding:4px 8px;border-radius:6px;text-align:center;
+                 font-size:.8rem;text-decoration:none">Catat Koleksi</a>
+     </div>
+   `).addTo(map);
+});
+
+if (titik.length > 0) {
+  map.fitBounds(titik.map(t=>[t.lat,t.lng]), {padding:[30,30]});
+}
+</script>
+{% endblock %}

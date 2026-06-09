@@ -1,0 +1,86 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Koleksi{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="fw-bold fs-5">Koleksi Bulan Ini</div>
+  {% if stats %}
+  <div class="text-end small text-muted">
+    <span class="badge bg-success">{{ stats.terkumpul }}</span>/{{ stats.total }} selesai
+  </div>
+  {% endif %}
+</div>
+
+<!-- Filter area -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="/marketing/koleksi?bulan={{ bulan }}"
+     class="btn btn-sm {% if not area %}btn-primary{% else %}btn-outline-secondary{% endif %}">Semua</a>
+  {% for a in areas %}
+  <a href="/marketing/koleksi?bulan={{ bulan }}&area={{ a.area }}"
+     class="btn btn-sm {% if area == a.area %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    {{ a.area }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if not koleksi %}
+<div class="card p-4 text-center text-muted">
+  <i class="bi bi-check-circle fs-2 d-block mb-2 text-success"></i>
+  {% if area %}Area {{ area }} sudah selesai semua!
+  {% else %}Semua koleksi bulan ini sudah selesai!{% endif %}
+</div>
+{% else %}
+
+{% set ns = namespace(current_area='__unset__') %}
+{% for k in koleksi %}
+  {% if k.area != ns.current_area %}
+    {% if ns.current_area != '__unset__' %}</div>{% endif %}
+    {% set ns.current_area = k.area %}
+    <div class="fw-semibold text-secondary small text-uppercase mb-2 mt-3">
+      <i class="bi bi-geo-alt"></i> {{ k.area or 'Tanpa Area' }}
+    </div>
+    <div>
+  {% endif %}
+
+  <div class="card mb-2">
+    <div class="d-flex align-items-stretch">
+      <!-- Warna strip kiri -->
+      <div style="width:5px;border-radius:8px 0 0 8px;background:
+        {% if k.status=='tidak_ada' %}#e67e22{% else %}#3498db{% endif %}"></div>
+
+      <div class="p-3 flex-grow-1">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-semibold">{{ k.donatur_nama }}</div>
+            <div class="small text-muted">{{ k.lokasi_nama or '' }}</div>
+            <div class="d-flex gap-1 mt-1">
+              {% if k.sumber_infaq == 'kencleng' %}
+                <span class="badge" style="background:#27ae60;font-size:.65rem">🏠 Kencleng</span>
+              {% else %}
+                <span class="badge" style="background:#2980b9;font-size:.65rem">🕌 Kotak Infaq</span>
+              {% endif %}
+              {% if k.status == 'tidak_ada' %}
+                <span class="badge bg-warning text-dark" style="font-size:.65rem">
+                  ⚠ Tidak Ada ({{ k.jumlah_kunjungan }}x)
+                </span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="d-flex gap-1">
+            {% if k.lat and k.lng %}
+            <a href="https://www.google.com/maps?q={{ k.lat }},{{ k.lng }}"
+               target="_blank" class="btn btn-sm btn-outline-secondary py-1 px-2">
+              <i class="bi bi-geo-alt"></i>
+            </a>
+            {% endif %}
+            <a href="/marketing/koleksi/{{ k.id }}"
+               class="btn btn-sm btn-primary py-1 px-2">Catat</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

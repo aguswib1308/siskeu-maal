@@ -56,6 +56,12 @@
   <a href="/marketing" class="{% if request.path == '/marketing' %}active{% endif %}">
     <i class="bi bi-house"></i> Beranda
   </a>
+  <a href="/marketing/koleksi" class="{% if '/koleksi' in request.path %}active{% endif %}">
+    <i class="bi bi-basket"></i> Koleksi
+  </a>
+  <a href="/marketing/peta" class="{% if '/peta' in request.path %}active{% endif %}">
+    <i class="bi bi-map"></i> Peta
+  </a>
   <a href="/marketing/catat" class="{% if '/catat' in request.path %}active{% endif %}">
     <i class="bi bi-plus-circle"></i> Catat
   </a>

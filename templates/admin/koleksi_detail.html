@@ -1,0 +1,108 @@
+{% extends 'admin/base.html' %}
+{% block title %}Detail Koleksi {{ bulan }}{% endblock %}
+{% block page_title %}<i class="bi bi-basket"></i> Koleksi {{ bulan }}{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  {% set pct = ((stats.terkumpul / stats.total)*100)|int if stats.total > 0 else 0 %}
+  <div class="col-md-3"><div class="card p-3" style="border-left:4px solid #27ae60">
+    <div class="text-muted small">Terkumpul</div>
+    <div class="fs-4 fw-bold text-success">{{ stats.terkumpul }} <small class="fs-6">/ {{ stats.total }}</small></div>
+    <div class="progress mt-1" style="height:6px"><div class="progress-bar bg-success" style="width:{{ pct }}%"></div></div>
+  </div></div>
+  <div class="col-md-3"><div class="card p-3" style="border-left:4px solid #e67e22">
+    <div class="text-muted small">Tidak Ada / Coba Lagi</div>
+    <div class="fs-4 fw-bold text-warning">{{ stats.tidak_ada }}</div>
+  </div></div>
+  <div class="col-md-3"><div class="card p-3" style="border-left:4px solid #95a5a6">
+    <div class="text-muted small">Belum Dikunjungi</div>
+    <div class="fs-4 fw-bold text-secondary">{{ stats.terjadwal }}</div>
+  </div></div>
+  <div class="col-md-3"><div class="card p-3" style="border-left:4px solid #2980b9">
+    <div class="text-muted small">Total Nominal</div>
+    <div class="fs-5 fw-bold text-primary">{{ stats.total_nominal | rupiah }}</div>
+  </div></div>
+</div>
+
+<!-- Filter -->
+<div class="card p-3 mb-3">
+  <form class="d-flex gap-2 flex-wrap align-items-end">
+    <div>
+      <label class="form-label small fw-semibold mb-1">Status</label>
+      <select name="status" class="form-select form-select-sm" style="width:150px">
+        <option value="">Semua</option>
+        <option value="terjadwal"  {% if status_filter=='terjadwal'  %}selected{% endif %}>Belum</option>
+        <option value="tidak_ada"  {% if status_filter=='tidak_ada'  %}selected{% endif %}>Tidak Ada</option>
+        <option value="terkumpul"  {% if status_filter=='terkumpul'  %}selected{% endif %}>Terkumpul</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label small fw-semibold mb-1">Area</label>
+      <select name="area" class="form-select form-select-sm" style="width:160px">
+        <option value="">Semua Area</option>
+        {% for a in areas %}
+        <option value="{{ a.area }}" {% if area_filter==a.area %}selected{% endif %}>{{ a.area }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-sm btn-primary">Filter</button>
+    <a href="/admin/koleksi/{{ bulan }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    <a href="/admin/koleksi/capaian?bulan={{ bulan }}" class="btn btn-sm btn-outline-info ms-auto">
+      <i class="bi bi-trophy"></i> Capaian Marketing
+    </a>
+  </form>
+</div>
+
+<!-- Tabel -->
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Nama</th><th>Area</th><th>Jenis</th><th class="text-center">Status</th><th class="text-center">Kunjungan</th><th>Dikumpulkan oleh</th><th>Tgl Koleksi</th><th class="text-end">Nominal</th></tr>
+      </thead>
+      <tbody>
+        {% for k in koleksi %}
+        <tr>
+          <td>
+            <div class="fw-semibold">{{ k.donatur_nama }}</div>
+            {% if k.lokasi_nama and k.lokasi_nama != k.donatur_nama %}
+            <div class="small text-muted">{{ k.lokasi_nama }}</div>
+            {% endif %}
+          </td>
+          <td class="small">{{ k.area or '—' }}</td>
+          <td>
+            {% if k.sumber_infaq == 'kencleng' %}
+            <span class="badge" style="background:#27ae60">🏠 Kencleng</span>
+            {% else %}
+            <span class="badge" style="background:#2980b9">🕌 Kotak</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% if k.status == 'terkumpul' %}
+              <span class="badge bg-success">Terkumpul</span>
+            {% elif k.status == 'tidak_ada' %}
+              <span class="badge bg-warning text-dark">Tidak Ada</span>
+            {% else %}
+              <span class="badge bg-secondary">Belum</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% if k.jumlah_kunjungan > 0 %}
+            <span class="badge bg-light text-dark border">{{ k.jumlah_kunjungan }}x</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="small">{{ k.marketing_nama or '—' }}</td>
+          <td class="small text-muted">{{ k.tanggal_koleksi or '—' }}</td>
+          <td class="text-end fw-semibold {% if k.status=='terkumpul' %}text-success{% else %}text-muted{% endif %}">
+            {% if k.status == 'terkumpul' %}{{ k.jumlah | rupiah }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
