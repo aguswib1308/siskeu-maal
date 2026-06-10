@@ -1,12 +1,12 @@
 {% extends 'marketing/base.html' %}
-{% block title %}Koleksi{% endblock %}
+{% block title %}Fundraising{% endblock %}
 
 {% block content %}
 
 {# ── Header + progress ─────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
-    <div class="fw-bold" style="font-size:1.05rem">Koleksi Bulan Ini</div>
+    <div class="fw-bold" style="font-size:1.05rem">Fundraising Bulan Ini</div>
     <div class="text-muted" style="font-size:.78rem">{{ bulan }}</div>
   </div>
   {% if stats %}
@@ -52,7 +52,7 @@
   <i class="bi bi-check-circle-fill fs-1 d-block mb-2" style="color:#27ae60;opacity:.6"></i>
   <div class="fw-semibold text-muted">
     {% if area %}Area {{ area }} sudah selesai!
-    {% else %}Semua koleksi sudah selesai!{% endif %}
+    {% else %}Semua fundraising sudah selesai!{% endif %}
   </div>
 </div>
 {% else %}

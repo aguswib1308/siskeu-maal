@@ -1,6 +1,6 @@
 {% extends 'admin/base.html' %}
-{% block title %}Koleksi{% endblock %}
-{% block page_title %}<i class="bi bi-basket"></i> Kelola Koleksi Bulanan{% endblock %}
+{% block title %}Fundraising{% endblock %}
+{% block page_title %}<i class="bi bi-basket"></i> Kelola Fundraising Bulanan{% endblock %}
 
 {% block content %}
 <div class="row g-3 mb-4">
@@ -15,19 +15,19 @@
 
 <!-- Buka Periode Baru -->
 <div class="card p-3 mb-4">
-  <div class="fw-semibold mb-3"><i class="bi bi-plus-circle"></i> Buka Periode Koleksi</div>
+  <div class="fw-semibold mb-3"><i class="bi bi-plus-circle"></i> Buka Periode Fundraising</div>
   <form method="POST" action="/admin/koleksi/buka" class="d-flex gap-2 align-items-end">
     <div>
       <label class="form-label fw-semibold small">Bulan</label>
       <input type="month" name="bulan" value="{{ bulan_ini }}" class="form-control" style="width:180px" required>
     </div>
     <button type="submit" class="btn btn-success"
-            onclick="return confirm('Buka periode koleksi untuk bulan ini? Sistem akan generate record untuk semua donatur aktif.')">
+            onclick="return confirm('Buka periode fundraising untuk bulan ini? Sistem akan generate record untuk semua donatur aktif.')">
       <i class="bi bi-play-circle"></i> Buka Periode
     </button>
   </form>
   <small class="text-muted mt-2 d-block">
-    Sistem akan membuat jadwal koleksi untuk semua <strong>{{ total_donatur }}</strong> donatur kencleng & kotak infaq aktif.
+    Sistem akan membuat jadwal fundraising untuk semua <strong>{{ total_donatur }}</strong> donatur kencleng & kotak infaq aktif.
   </small>
 </div>
 
@@ -68,7 +68,7 @@
   {% else %}
   <div class="text-center text-muted py-4">
     <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-    Belum ada periode koleksi. Klik "Buka Periode" untuk memulai.
+    Belum ada periode fundraising. Klik "Buka Periode" untuk memulai.
   </div>
   {% endif %}
 </div>
