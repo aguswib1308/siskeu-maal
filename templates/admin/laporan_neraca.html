@@ -31,24 +31,28 @@
     <div class="report-period">Per {{ last_day }} — {{ bulan | bulan_label }}</div>
   </div>
 
-  <div class="row g-4 p-4">
-    <div class="col-md-6">
-      <table class="table table-sm report-table">
-        <thead>
-          <tr class="report-thead"><th colspan="2">ASET</th></tr>
-        </thead>
-        <tbody>
-          <tr class="report-group"><td colspan="2">Aset Lancar</td></tr>
-          {% for dana, label in [('zakat','Kas & Setara Kas Dana Zakat'),
-                                  ('infak_sedekah','Kas & Setara Kas Dana Infak/Sedekah'),
-                                  ('amil','Kas & Setara Kas Dana Amil'),
-                                  ('wakaf','Kas & Setara Kas Dana Wakaf')] %}
-          <tr>
-            <td class="ps-4 report-item">{{ label }}</td>
-            <td class="text-end report-amount">{{ kas.get(dana, 0)|rupiah }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
+  <div class="row g-4 p-4 align-items-stretch">
+    <div class="col-md-6 d-flex flex-column">
+      <div class="flex-grow-1">
+        <table class="table table-sm report-table">
+          <thead>
+            <tr class="report-thead"><th colspan="2">ASET</th></tr>
+          </thead>
+          <tbody>
+            <tr class="report-group"><td colspan="2">Aset Lancar</td></tr>
+            {% for dana, label in [('zakat','Kas & Setara Kas Dana Zakat'),
+                                    ('infak_sedekah','Kas & Setara Kas Dana Infak/Sedekah'),
+                                    ('amil','Kas & Setara Kas Dana Amil'),
+                                    ('wakaf','Kas & Setara Kas Dana Wakaf')] %}
+            <tr>
+              <td class="ps-4 report-item">{{ label }}</td>
+              <td class="text-end report-amount">{{ kas.get(dana, 0)|rupiah }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <table class="table table-sm report-table mb-0">
         <tfoot>
           <tr class="report-total">
             <td>TOTAL ASET</td>
@@ -58,34 +62,38 @@
       </table>
     </div>
 
-    <div class="col-md-6">
-      <table class="table table-sm report-table">
-        <thead>
-          <tr class="report-thead"><th colspan="2">LIABILITAS & SALDO DANA</th></tr>
-        </thead>
-        <tbody>
-          <tr class="report-group"><td colspan="2">Liabilitas</td></tr>
-          <tr>
-            <td class="ps-4 report-item">Titipan / Hutang Dana Zakat</td>
-            <td class="text-end report-amount">Rp 0</td>
-          </tr>
-          <tr>
-            <td class="ps-4 report-item">Titipan / Hutang Dana Infak</td>
-            <td class="text-end report-amount">Rp 0</td>
-          </tr>
-          <tr class="report-subtotal">
-            <td>Total Liabilitas</td>
-            <td class="text-end">Rp 0</td>
-          </tr>
-          <tr class="report-group" style="border-top:2px solid #dee2e6"><td colspan="2">Saldo Dana</td></tr>
-          {% for dana in dana_types %}
-          {% set sal = kas.get(dana, 0) %}
-          <tr>
-            <td class="ps-4 report-item">Saldo Dana {{ LABEL_DANA.get(dana, dana) }}</td>
-            <td class="text-end report-amount {% if sal < 0 %}text-danger{% endif %}">{{ sal|rupiah }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
+    <div class="col-md-6 d-flex flex-column">
+      <div class="flex-grow-1">
+        <table class="table table-sm report-table">
+          <thead>
+            <tr class="report-thead"><th colspan="2">LIABILITAS & SALDO DANA</th></tr>
+          </thead>
+          <tbody>
+            <tr class="report-group"><td colspan="2">Liabilitas</td></tr>
+            <tr>
+              <td class="ps-4 report-item">Titipan / Hutang Dana Zakat</td>
+              <td class="text-end report-amount">Rp 0</td>
+            </tr>
+            <tr>
+              <td class="ps-4 report-item">Titipan / Hutang Dana Infak</td>
+              <td class="text-end report-amount">Rp 0</td>
+            </tr>
+            <tr class="report-subtotal">
+              <td>Total Liabilitas</td>
+              <td class="text-end">Rp 0</td>
+            </tr>
+            <tr class="report-group" style="border-top:2px solid #dee2e6"><td colspan="2">Saldo Dana</td></tr>
+            {% for dana in dana_types %}
+            {% set sal = kas.get(dana, 0) %}
+            <tr>
+              <td class="ps-4 report-item">Saldo Dana {{ LABEL_DANA.get(dana, dana) }}</td>
+              <td class="text-end report-amount {% if sal < 0 %}text-danger{% endif %}">{{ sal|rupiah }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <table class="table table-sm report-table mb-0">
         <tfoot>
           <tr class="report-total">
             <td>TOTAL LIABILITAS & SALDO DANA</td>
