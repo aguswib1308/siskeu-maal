@@ -3,7 +3,6 @@
 {% block page_title %}<i class="bi bi-bank2"></i> Neraca{% endblock %}
 
 {% block content %}
-{# ── Filter ───────────────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-4 no-print">
   <form class="d-flex gap-2">
     <input type="month" name="bulan" value="{{ bulan }}"
@@ -15,113 +14,105 @@
   </button>
 </div>
 
-{# ── Header laporan ───────────────────────────────────── #}
-<div class="card p-4">
-  <div class="text-center mb-4">
-    <div class="fw-bold fs-5">BAITUL MAAL BMT</div>
-    <div class="fw-bold fs-4 mt-1">NERACA</div>
-    <div class="text-muted">Per {{ last_day | replace('-', ' ') }} — {{ bulan | bulan_label }}</div>
-    <hr>
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}
+    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+    {% endif %}
+    {% if inst.alamat %}
+    <div class="report-addr">{{ inst.alamat }}
+      {% if inst.telepon %} · Telp: {{ inst.telepon }}{% endif %}
+      {% if inst.email %} · {{ inst.email }}{% endif %}
+    </div>
+    {% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">NERACA (LAPORAN POSISI KEUANGAN)</div>
+    <div class="report-period">Per {{ last_day }} — {{ bulan | bulan_label }}</div>
   </div>
 
-  <div class="row g-4">
-
-    {# ── ASET ──────────────────────────────────────────── #}
+  <div class="row g-4 p-4">
     <div class="col-md-6">
-      <table class="table table-sm">
+      <table class="table table-sm report-table">
         <thead>
-          <tr style="background:#1a5276;color:#fff">
-            <th colspan="2" class="ps-3">ASET</th>
-          </tr>
+          <tr class="report-thead"><th colspan="2">ASET</th></tr>
         </thead>
         <tbody>
-          <tr class="table-light">
-            <td colspan="2" class="fw-semibold ps-3">Aset Lancar</td>
-          </tr>
+          <tr class="report-group"><td colspan="2">Aset Lancar</td></tr>
+          {% for dana, label in [('zakat','Kas & Setara Kas Dana Zakat'),
+                                  ('infak_sedekah','Kas & Setara Kas Dana Infak/Sedekah'),
+                                  ('amil','Kas & Setara Kas Dana Amil'),
+                                  ('wakaf','Kas & Setara Kas Dana Wakaf')] %}
           <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Zakat</td>
-            <td class="text-end">{{ kas.get('zakat', 0)|rupiah }}</td>
+            <td class="ps-4 report-item">{{ label }}</td>
+            <td class="text-end report-amount">{{ kas.get(dana, 0)|rupiah }}</td>
           </tr>
-          <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Infak/Sedekah</td>
-            <td class="text-end">{{ kas.get('infak_sedekah', 0)|rupiah }}</td>
-          </tr>
-          <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Amil</td>
-            <td class="text-end">{{ kas.get('amil', 0)|rupiah }}</td>
-          </tr>
-          <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">Kas &amp; Setara Kas Dana Wakaf</td>
-            <td class="text-end">{{ kas.get('wakaf', 0)|rupiah }}</td>
-          </tr>
-          <tr class="table-light fw-bold border-top">
-            <td class="ps-3">TOTAL ASET</td>
-            <td class="text-end text-primary">{{ total_aset|rupiah }}</td>
-          </tr>
+          {% endfor %}
         </tbody>
+        <tfoot>
+          <tr class="report-total">
+            <td>TOTAL ASET</td>
+            <td class="text-end">{{ total_aset|rupiah }}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
 
-    {# ── LIABILITAS + SALDO DANA ───────────────────────── #}
     <div class="col-md-6">
-      <table class="table table-sm">
+      <table class="table table-sm report-table">
         <thead>
-          <tr style="background:#1a5276;color:#fff">
-            <th colspan="2" class="ps-3">LIABILITAS &amp; SALDO DANA</th>
-          </tr>
+          <tr class="report-thead"><th colspan="2">LIABILITAS & SALDO DANA</th></tr>
         </thead>
         <tbody>
-          <tr class="table-light">
-            <td colspan="2" class="fw-semibold ps-3">Liabilitas</td>
+          <tr class="report-group"><td colspan="2">Liabilitas</td></tr>
+          <tr>
+            <td class="ps-4 report-item">Titipan / Hutang Dana Zakat</td>
+            <td class="text-end report-amount">Rp 0</td>
           </tr>
           <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">Titipan / Hutang Dana Zakat</td>
+            <td class="ps-4 report-item">Titipan / Hutang Dana Infak</td>
+            <td class="text-end report-amount">Rp 0</td>
+          </tr>
+          <tr class="report-subtotal">
+            <td>Total Liabilitas</td>
             <td class="text-end">Rp 0</td>
           </tr>
-          <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">Titipan / Hutang Dana Infak</td>
-            <td class="text-end">Rp 0</td>
-          </tr>
-          <tr class="fw-semibold" style="border-top:1px solid #dee2e6">
-            <td class="ps-3">Total Liabilitas</td>
-            <td class="text-end">Rp 0</td>
-          </tr>
-
-          <tr class="table-light" style="border-top:2px solid #dee2e6">
-            <td colspan="2" class="fw-semibold ps-3">Saldo Dana</td>
-          </tr>
+          <tr class="report-group" style="border-top:2px solid #dee2e6"><td colspan="2">Saldo Dana</td></tr>
           {% for dana in dana_types %}
           {% set sal = kas.get(dana, 0) %}
           <tr>
-            <td class="ps-4 text-muted" style="font-size:.85rem">
-              Saldo Dana {{ LABEL_DANA.get(dana, dana) }}
-            </td>
-            <td class="text-end {% if sal < 0 %}text-danger{% endif %}">
-              {{ sal|rupiah }}
-            </td>
+            <td class="ps-4 report-item">Saldo Dana {{ LABEL_DANA.get(dana, dana) }}</td>
+            <td class="text-end report-amount {% if sal < 0 %}text-danger{% endif %}">{{ sal|rupiah }}</td>
           </tr>
           {% endfor %}
-          <tr class="table-light fw-bold border-top">
-            <td class="ps-3">TOTAL LIABILITAS &amp; SALDO DANA</td>
-            <td class="text-end text-primary">{{ total_aset|rupiah }}</td>
-          </tr>
         </tbody>
+        <tfoot>
+          <tr class="report-total">
+            <td>TOTAL LIABILITAS & SALDO DANA</td>
+            <td class="text-end">{{ total_aset|rupiah }}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
-
   </div>
 
-  <div class="text-muted small text-end mt-3 no-print">
-    Dicetak: {{ now if now else '' }} · Sistem Keuangan Baitul Maal
+  {% if inst.ketua or inst.bendahara %}
+  <div class="report-sign">
+    <div class="row">
+      <div class="col-6 text-center">
+        <div class="sign-role">Mengetahui,</div>
+        <div class="sign-name">{{ inst.ketua or '_______________' }}</div>
+        <div class="sign-label">Ketua</div>
+      </div>
+      <div class="col-6 text-center">
+        <div class="sign-role">Dibuat oleh,</div>
+        <div class="sign-name">{{ inst.bendahara or '_______________' }}</div>
+        <div class="sign-label">Bendahara</div>
+      </div>
+    </div>
   </div>
+  {% endif %}
 </div>
 
-<style>
-@media print {
-  .no-print { display: none !important; }
-  .sidebar, .topbar { display: none !important; }
-  .main { margin-left: 0 !important; padding: 1rem !important; }
-  .card { box-shadow: none !important; border: none !important; }
-}
-</style>
+{% include 'admin/_report_style.html' %}
 {% endblock %}

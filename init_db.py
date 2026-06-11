@@ -16,9 +16,17 @@ def migrate(conn):
         ('coa_id',      'INTEGER REFERENCES chart_of_accounts(id)'),
         ('penerima_id', 'INTEGER REFERENCES penerima_manfaat(id)'),
         ('jenis_dana',  'TEXT'),
+        ('jurnal_id',   'INTEGER REFERENCES jurnal(id)'),
     ]:
         if col not in trx:
             c.execute(f"ALTER TABLE transaksi ADD COLUMN {col} {defn}")
+
+    usr = {r[1] for r in c.execute("PRAGMA table_info(users)")}
+    for col, defn in [
+        ('no_hp', 'TEXT'),
+    ]:
+        if col not in usr:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} {defn}")
 
     don = {r[1] for r in c.execute("PRAGMA table_info(donatur)")}
     for col, defn in [
@@ -30,6 +38,7 @@ def migrate(conn):
         ('lat',          'REAL'),
         ('lng',          'REAL'),
         ('aktif_infaq',  'INTEGER DEFAULT 1'),
+        ('program_id',   'INTEGER REFERENCES chart_of_accounts(id)'),
     ]:
         if col not in don:
             c.execute(f"ALTER TABLE donatur ADD COLUMN {col} {defn}")
@@ -130,6 +139,49 @@ def init():
             keterangan TEXT
         );
     ''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS instansi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT NOT NULL DEFAULT 'BAITUL MAAL BMT',
+        nama_lembaga TEXT DEFAULT '',
+        alamat TEXT DEFAULT '',
+        telepon TEXT DEFAULT '',
+        email TEXT DEFAULT '',
+        website TEXT DEFAULT '',
+        ketua TEXT DEFAULT '',
+        bendahara TEXT DEFAULT '',
+        sekretaris TEXT DEFAULT '',
+        no_izin TEXT DEFAULT '',
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+    c.execute("INSERT OR IGNORE INTO instansi (id, nama) VALUES (1, 'BAITUL MAAL BMT')")
+
+    c.execute('''CREATE TABLE IF NOT EXISTS jurnal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tanggal TEXT NOT NULL,
+        no_bukti TEXT,
+        keterangan TEXT,
+        debit_coa_id INTEGER REFERENCES chart_of_accounts(id),
+        kredit_coa_id INTEGER REFERENCES chart_of_accounts(id),
+        jumlah REAL NOT NULL,
+        user_id INTEGER REFERENCES users(id),
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS area (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT UNIQUE NOT NULL,
+        aktif INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+
+    AREA_SEED = ['Mundu','Banjardowo','Ngerco','Barengan','Giriwono','Wonokarto',
+                 'Krisak','Kedungringin','Kajen','Donoharjo','Gerdu','Bauresan',
+                 'Cubluk','Pasar','Pokoh','Bulusulur','Klemut','Sendangsari',
+                 'Timang','Manjung','Sonoharjo','Kedungsono','Nambangan',
+                 'Keblokan','Jomboran','Sumberjo','Jurug','Brumbung']
+    c.executemany("INSERT OR IGNORE INTO area (nama) VALUES (?)",
+                  [(a,) for a in AREA_SEED])
 
     migrate(conn)
 

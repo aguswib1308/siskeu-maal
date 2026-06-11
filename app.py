@@ -93,6 +93,28 @@ def buka_periode(bulan, user_id):
     conn.close()
     return created
 
+def auto_koleksi_donatur_baru(conn, donatur_id, sumber_infaq):
+    """Buat koleksi_bulanan bulan ini untuk donatur baru kencleng/kotak_infaq."""
+    if sumber_infaq in ('kencleng', 'kotak_infaq'):
+        bulan = date.today().strftime('%Y-%m')
+        try:
+            conn.execute("INSERT INTO koleksi_bulanan (donatur_id, bulan) VALUES (?,?)",
+                         (donatur_id, bulan))
+        except:
+            pass
+
+def get_instansi(conn=None):
+    close = False
+    if conn is None:
+        conn = get_db(); close = True
+    row = conn.execute("SELECT * FROM instansi WHERE id=1").fetchone()
+    if close: conn.close()
+    if row:
+        return dict(row)
+    return {'nama': 'BAITUL MAAL BMT', 'nama_lembaga': '', 'alamat': '', 'telepon': '',
+            'email': '', 'website': '', 'ketua': '', 'bendahara': '', 'sekretaris': '',
+            'no_izin': ''}
+
 def auto_transaksi_koleksi(conn, koleksi_id, donatur_id, bulan, sumber, jumlah, tanggal, user_id):
     """Buat transaksi otomatis saat koleksi terkumpul."""
     coa = conn.execute("SELECT id FROM chart_of_accounts WHERE kode='4.2.2'").fetchone()
@@ -188,11 +210,14 @@ def admin_transaksi():
     query += ' ORDER BY t.tanggal DESC, t.created_at DESC'
     transaksi   = conn.execute(query, params).fetchall()
     coa_list    = conn.execute("SELECT * FROM chart_of_accounts WHERE jenis_transaksi IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
+    coa_parents = conn.execute(
+        "SELECT * FROM chart_of_accounts WHERE parent_kode IS NOT NULL AND aktif=1 ORDER BY kode"
+    ).fetchall()
     donatur_list= conn.execute("SELECT * FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list=conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
     conn.close()
     return render_template('admin/transaksi.html', transaksi=transaksi, coa_list=coa_list,
-        donatur_list=donatur_list, penerima_list=penerima_list,
+        coa_parents=coa_parents, donatur_list=donatur_list, penerima_list=penerima_list,
         bulan=bulan, jenis=jenis, jenis_dana=jenis_dana)
 
 @app.route('/admin/transaksi/tambah', methods=['POST'])
@@ -300,11 +325,11 @@ def laporan_neraca():
 
     dana_types = ['zakat', 'infak_sedekah', 'amil', 'wakaf']
     total_aset = sum(kas.get(d, 0) for d in dana_types)
+    inst = get_instansi(conn)
     conn.close()
-
     return render_template('admin/laporan_neraca.html',
         kas=kas, dana_types=dana_types, total_aset=total_aset,
-        bulan=bulan, last_day=ld)
+        bulan=bulan, last_day=ld, inst=inst)
 
 
 @app.route('/admin/laporan/dana')
@@ -313,9 +338,10 @@ def laporan_dana():
     bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
     conn  = get_db()
     data  = _dana_summary(conn, bulan)
+    inst  = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_dana.html',
-        data=data, bulan=bulan,
+        data=data, bulan=bulan, inst=inst,
         dana_types=['zakat', 'infak_sedekah', 'amil', 'wakaf'])
 
 
@@ -349,11 +375,12 @@ def laporan_arus_kas():
     total_keluar = sum(r['total'] for r in keluar)
     conn.close()
 
+    inst = get_instansi()
     return render_template('admin/laporan_arus_kas.html',
         masuk=masuk, keluar=keluar,
         total_masuk=total_masuk, total_keluar=total_keluar,
         saldo_awal=saldo_awal, saldo_akhir=saldo_awal + total_masuk - total_keluar,
-        bulan=bulan)
+        bulan=bulan, inst=inst)
 
 # ── Admin Koleksi ─────────────────────────────────────────────────────────────
 
@@ -559,21 +586,24 @@ def master_donatur():
     q       = request.args.get('q','')
     sumber  = request.args.get('sumber','')
     area    = request.args.get('area','')
-    query   = "SELECT * FROM donatur WHERE 1=1"
+    query   = "SELECT d.*, c.nama AS program_nama FROM donatur d LEFT JOIN chart_of_accounts c ON d.program_id=c.id WHERE 1=1"
     params  = []
     if q:
-        query += " AND (nama LIKE ? OR no_hp LIKE ? OR lokasi_nama LIKE ?)";
+        query += " AND (d.nama LIKE ? OR d.no_hp LIKE ? OR d.lokasi_nama LIKE ?)";
         params += [f'%{q}%',f'%{q}%',f'%{q}%']
     if sumber:
-        query += " AND sumber_infaq=?"; params.append(sumber)
+        query += " AND d.sumber_infaq=?"; params.append(sumber)
     if area:
-        query += " AND area=?"; params.append(area)
-    query += " ORDER BY sumber_infaq, area, nama"
+        query += " AND d.area=?"; params.append(area)
+    query += " ORDER BY d.sumber_infaq, d.area, d.nama"
     donatur = conn.execute(query, params).fetchall()
-    areas   = conn.execute("SELECT DISTINCT area FROM donatur WHERE area IS NOT NULL ORDER BY area").fetchall()
+    areas   = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
+    produk_list = conn.execute(
+        "SELECT id, kode, nama, parent_kode FROM chart_of_accounts WHERE parent_kode IN ('4.1','4.2.1','4.4') AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode"
+    ).fetchall()
     conn.close()
     return render_template('admin/master/donatur.html',
-        donatur=donatur, areas=areas, q=q, sumber=sumber, area=area)
+        donatur=donatur, areas=areas, produk_list=produk_list, q=q, sumber=sumber, area=area)
 
 @app.route('/admin/master/donatur/tambah', methods=['POST'])
 @admin_required
@@ -587,13 +617,16 @@ def master_donatur_tambah():
         try: lat = float(data['lat']); lng = float(data['lng'])
         except: pass
     conn = get_db()
-    conn.execute("""INSERT INTO donatur
-        (nama,nik,no_hp,alamat,jenis,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+    program_id = int(data['program_id']) if data.get('program_id') else None
+    sumber = data.get('sumber_infaq', 'tunai')
+    cur = conn.execute("""INSERT INTO donatur
+        (nama,nik,no_hp,alamat,jenis,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq,program_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
         (data['nama'], data.get('nik',''), data.get('no_hp',''), data.get('alamat',''),
-         data.get('jenis','perorangan'), data.get('sumber_infaq','tunai'),
+         data.get('jenis','perorangan'), sumber,
          data.get('area',''), data.get('lokasi_nama',''),
-         lat, lng, 1 if data.get('aktif_infaq') else 0))
+         lat, lng, 1 if data.get('aktif_infaq') else 0, program_id))
+    auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
     flash('Donatur berhasil ditambahkan.', 'success')
     return redirect(url_for('master_donatur'))
@@ -613,13 +646,14 @@ def master_donatur_edit(id):
     existing = conn.execute("SELECT lat,lng FROM donatur WHERE id=?", (id,)).fetchone()
     if lat is None and existing:
         lat, lng = existing['lat'], existing['lng']
+    program_id = int(data['program_id']) if data.get('program_id') else None
     conn.execute("""UPDATE donatur SET
-        nama=?,nik=?,no_hp=?,alamat=?,jenis=?,sumber_infaq=?,area=?,lokasi_nama=?,lat=?,lng=?,aktif_infaq=?
+        nama=?,nik=?,no_hp=?,alamat=?,jenis=?,sumber_infaq=?,area=?,lokasi_nama=?,lat=?,lng=?,aktif_infaq=?,program_id=?
         WHERE id=?""",
         (data['nama'], data.get('nik',''), data.get('no_hp',''), data.get('alamat',''),
          data.get('jenis','perorangan'), data.get('sumber_infaq','tunai'),
          data.get('area',''), data.get('lokasi_nama',''),
-         lat, lng, 1 if data.get('aktif_infaq') else 0, id))
+         lat, lng, 1 if data.get('aktif_infaq') else 0, program_id, id))
     conn.commit(); conn.close()
     flash('Donatur diperbarui.', 'success')
     return redirect(url_for('master_donatur'))
@@ -631,6 +665,22 @@ def master_donatur_toggle(id):
     conn.execute("UPDATE donatur SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
     conn.commit(); conn.close()
     return redirect(url_for('master_donatur'))
+
+@app.route('/admin/master/donatur/quick/<int:id>', methods=['POST'])
+@admin_required
+def master_donatur_quick(id):
+    ALLOWED = {'nama', 'area', 'no_hp', 'sumber_infaq', 'lokasi_nama'}
+    data = request.json or {}
+    field = data.get('field', '')
+    value = data.get('value', '').strip()
+    if field not in ALLOWED:
+        return jsonify(ok=False, msg='Field tidak valid'), 400
+    if field == 'nama' and not value:
+        return jsonify(ok=False, msg='Nama wajib diisi'), 400
+    conn = get_db()
+    conn.execute(f"UPDATE donatur SET {field}=? WHERE id=?", (value or None, id))
+    conn.commit(); conn.close()
+    return jsonify(ok=True, field=field, value=value)
 
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
@@ -680,6 +730,178 @@ def master_penerima_toggle(id):
     conn.commit(); conn.close()
     return redirect(url_for('master_penerima'))
 
+# ── Master: Area ─────────────────────────────────────────────────────────────
+
+@app.route('/admin/master/area')
+@admin_required
+def master_area():
+    conn = get_db()
+    areas = conn.execute("SELECT a.*, (SELECT COUNT(*) FROM donatur d WHERE d.area=a.nama) AS jml_donatur FROM area a ORDER BY a.nama").fetchall()
+    conn.close()
+    return render_template('admin/master/area.html', areas=areas)
+
+@app.route('/admin/master/area/tambah', methods=['POST'])
+@admin_required
+def master_area_tambah():
+    nama = request.form.get('nama', '').strip()
+    if not nama:
+        flash('Nama area wajib diisi.', 'danger')
+        return redirect(url_for('master_area'))
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM area WHERE nama=?", (nama,)).fetchone()
+    if existing:
+        flash('Area sudah ada.', 'warning')
+    else:
+        conn.execute("INSERT INTO area (nama) VALUES (?)", (nama,))
+        conn.commit()
+        flash(f'Area "{nama}" ditambahkan.', 'success')
+    conn.close()
+    return redirect(url_for('master_area'))
+
+@app.route('/admin/master/area/edit/<int:id>', methods=['POST'])
+@admin_required
+def master_area_edit(id):
+    nama = request.form.get('nama', '').strip()
+    if not nama:
+        flash('Nama area wajib diisi.', 'danger')
+        return redirect(url_for('master_area'))
+    conn = get_db()
+    old = conn.execute("SELECT nama FROM area WHERE id=?", (id,)).fetchone()
+    dup = conn.execute("SELECT id FROM area WHERE nama=? AND id!=?", (nama, id)).fetchone()
+    if dup:
+        flash('Nama area sudah dipakai.', 'warning')
+    else:
+        conn.execute("UPDATE area SET nama=? WHERE id=?", (nama, id))
+        if old and old['nama']:
+            conn.execute("UPDATE donatur SET area=? WHERE area=?", (nama, old['nama']))
+        conn.commit()
+        flash(f'Area diperbarui menjadi "{nama}".', 'success')
+    conn.close()
+    return redirect(url_for('master_area'))
+
+@app.route('/admin/master/area/toggle/<int:id>', methods=['POST'])
+@admin_required
+def master_area_toggle(id):
+    conn = get_db()
+    conn.execute("UPDATE area SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return redirect(url_for('master_area'))
+
+@app.route('/admin/master/area/hapus/<int:id>', methods=['POST'])
+@admin_required
+def master_area_hapus(id):
+    conn = get_db()
+    cnt = conn.execute("SELECT COUNT(*) FROM donatur WHERE area=(SELECT nama FROM area WHERE id=?)", (id,)).fetchone()[0]
+    if cnt > 0:
+        flash(f'Tidak bisa hapus — masih ada {cnt} donatur di area ini.', 'danger')
+    else:
+        conn.execute("DELETE FROM area WHERE id=?", (id,))
+        conn.commit()
+        flash('Area dihapus.', 'success')
+    conn.close()
+    return redirect(url_for('master_area'))
+
+# ── Master: Instansi ─────────────────────────────────────────────────────────
+
+@app.route('/admin/master/instansi')
+@admin_required
+def master_instansi():
+    conn = get_db()
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/master/instansi.html', inst=inst)
+
+@app.route('/admin/master/instansi/simpan', methods=['POST'])
+@admin_required
+def master_instansi_simpan():
+    data = request.form
+    conn = get_db()
+    conn.execute("""UPDATE instansi SET
+        nama=?, nama_lembaga=?, alamat=?, telepon=?, email=?, website=?,
+        ketua=?, bendahara=?, sekretaris=?, no_izin=?,
+        updated_at=datetime('now','localtime')
+        WHERE id=1""",
+        (data.get('nama','').strip(), data.get('nama_lembaga','').strip(),
+         data.get('alamat','').strip(), data.get('telepon','').strip(),
+         data.get('email','').strip(), data.get('website','').strip(),
+         data.get('ketua','').strip(), data.get('bendahara','').strip(),
+         data.get('sekretaris','').strip(), data.get('no_izin','').strip()))
+    conn.commit(); conn.close()
+    flash('Data instansi berhasil diperbarui.', 'success')
+    return redirect(url_for('master_instansi'))
+
+# ── Admin Jurnal (Non-Tunai) ─────────────────────────────────────────────────
+
+@app.route('/admin/jurnal')
+@admin_required
+def admin_jurnal():
+    conn = get_db()
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    jurnal = conn.execute('''
+        SELECT j.*, cd.kode as debit_kode, cd.nama as debit_nama,
+               ck.kode as kredit_kode, ck.nama as kredit_nama, u.nama as petugas
+        FROM jurnal j
+        LEFT JOIN chart_of_accounts cd ON j.debit_coa_id=cd.id
+        LEFT JOIN chart_of_accounts ck ON j.kredit_coa_id=ck.id
+        LEFT JOIN users u ON j.user_id=u.id
+        WHERE strftime('%Y-%m',j.tanggal)=?
+        ORDER BY j.tanggal DESC, j.created_at DESC
+    ''', (bulan,)).fetchall()
+    coa_all = conn.execute(
+        "SELECT id, kode, nama, kelompok, jenis_dana FROM chart_of_accounts WHERE aktif=1 ORDER BY kode"
+    ).fetchall()
+    conn.close()
+    return render_template('admin/jurnal.html', jurnal=jurnal, coa_all=coa_all, bulan=bulan)
+
+@app.route('/admin/jurnal/tambah', methods=['POST'])
+@admin_required
+def admin_jurnal_tambah():
+    data = request.form
+    conn = get_db()
+    debit_coa_id = int(data['debit_coa_id'])
+    kredit_coa_id = int(data['kredit_coa_id'])
+    jumlah = float(data['jumlah'].replace('.','').replace(',',''))
+    tanggal = data['tanggal']
+    keterangan = data.get('keterangan', '')
+    no_bukti = data.get('no_bukti', '').strip()
+
+    cur = conn.execute("""INSERT INTO jurnal
+        (tanggal, no_bukti, keterangan, debit_coa_id, kredit_coa_id, jumlah, user_id)
+        VALUES (?,?,?,?,?,?,?)""",
+        (tanggal, no_bukti, keterangan, debit_coa_id, kredit_coa_id, jumlah, session['user_id']))
+    jurnal_id = cur.lastrowid
+
+    debit_coa = conn.execute("SELECT jenis_dana, jenis_transaksi FROM chart_of_accounts WHERE id=?",
+                              (debit_coa_id,)).fetchone()
+    kredit_coa = conn.execute("SELECT jenis_dana, jenis_transaksi FROM chart_of_accounts WHERE id=?",
+                               (kredit_coa_id,)).fetchone()
+
+    conn.execute("""INSERT INTO transaksi
+        (tanggal, jenis, jenis_dana, coa_id, jumlah, keterangan, user_id, jurnal_id)
+        VALUES (?,?,?,?,?,?,?,?)""",
+        (tanggal, 'masuk', debit_coa['jenis_dana'] if debit_coa else None,
+         debit_coa_id, jumlah, f'[Jurnal] {keterangan}', session['user_id'], jurnal_id))
+
+    conn.execute("""INSERT INTO transaksi
+        (tanggal, jenis, jenis_dana, coa_id, jumlah, keterangan, user_id, jurnal_id)
+        VALUES (?,?,?,?,?,?,?,?)""",
+        (tanggal, 'keluar', kredit_coa['jenis_dana'] if kredit_coa else None,
+         kredit_coa_id, jumlah, f'[Jurnal] {keterangan}', session['user_id'], jurnal_id))
+
+    conn.commit(); conn.close()
+    flash('Jurnal berhasil dicatat.', 'success')
+    return redirect(url_for('admin_jurnal'))
+
+@app.route('/admin/jurnal/hapus/<int:id>', methods=['POST'])
+@admin_required
+def admin_jurnal_hapus(id):
+    conn = get_db()
+    conn.execute("DELETE FROM transaksi WHERE jurnal_id=?", (id,))
+    conn.execute("DELETE FROM jurnal WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    flash('Jurnal dan transaksi terkait dihapus.', 'warning')
+    return redirect(url_for('admin_jurnal'))
+
 # ── Marketing Dashboard ───────────────────────────────────────────────────────
 
 @app.route('/marketing')
@@ -716,6 +938,7 @@ def marketing_koleksi():
     conn = get_db()
     bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
     area  = request.args.get('area', '')
+    q     = request.args.get('q', '').strip()
     query = '''
         SELECT kb.*, d.nama as donatur_nama, d.sumber_infaq, d.area,
                d.lokasi_nama, d.lat, d.lng, u.nama as marketing_nama
@@ -724,8 +947,13 @@ def marketing_koleksi():
         LEFT JOIN users u ON kb.marketing_kunjungi_terakhir=u.id
         WHERE kb.bulan=? AND kb.status != 'terkumpul' '''
     params = [bulan]
-    if area:
+    if area == '__none__':
+        query += " AND (d.area IS NULL OR d.area='')"
+    elif area:
         query += ' AND d.area=?'; params.append(area)
+    if q:
+        query += ' AND (d.nama LIKE ? OR d.lokasi_nama LIKE ?)'
+        params += [f'%{q}%', f'%{q}%']
     query += ' ORDER BY d.area, d.sumber_infaq, d.nama'
     koleksi = conn.execute(query, params).fetchall()
     areas = conn.execute(
@@ -739,7 +967,7 @@ def marketing_koleksi():
     ).fetchone()
     conn.close()
     return render_template('marketing/koleksi.html', koleksi=koleksi, areas=areas,
-        bulan=bulan, area=area, stats=stats)
+        bulan=bulan, area=area, q=q, stats=stats)
 
 @app.route('/marketing/koleksi/<int:id>', methods=['GET'])
 @login_required
@@ -775,7 +1003,7 @@ def marketing_koleksi_catat(id):
     today = date.today().isoformat()
 
     if aksi == 'terkumpul':
-        jumlah = float(request.form.get('jumlah', 0) or 0)
+        jumlah = float((request.form.get('jumlah', '0') or '0').replace('.','').replace(',',''))
         kol = conn.execute("SELECT * FROM koleksi_bulanan WHERE id=?", (id,)).fetchone()
         if not kol:
             conn.close(); flash('Data tidak ditemukan.', 'danger')
@@ -856,6 +1084,49 @@ def marketing_peta():
     conn.close()
     return render_template('marketing/peta.html', titik_json=titik_json, bulan=bulan)
 
+# ── Marketing Donatur ─────────────────────────────────────────────────────────
+
+@app.route('/marketing/donatur')
+@login_required
+def marketing_donatur_list():
+    conn = get_db()
+    q = request.args.get('q', '').strip()
+    query = "SELECT * FROM donatur WHERE aktif=1"
+    params = []
+    if q:
+        query += " AND (nama LIKE ? OR area LIKE ? OR no_hp LIKE ?)"
+        params += [f'%{q}%'] * 3
+    query += " ORDER BY nama"
+    donatur = conn.execute(query, params).fetchall()
+    areas = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
+    conn.close()
+    return render_template('marketing/donatur.html', donatur=donatur, areas=areas, q=q)
+
+@app.route('/marketing/donatur/tambah', methods=['POST'])
+@login_required
+def marketing_donatur_tambah():
+    data = request.form
+    lat = lng = None
+    gmaps = data.get('gmaps_url', '').strip()
+    if gmaps:
+        lat, lng = parse_gmaps_url(gmaps)
+    if not lat and data.get('lat'):
+        try: lat = float(data['lat']); lng = float(data['lng'])
+        except: pass
+    conn = get_db()
+    sumber = data.get('sumber_infaq', 'tunai')
+    cur = conn.execute("""INSERT INTO donatur
+        (nama,no_hp,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq)
+        VALUES (?,?,?,?,?,?,?,?)""",
+        (data['nama'], data.get('no_hp', ''),
+         sumber,
+         data.get('area', ''), data.get('lokasi_nama', ''),
+         lat, lng, 1 if data.get('aktif_infaq') else 0))
+    auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
+    conn.commit(); conn.close()
+    flash(f'Donatur "{data["nama"]}" berhasil ditambahkan.', 'success')
+    return redirect(url_for('marketing_donatur_list'))
+
 # ── Marketing Transaksi Tunai ─────────────────────────────────────────────────
 
 @app.route('/marketing/catat', methods=['GET', 'POST'])
@@ -880,15 +1151,14 @@ def marketing_catat():
         flash('Transaksi berhasil dicatat!', 'success')
         return redirect(url_for('marketing_dashboard'))
     coa_list      = conn.execute("SELECT * FROM chart_of_accounts WHERE jenis_transaksi IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
-    donatur_list  = conn.execute("SELECT * FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
+    coa_parents   = conn.execute("SELECT kode, nama FROM chart_of_accounts WHERE parent_kode IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
+    donatur_list  = conn.execute("SELECT id, nama, area FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list = conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
-    # Map parent_kode → nama untuk optgroup label
-    parents = conn.execute("SELECT kode, nama FROM chart_of_accounts WHERE jenis_transaksi IS NULL").fetchall()
-    coa_group = {p['kode']: p['nama'] for p in parents}
     conn.close()
     return render_template('marketing/catat.html', coa_list=coa_list,
+        coa_parents=coa_parents,
         donatur_list=donatur_list, penerima_list=penerima_list,
-        coa_group=coa_group, hari_ini=date.today().isoformat())
+        hari_ini=date.today().isoformat())
 
 @app.route('/marketing/riwayat')
 @login_required

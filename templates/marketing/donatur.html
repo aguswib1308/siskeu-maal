@@ -1,0 +1,182 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Donatur{% endblock %}
+
+{% block content %}
+
+{# ── Search ── #}
+<form class="mb-3">
+  <div class="input-group">
+    <input type="text" name="q" value="{{ q }}" class="form-control"
+           placeholder="Cari nama / area / HP..."
+           style="border-radius:10px 0 0 10px;border-color:#d0dde8;font-size:.9rem">
+    <button class="btn btn-primary" style="border-radius:0 10px 10px 0">
+      <i class="bi bi-search"></i>
+    </button>
+  </div>
+</form>
+
+{# ── Tombol tambah ── #}
+<button class="btn btn-success w-100 mb-3" style="border-radius:10px;font-weight:600"
+        onclick="document.getElementById('formTambah').style.display=
+                 document.getElementById('formTambah').style.display==='none'?'':'none'">
+  <i class="bi bi-plus-lg"></i> Tambah Donatur Baru
+</button>
+
+{# ── Form tambah ── #}
+<div id="formTambah" class="card p-3 mb-3" style="display:none">
+  <form method="POST" action="/marketing/donatur/tambah">
+    <div class="fw-bold mb-3" style="font-size:.95rem">Donatur Baru</div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Nama Lengkap / Lokasi</label>
+      <input type="text" name="nama" class="form-control" required
+             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Kategori</label>
+      <select name="sumber_infaq" class="form-select"
+              style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+        <option value="tunai">💵 Tunai</option>
+        <option value="kencleng">🏠 Kencleng</option>
+        <option value="kotak_infaq">🕌 Kotak Infaq</option>
+        <option value="zakat">🌙 Zakat</option>
+        <option value="infaq_terikat">🎯 Infaq Terikat</option>
+        <option value="wakaf">🏛️ Wakaf</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Area</label>
+      <input type="text" name="area" class="form-control" list="areaList"
+             placeholder="Pilih area..."
+             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+      <datalist id="areaList">{% for a in areas %}<option value="{{ a.area }}">{% endfor %}</datalist>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">No HP
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="no_hp" class="form-control" placeholder="628xxx"
+             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Deskripsi Lokasi
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="lokasi_nama" class="form-control"
+             placeholder="cth: Toko Budi - Jl. Mawar 5"
+             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Koordinat
+        <span class="text-muted fw-normal">(paste link Google Maps)</span></label>
+      <input type="text" name="gmaps_url" class="form-control mb-2"
+             placeholder="https://maps.google.com/?q=..."
+             style="border-radius:10px;border-color:#d0dde8;font-size:.85rem">
+      <div class="d-flex gap-2">
+        <input type="number" name="lat" class="form-control form-control-sm"
+               placeholder="Latitude" step="any" style="border-radius:8px;font-size:.85rem">
+        <input type="number" name="lng" class="form-control form-control-sm"
+               placeholder="Longitude" step="any" style="border-radius:8px;font-size:.85rem">
+      </div>
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" name="aktif_infaq" value="1" id="chkAktif" checked>
+        <label class="form-check-label small" for="chkAktif">Aktif dikoleksi</label>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="button" onclick="document.getElementById('formTambah').style.display='none'"
+              style="flex:1;padding:.65rem;border-radius:10px;border:1.5px solid #d0dde8;
+                     background:#fff;color:#64748b;font-weight:600;font-size:.88rem;cursor:pointer">
+        Batal
+      </button>
+      <button type="submit"
+              style="flex:2;padding:.65rem;border-radius:10px;border:none;
+                     background:#1e8449;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer">
+        <i class="bi bi-check2"></i> Simpan
+      </button>
+    </div>
+  </form>
+</div>
+
+{# ── List donatur ── #}
+<div class="section-label">{{ donatur|length }} Donatur</div>
+
+{% for d in donatur %}
+<div class="card mb-2" style="overflow:hidden">
+  <div class="d-flex align-items-stretch">
+    <div style="width:4px;flex-shrink:0;background:
+      {% if d.sumber_infaq=='kencleng' %}#27ae60
+      {% elif d.sumber_infaq=='kotak_infaq' %}#2980b9
+      {% elif d.sumber_infaq=='zakat' %}#f39c12
+      {% elif d.sumber_infaq=='infaq_terikat' %}#8e44ad
+      {% elif d.sumber_infaq=='wakaf' %}#e67e22
+      {% else %}#94a3b8{% endif %}"></div>
+    <div class="p-3 flex-grow-1">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div style="min-width:0;flex:1">
+          <div class="fw-semibold text-truncate" style="font-size:.9rem">{{ d.nama }}</div>
+          {% if d.lokasi_nama and d.lokasi_nama != d.nama %}
+          <div class="text-muted text-truncate" style="font-size:.75rem">{{ d.lokasi_nama }}</div>
+          {% endif %}
+          <div class="d-flex gap-1 mt-1 flex-wrap">
+            {% if d.sumber_infaq == 'kencleng' %}
+            <span style="background:#e8f8f0;color:#1e8449;border-radius:6px;
+                         padding:2px 7px;font-size:.67rem;font-weight:600">🏠 Kencleng</span>
+            {% elif d.sumber_infaq == 'kotak_infaq' %}
+            <span style="background:#eaf4fb;color:#1a5276;border-radius:6px;
+                         padding:2px 7px;font-size:.67rem;font-weight:600">🕌 Kotak Infaq</span>
+            {% elif d.sumber_infaq == 'zakat' %}
+            <span style="background:#fef9e7;color:#d4ac0d;border-radius:6px;
+                         padding:2px 7px;font-size:.67rem;font-weight:600">🌙 Zakat</span>
+            {% elif d.sumber_infaq == 'infaq_terikat' %}
+            <span style="background:#f4ecf7;color:#8e44ad;border-radius:6px;
+                         padding:2px 7px;font-size:.67rem;font-weight:600">🎯 Infaq Terikat</span>
+            {% elif d.sumber_infaq == 'wakaf' %}
+            <span style="background:#fdf2e9;color:#e67e22;border-radius:6px;
+                         padding:2px 7px;font-size:.67rem;font-weight:600">🏛️ Wakaf</span>
+            {% else %}
+            <span style="background:#f0f4f8;color:#64748b;border-radius:6px;
+                         padding:2px 7px;font-size:.67rem;font-weight:600">💵 Tunai</span>
+            {% endif %}
+            {% if d.area %}
+            <span style="font-size:.67rem;color:#94a3b8">
+              <i class="bi bi-geo-alt"></i> {{ d.area }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0">
+          {% if d.no_hp %}
+          <a href="https://wa.me/{{ d.no_hp }}" target="_blank"
+             style="width:36px;height:36px;border-radius:9px;background:#e8f8f0;
+                    color:#1e8449;display:flex;align-items:center;justify-content:center;
+                    text-decoration:none;font-size:1rem">
+            <i class="bi bi-whatsapp"></i>
+          </a>
+          {% endif %}
+          {% if d.lat and d.lng %}
+          <a href="https://www.google.com/maps?q={{ d.lat }},{{ d.lng }}" target="_blank"
+             style="width:36px;height:36px;border-radius:9px;background:#f0f4f8;
+                    color:#64748b;display:flex;align-items:center;justify-content:center;
+                    text-decoration:none;font-size:1rem">
+            <i class="bi bi-geo-alt"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card p-4 text-center">
+  <div class="text-muted">
+    {% if q %}Tidak ditemukan donatur "{{ q }}"{% else %}Belum ada donatur{% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

@@ -12,7 +12,10 @@
         <option value="">Semua Jenis</option>
         <option value="tunai"       {% if sumber=='tunai'       %}selected{% endif %}>Tunai</option>
         <option value="kencleng"    {% if sumber=='kencleng'    %}selected{% endif %}>Kencleng</option>
-        <option value="kotak_infaq" {% if sumber=='kotak_infaq' %}selected{% endif %}>Kotak Infaq</option>
+        <option value="kotak_infaq"    {% if sumber=='kotak_infaq'    %}selected{% endif %}>Kotak Infaq</option>
+        <option value="zakat"         {% if sumber=='zakat'         %}selected{% endif %}>Zakat</option>
+        <option value="infaq_terikat" {% if sumber=='infaq_terikat' %}selected{% endif %}>Infaq Terikat</option>
+        <option value="wakaf"         {% if sumber=='wakaf'         %}selected{% endif %}>Wakaf</option>
       </select>
       <select name="area" class="form-select form-select-sm" style="width:150px">
         <option value="">Semua Area</option>
@@ -37,26 +40,43 @@
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>#</th><th>Nama / Lokasi</th><th>Area</th><th>Jenis</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
+        <tr><th>#</th><th>Nama / Lokasi</th><th>Area</th><th>Kategori</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
       </thead>
       <tbody>
         {% for d in donatur %}
-        <tr class="{% if not d.aktif %}table-secondary text-muted{% endif %}">
+        <tr class="{% if not d.aktif %}table-secondary text-muted{% endif %}" data-did="{{ d.id }}">
           <td class="small">{{ loop.index }}</td>
-          <td>
-            <div class="fw-semibold">{{ d.nama }}</div>
+          <td class="qe-cell" data-field="nama" data-val="{{ d.nama }}">
+            <span class="qe-label" style="cursor:pointer;border-bottom:1px dashed #ccc">
+              <span class="fw-semibold">{{ d.nama }}</span>
+            </span>
             {% if d.lokasi_nama and d.lokasi_nama != d.nama %}
-            <div class="small text-muted">{{ d.lokasi_nama }}</div>
+            <div class="small text-muted qe-sub" data-field="lokasi_nama" data-val="{{ d.lokasi_nama or '' }}"
+                 style="cursor:pointer;border-bottom:1px dashed #eee">{{ d.lokasi_nama }}</div>
             {% endif %}
           </td>
-          <td class="small">{{ d.area or '—' }}</td>
-          <td>
+          <td class="small qe-cell" data-field="area" data-val="{{ d.area or '' }}" data-list="areaListInline">
+            <span class="qe-label" style="cursor:pointer;border-bottom:1px dashed #aaa"
+                  title="Klik untuk edit">{{ d.area or '—' }}</span>
+          </td>
+          <td class="qe-cell" data-field="sumber_infaq" data-val="{{ d.sumber_infaq }}" data-type="select">
+            <span class="qe-label" style="cursor:pointer" title="Klik untuk edit">
             {% if d.sumber_infaq == 'kencleng' %}
               <span class="badge" style="background:#27ae60">🏠 Kencleng</span>
             {% elif d.sumber_infaq == 'kotak_infaq' %}
               <span class="badge" style="background:#2980b9">🕌 Kotak Infaq</span>
+            {% elif d.sumber_infaq == 'zakat' %}
+              <span class="badge" style="background:#f39c12">🌙 Zakat</span>
+            {% elif d.sumber_infaq == 'infaq_terikat' %}
+              <span class="badge" style="background:#8e44ad">🎯 Infaq Terikat</span>
+            {% elif d.sumber_infaq == 'wakaf' %}
+              <span class="badge" style="background:#e67e22">🏛️ Wakaf</span>
             {% else %}
               <span class="badge bg-secondary">💵 Tunai</span>
+            {% endif %}
+            </span>
+            {% if d.program_nama %}
+            <div class="small text-muted mt-1" style="font-size:.7rem">{{ d.program_nama }}</div>
             {% endif %}
             {% if d.sumber_infaq in ('kencleng','kotak_infaq') %}
               <span class="badge {% if d.aktif_infaq %}bg-success{% else %}bg-danger{% endif %} ms-1" style="font-size:.65rem">
@@ -75,7 +95,10 @@
             <span class="text-muted">—</span>
             {% endif %}
           </td>
-          <td class="small">{{ d.no_hp or '—' }}</td>
+          <td class="small qe-cell" data-field="no_hp" data-val="{{ d.no_hp or '' }}">
+            <span class="qe-label" style="cursor:pointer;border-bottom:1px dashed #ccc"
+                  title="Klik untuk edit">{{ d.no_hp or '—' }}</span>
+          </td>
           <td>
             <span class="badge {% if d.aktif %}bg-success{% else %}bg-secondary{% endif %}">
               {% if d.aktif %}Aktif{% else %}Nonaktif{% endif %}
@@ -114,11 +137,35 @@
           <input type="text" name="nama" class="form-control" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Jenis Infaq</label>
-          <select name="sumber_infaq" class="form-select" id="addSumber" onchange="toggleKoord('add')">
+          <label class="form-label fw-semibold">Kategori ZIS</label>
+          <select name="sumber_infaq" class="form-select" id="addSumber" onchange="toggleFields('add')">
             <option value="tunai">💵 Tunai</option>
             <option value="kencleng">🏠 Kencleng</option>
             <option value="kotak_infaq">🕌 Kotak Infaq</option>
+            <option value="zakat">🌙 Zakat</option>
+            <option value="infaq_terikat">🎯 Infaq Terikat (Program)</option>
+            <option value="wakaf">🏛️ Wakaf</option>
+          </select>
+        </div>
+        <div class="col-md-6 program-wrap" id="addProgramWrap" style="display:none">
+          <label class="form-label fw-semibold">Program</label>
+          <select name="program_id" class="form-select">
+            <option value="">— Pilih Program —</option>
+            <optgroup label="🌙 Zakat">
+              {% for p in produk_list if p.parent_kode == '4.1' %}
+              <option value="{{ p.id }}">{{ p.nama }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🎯 Infaq Terikat">
+              {% for p in produk_list if p.parent_kode == '4.2.1' %}
+              <option value="{{ p.id }}">{{ p.nama }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🏛️ Wakaf">
+              {% for p in produk_list if p.parent_kode == '4.4' %}
+              <option value="{{ p.id }}">{{ p.nama }}</option>
+              {% endfor %}
+            </optgroup>
           </select>
         </div>
         <div class="col-md-6">
@@ -179,11 +226,36 @@
           <input type="text" name="nama" class="form-control" value="{{ d.nama }}" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Jenis Infaq</label>
-          <select name="sumber_infaq" class="form-select">
-            <option value="tunai"       {% if d.sumber_infaq=='tunai'       %}selected{% endif %}>💵 Tunai</option>
-            <option value="kencleng"    {% if d.sumber_infaq=='kencleng'    %}selected{% endif %}>🏠 Kencleng</option>
-            <option value="kotak_infaq" {% if d.sumber_infaq=='kotak_infaq' %}selected{% endif %}>🕌 Kotak Infaq</option>
+          <label class="form-label fw-semibold">Kategori ZIS</label>
+          <select name="sumber_infaq" class="form-select edit-sumber" data-id="{{ d.id }}" id="edit{{ d.id }}Sumber" onchange="toggleFields('edit'+{{ d.id }})">
+            <option value="tunai"          {% if d.sumber_infaq=='tunai'          %}selected{% endif %}>💵 Tunai</option>
+            <option value="kencleng"       {% if d.sumber_infaq=='kencleng'       %}selected{% endif %}>🏠 Kencleng</option>
+            <option value="kotak_infaq"    {% if d.sumber_infaq=='kotak_infaq'    %}selected{% endif %}>🕌 Kotak Infaq</option>
+            <option value="zakat"          {% if d.sumber_infaq=='zakat'          %}selected{% endif %}>🌙 Zakat</option>
+            <option value="infaq_terikat"  {% if d.sumber_infaq=='infaq_terikat'  %}selected{% endif %}>🎯 Infaq Terikat (Program)</option>
+            <option value="wakaf"          {% if d.sumber_infaq=='wakaf'          %}selected{% endif %}>🏛️ Wakaf</option>
+          </select>
+        </div>
+        <div class="col-md-6 program-wrap" id="edit{{ d.id }}ProgramWrap"
+             style="{% if d.sumber_infaq not in ('zakat','infaq_terikat','wakaf') %}display:none{% endif %}">
+          <label class="form-label fw-semibold">Program</label>
+          <select name="program_id" class="form-select">
+            <option value="">— Pilih Program —</option>
+            <optgroup label="🌙 Zakat">
+              {% for p in produk_list if p.parent_kode == '4.1' %}
+              <option value="{{ p.id }}" {% if d.program_id == p.id %}selected{% endif %}>{{ p.nama }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🎯 Infaq Terikat">
+              {% for p in produk_list if p.parent_kode == '4.2.1' %}
+              <option value="{{ p.id }}" {% if d.program_id == p.id %}selected{% endif %}>{{ p.nama }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="🏛️ Wakaf">
+              {% for p in produk_list if p.parent_kode == '4.4' %}
+              <option value="{{ p.id }}" {% if d.program_id == p.id %}selected{% endif %}>{{ p.nama }}</option>
+              {% endfor %}
+            </optgroup>
           </select>
         </div>
         <div class="col-md-6">
@@ -238,11 +310,122 @@
 
 {% block scripts %}
 <script>
-function toggleKoord(prefix) {
-  const sumber = document.getElementById(prefix + 'Sumber').value;
-  const el = document.getElementById(prefix + 'Koord');
-  if (el) el.style.display = (sumber === 'tunai') ? 'none' : '';
+function toggleFields(prefix) {
+  const sel = document.getElementById(prefix + 'Sumber');
+  if (!sel) return;
+  const sumber = sel.value;
+  const koord = document.getElementById(prefix + 'Koord');
+  if (koord) koord.style.display = (sumber === 'tunai') ? 'none' : '';
+  const prog = document.getElementById(prefix + 'ProgramWrap');
+  const showProg = ['zakat','infaq_terikat','wakaf'].includes(sumber);
+  if (prog) {
+    prog.style.display = showProg ? '' : 'none';
+    // filter optgroups sesuai kategori
+    const sel = prog.querySelector('select');
+    if (sel) {
+      const map = {zakat:'Zakat', infaq_terikat:'Infaq Terikat', wakaf:'Wakaf'};
+      sel.querySelectorAll('optgroup').forEach(g => {
+        g.style.display = g.label.includes(map[sumber] || '') ? '' : 'none';
+      });
+      sel.value = '';
+    }
+  }
 }
-toggleKoord('add');
+toggleFields('add');
+
+const SUMBER_OPTS = [
+  {v:'tunai',l:'💵 Tunai'},{v:'kencleng',l:'🏠 Kencleng'},{v:'kotak_infaq',l:'🕌 Kotak Infaq'},
+  {v:'zakat',l:'🌙 Zakat'},{v:'infaq_terikat',l:'🎯 Infaq Terikat'},{v:'wakaf',l:'🏛️ Wakaf'}
+];
+const SUMBER_BADGE = {
+  tunai:'bg-secondary', kencleng:'background:#27ae60', kotak_infaq:'background:#2980b9',
+  zakat:'background:#f39c12', infaq_terikat:'background:#8e44ad', wakaf:'background:#e67e22'
+};
+
+document.querySelector('tbody').addEventListener('click', function(e) {
+  const label = e.target.closest('.qe-label') || e.target.closest('.qe-sub');
+  if (!label) return;
+  const cell = label.closest('.qe-cell') || label.closest('td');
+  if (!cell) return;
+  if (cell.querySelector('input, select')) return;
+
+  const row = cell.closest('tr');
+  const did = row.dataset.did;
+  const field = label.dataset.field || cell.dataset.field;
+  const val = label.dataset.val !== undefined ? label.dataset.val : cell.dataset.val;
+  const isSelect = cell.dataset.type === 'select';
+
+  let el;
+  if (isSelect) {
+    el = document.createElement('select');
+    el.className = 'form-select form-select-sm';
+    el.style.cssText = 'width:140px;font-size:.8rem';
+    SUMBER_OPTS.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.v; opt.textContent = o.l;
+      if (o.v === val) opt.selected = true;
+      el.appendChild(opt);
+    });
+  } else {
+    el = document.createElement('input');
+    el.type = 'text'; el.value = val;
+    el.className = 'form-control form-control-sm d-inline-block';
+    el.style.cssText = 'width:140px;font-size:.85rem;padding:2px 6px;border:1.5px solid #2980b9;border-radius:6px';
+    if (cell.dataset.list) el.setAttribute('list', cell.dataset.list);
+  }
+  label.style.display = 'none';
+  cell.appendChild(el);
+  el.focus();
+  if (!isSelect && el.select) el.select();
+
+  let done = false;
+
+  async function save() {
+    if (done) return; done = true;
+    const newVal = el.value.trim();
+    try {
+      const r = await fetch(`/admin/master/donatur/quick/${did}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({field, value: newVal})
+      });
+      const j = await r.json();
+      if (!j.ok) { done = false; el.style.borderColor='#e74c3c'; return; }
+      cell.dataset.val = newVal;
+      if (label.dataset.val !== undefined) label.dataset.val = newVal;
+      cell.style.background = '#d5f5e3';
+      setTimeout(() => cell.style.background = '', 600);
+    } catch(_) { done = false; el.style.borderColor='#e74c3c'; return; }
+    finish(cell, label, field, newVal);
+  }
+
+  function cancel() { done = true; el.remove(); label.style.display = ''; }
+
+  el.addEventListener('blur', save);
+  el.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter')  { ev.preventDefault(); save(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+  });
+  if (isSelect) el.addEventListener('change', save);
+});
+
+function finish(cell, label, field, val) {
+  const el = cell.querySelector('input, select');
+  if (el) el.remove();
+  label.style.display = '';
+  if (field === 'sumber_infaq') {
+    const opt = SUMBER_OPTS.find(o => o.v === val) || {l:val};
+    const bs = SUMBER_BADGE[val] || 'bg-secondary';
+    const style = bs.startsWith('bg-') ? '' : bs;
+    const cls = bs.startsWith('bg-') ? 'badge '+bs : 'badge';
+    label.innerHTML = `<span class="${cls}" ${style ? 'style="'+style+'"' : ''}>${opt.l}</span>`;
+  } else if (field === 'nama') {
+    label.innerHTML = `<span class="fw-semibold">${val || '—'}</span>`;
+  } else {
+    label.textContent = val || '—';
+  }
+}
 </script>
+<datalist id="areaListInline">
+  {% for a in areas %}<option value="{{ a.area }}">{% endfor %}
+</datalist>
 {% endblock %}

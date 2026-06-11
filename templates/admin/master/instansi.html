@@ -1,0 +1,72 @@
+{% extends 'admin/base.html' %}
+{% block title %}Data Instansi{% endblock %}
+{% block page_title %}<i class="bi bi-building"></i> Data Instansi{% endblock %}
+
+{% block content %}
+<div class="card p-4" style="max-width:720px">
+  <form method="POST" action="/admin/master/instansi/simpan">
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label fw-semibold">Nama Instansi (Kop Laporan)</label>
+        <input type="text" name="nama" class="form-control" value="{{ inst.nama }}" required
+               placeholder="contoh: BAITUL MAAL BMT AMANAH UMMAH">
+        <div class="form-text">Ditampilkan sebagai judul utama di kop semua laporan.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">Nama Lembaga Induk</label>
+        <input type="text" name="nama_lembaga" class="form-control" value="{{ inst.nama_lembaga }}"
+               placeholder="contoh: KSPPS BMT Amanah Ummah">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">Alamat</label>
+        <input type="text" name="alamat" class="form-control" value="{{ inst.alamat }}"
+               placeholder="Jl. Raya No. 123, Kecamatan, Kabupaten">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Telepon</label>
+        <input type="text" name="telepon" class="form-control" value="{{ inst.telepon }}"
+               placeholder="0271-xxxxxxx">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Email</label>
+        <input type="email" name="email" class="form-control" value="{{ inst.email }}"
+               placeholder="info@bmt.co.id">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Website</label>
+        <input type="text" name="website" class="form-control" value="{{ inst.website }}"
+               placeholder="https://bmt.co.id">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">No. Izin / SK</label>
+        <input type="text" name="no_izin" class="form-control" value="{{ inst.no_izin }}"
+               placeholder="Nomor SK pendirian">
+      </div>
+
+      <div class="col-12"><hr class="my-1"></div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Ketua</label>
+        <input type="text" name="ketua" class="form-control" value="{{ inst.ketua }}"
+               placeholder="Nama Ketua">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Sekretaris</label>
+        <input type="text" name="sekretaris" class="form-control" value="{{ inst.sekretaris }}"
+               placeholder="Nama Sekretaris">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Bendahara</label>
+        <input type="text" name="bendahara" class="form-control" value="{{ inst.bendahara }}"
+               placeholder="Nama Bendahara">
+      </div>
+
+      <div class="col-12 mt-3">
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-check-lg"></i> Simpan
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -134,6 +134,10 @@
     <i class="bi bi-map{% if 'peta' in request.path %}-fill{% endif %}"></i>
     <span>Peta</span>
   </a>
+  <a href="/marketing/donatur" class="{% if '/donatur' in request.path and 'koleksi' not in request.path %}active{% endif %}">
+    <i class="bi bi-people{% if '/donatur' in request.path and 'koleksi' not in request.path %}-fill{% endif %}"></i>
+    <span>Donatur</span>
+  </a>
   <a href="/marketing/catat" class="{% if request.path == '/marketing/catat' %}active{% endif %}">
     <i class="bi bi-plus-circle{% if request.path == '/marketing/catat' %}-fill{% endif %}"></i>
     <span>Catat</span>

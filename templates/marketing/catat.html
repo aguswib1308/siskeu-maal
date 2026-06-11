@@ -3,7 +3,7 @@
 
 {% block content %}
 
-<form method="POST" action="/marketing/catat" autocomplete="off">
+<form method="POST" action="/marketing/catat" autocomplete="off" onsubmit="return prepSubmit()">
 
   {# ── Jenis transaksi ─────────────────────────────────── #}
   <div class="section-label">Jenis</div>
@@ -34,43 +34,36 @@
            class="form-control">
   </div>
 
-  {# ── Akun / COA ──────────────────────────────────────── #}
+  {# ── Akun / COA — 2 cascading selects ───────────────── #}
   <div class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">Produk / Akun</label>
+    <label class="form-label fw-semibold" style="font-size:.85rem">Kelompok Akun</label>
+    <select id="selInduk" onchange="filterSub()"
+            style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+            class="form-select">
+      <option value="">— Pilih Kelompok —</option>
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-semibold" style="font-size:.85rem">Sub Akun / Produk</label>
     <select name="coa_id" id="selCoa" required
             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
             class="form-select">
-      <option value="">— Pilih Produk —</option>
-      {% set ns = namespace(grp='') %}
-      {% for c in coa_list %}
-        {# Tentukan label grup dari parent_kode #}
-        {% set pg = coa_group.get(c.parent_kode, c.parent_kode or '') %}
-        {% if pg != ns.grp %}
-          {% if ns.grp %}</optgroup>{% endif %}
-          {% set ns.grp = pg %}
-          <optgroup label="{{ pg }}">
-        {% endif %}
-        <option value="{{ c.id }}" data-jenis="{{ c.jenis_transaksi }}">
-          {{ c.nama }}
-        </option>
-      {% endfor %}
-      {% if ns.grp %}</optgroup>{% endif %}
+      <option value="">— Pilih Sub Akun —</option>
     </select>
   </div>
 
-  {# ── Donatur (masuk) ─────────────────────────────────── #}
+  {# ── Donatur (masuk) — searchable ───────────────────── #}
   <div id="wrapDonatur" class="mb-3">
     <label class="form-label fw-semibold" style="font-size:.85rem">
       Donatur <span class="text-muted fw-normal">(opsional)</span>
     </label>
-    <select name="donatur_id"
-            style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
-            class="form-select">
-      <option value="">— Pilih atau kosongkan —</option>
-      {% for d in donatur_list %}
-      <option value="{{ d.id }}">{{ d.nama }}</option>
-      {% endfor %}
-    </select>
+    <div class="position-relative" id="donaturSearch">
+      <input type="hidden" name="donatur_id" id="donaturId">
+      <input type="text" id="donaturInput" class="form-control" placeholder="Ketik nama donatur..."
+             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+             autocomplete="off">
+      <div id="donaturDropdown" class="search-dropdown" style="display:none"></div>
+    </div>
   </div>
 
   {# ── Penerima manfaat (keluar) ───────────────────────── #}
@@ -90,18 +83,18 @@
     </select>
   </div>
 
-  {# ── Jumlah ──────────────────────────────────────────── #}
+  {# ── Jumlah — with thousands separator ──────────────── #}
   <div class="mb-3">
     <label class="form-label fw-semibold" style="font-size:.85rem">Jumlah (Rp)</label>
     <div class="input-group">
       <span class="input-group-text"
             style="border-radius:10px 0 0 10px;background:#f0f4f8;
                    border-color:#d0dde8;color:#64748b;font-weight:600">Rp</span>
-      <input type="number" name="jumlah" required min="1"
-             inputmode="numeric" pattern="[0-9]*" placeholder="0"
+      <input type="text" name="jumlah" required inputmode="numeric"
+             placeholder="0" id="inputJumlah"
              style="border-radius:0 10px 10px 0;border-color:#d0dde8;
                     font-size:1.1rem;font-weight:700;padding:.65rem .9rem"
-             class="form-control">
+             class="form-control" oninput="formatRibuan(this)">
     </div>
   </div>
 
@@ -131,21 +124,179 @@
   }
   #jenisMasuk:checked  + .jenis-pill { background:#e8f8f0; color:#1e8449; border-color:#1e8449; }
   #jenisKeluar:checked + .jenis-pill { background:#fde8e6; color:#922b21; border-color:#e74c3c; }
+  .search-dropdown {
+    position:absolute; top:100%; left:0; right:0; z-index:50;
+    background:#fff; border:1px solid #d0dde8; border-radius:0 0 10px 10px;
+    max-height:220px; overflow-y:auto;
+    box-shadow:0 4px 12px rgba(0,0,0,.1);
+  }
+  .search-dropdown .dd-item {
+    padding:8px 12px; cursor:pointer; font-size:.88rem; border-bottom:1px solid #f0f4f8;
+  }
+  .search-dropdown .dd-item:hover, .search-dropdown .dd-item.active { background:#eaf4fb; }
+  .search-dropdown .dd-item .dd-area { font-size:.7rem; color:#94a3b8; }
+  .search-dropdown .dd-clear {
+    padding:6px 12px; cursor:pointer; font-size:.8rem; color:#e74c3c; text-align:center;
+    border-bottom:1px solid #f0f4f8;
+  }
+  .search-dropdown .dd-clear:hover { background:#fde8e6; }
 </style>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
+/* ── COA data (tojson = proper JS escaping) ── */
+const COA_ALL = {
+  {% for p in coa_parents %}
+  {{ p.kode|tojson }}: {{ p.nama|tojson }},
+  {% endfor %}
+};
+
+const COA_LEAVES = [
+  {% for c in coa_list %}
+  {id:{{ c.id }}, kode:{{ c.kode|tojson }}, nama:{{ c.nama|tojson }},
+   jenis:{{ c.jenis_transaksi|tojson }}, parent:{{ c.parent_kode|tojson }}},
+  {% endfor %}
+];
+
+// True leaves = items no other item lists as parent
+const trueLeaves = COA_LEAVES.filter(c => !COA_LEAVES.some(x => x.parent === c.kode));
+
+// Kelompok = level-2 codes only (direct children of 4 or 5)
+// e.g. 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4
+const kelompokKodes = Object.keys(COA_ALL)
+  .filter(k => /^[45]\.[0-9]+$/.test(k))
+  .sort();
+
+function buildInduk() {
+  const jenis = document.querySelector('input[name="jenis"]:checked').value;
+  const prefix = jenis === 'masuk' ? '4' : '5';
+  const sel = document.getElementById('selInduk');
+  sel.innerHTML = '<option value="">— Pilih Kelompok —</option>';
+  kelompokKodes.filter(k => k.startsWith(prefix + '.')).forEach(kode => {
+    const opt = document.createElement('option');
+    opt.value = kode;
+    opt.textContent = COA_ALL[kode] || kode;
+    sel.appendChild(opt);
+  });
+}
+
+function filterSub() {
+  const parent = document.getElementById('selInduk').value;
+  const sel = document.getElementById('selCoa');
+  sel.innerHTML = '<option value="">— Pilih Sub Akun —</option>';
+  if (!parent) return;
+
+  // Find all true leaves whose kode starts with parent kode
+  // e.g. parent=4.2 → matches 4.2.1.01, 4.2.2.01, 4.2.3, etc.
+  const items = trueLeaves.filter(c => c.kode.startsWith(parent + '.'));
+
+  // Group by intermediate parent (if any)
+  const groups = {};
+  items.forEach(c => {
+    // direct child of selected parent? group = ''
+    // otherwise group by intermediate parent name
+    const rel = c.parent;
+    const groupKey = (rel === parent) ? '' : rel;
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push(c);
+  });
+
+  const sortedKeys = Object.keys(groups).sort();
+  sortedKeys.forEach(gk => {
+    if (gk && sortedKeys.length > 1) {
+      const grp = document.createElement('optgroup');
+      grp.label = COA_ALL[gk] || gk;
+      groups[gk].forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nama;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    } else {
+      groups[gk].forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nama;
+        sel.appendChild(opt);
+      });
+    }
+  });
+}
+
 function filterCoa() {
-  var jenis = document.querySelector('input[name="jenis"]:checked').value;
-  var opts = document.querySelectorAll('#selCoa option[data-jenis]');
-  opts.forEach(function(o){ o.style.display = (o.dataset.jenis===jenis) ? '' : 'none'; });
-  var first = Array.from(opts).find(function(o){ return o.dataset.jenis===jenis; });
-  document.getElementById('selCoa').value = first ? first.value : '';
+  const jenis = document.querySelector('input[name="jenis"]:checked').value;
   document.getElementById('wrapDonatur').style.display  = jenis==='masuk'  ? '' : 'none';
   document.getElementById('wrapPenerima').style.display = jenis==='keluar' ? '' : 'none';
+  buildInduk();
+  document.getElementById('selCoa').innerHTML = '<option value="">— Pilih Sub Akun —</option>';
 }
 filterCoa();
+
+/* ── Thousands separator ── */
+function formatRibuan(el) {
+  let cur = el.selectionStart;
+  let old = el.value;
+  let raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw).toLocaleString('id-ID') : '';
+  let diff = el.value.length - old.length;
+  el.setSelectionRange(cur + diff, cur + diff);
+}
+
+function prepSubmit() {
+  document.querySelectorAll('input[name="jumlah"]').forEach(el => {
+    el.value = el.value.replace(/\./g, '').replace(/,/g, '');
+  });
+  return true;
+}
+
+/* ── Donatur search ── */
+const DONATUR = [
+  {% for d in donatur_list %}
+  {id:{{ d.id }}, nama:{{ d.nama|tojson }}, area:{{ (d.area or '')|tojson }}},
+  {% endfor %}
+];
+
+const dInput = document.getElementById('donaturInput');
+const dDrop  = document.getElementById('donaturDropdown');
+const dHidden = document.getElementById('donaturId');
+
+function escH(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+dInput.addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  dDrop.innerHTML = '';
+  if (!q) { dDrop.style.display = 'none'; return; }
+  const matches = DONATUR.filter(d =>
+    d.nama.toLowerCase().includes(q) || d.area.toLowerCase().includes(q)
+  ).slice(0, 15);
+  if (!matches.length) { dDrop.style.display = 'none'; return; }
+  if (dHidden.value) {
+    const cl = document.createElement('div');
+    cl.className = 'dd-clear';
+    cl.textContent = '✕ Hapus pilihan';
+    cl.onclick = () => { dHidden.value=''; dInput.value=''; dDrop.style.display='none'; };
+    dDrop.appendChild(cl);
+  }
+  matches.forEach(d => {
+    const div = document.createElement('div');
+    div.className = 'dd-item';
+    div.innerHTML = escH(d.nama) + (d.area ? ' <span class="dd-area">'+escH(d.area)+'</span>' : '');
+    div.onclick = () => {
+      dHidden.value = d.id;
+      dInput.value = d.nama;
+      dDrop.style.display = 'none';
+    };
+    dDrop.appendChild(div);
+  });
+  dDrop.style.display = '';
+});
+
+dInput.addEventListener('focus', function() { if(this.value) this.dispatchEvent(new Event('input')); });
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#donaturSearch')) dDrop.style.display = 'none';
+});
 </script>
 {% endblock %}

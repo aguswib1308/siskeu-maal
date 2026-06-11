@@ -82,37 +82,36 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body row g-3">
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Jenis</label>
-          <select name="jenis" class="form-select" required id="selJenis" onchange="filterCoa()">
-            <option value="masuk">Penerimaan</option>
-            <option value="keluar">Penyaluran / Beban</option>
-          </select>
-        </div>
+        <input type="hidden" name="jenis" id="hiddenJenis" value="">
         <div class="col-md-6">
           <label class="form-label fw-semibold">Tanggal</label>
           <input type="date" name="tanggal" class="form-control" required value="{{ bulan }}-01">
         </div>
-        <div class="col-12">
-          <label class="form-label fw-semibold">Akun (Chart of Accounts)</label>
+        <div class="col-md-6 d-flex align-items-end pb-1">
+          <span id="jenisLabel" class="badge bg-secondary fs-6 py-2 px-3">— Pilih akun —</span>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Kelompok Akun</label>
+          <select class="form-select" id="selInduk" onchange="filterSub()">
+            <option value="">— Pilih Kelompok —</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Sub Akun</label>
           <select name="coa_id" class="form-select" required id="selCoa">
-            <option value="">— Pilih Akun —</option>
-            {% for c in coa_list %}
-            <option value="{{ c.id }}" data-jenis="{{ c.jenis_transaksi }}" data-dana="{{ c.jenis_dana }}">
-              [{{ c.kode }}] {{ c.nama }}
-              {% if c.jenis_dana %}({{ LABEL_DANA.get(c.jenis_dana,'') }}){% endif %}
-            </option>
-            {% endfor %}
+            <option value="">— Pilih Sub Akun —</option>
           </select>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Donatur <span class="text-muted fw-normal">(untuk penerimaan)</span></label>
-          <select name="donatur_id" class="form-select">
-            <option value="">— Pilih atau kosongkan —</option>
-            {% for d in donatur_list %}
-            <option value="{{ d.id }}">{{ d.nama }}</option>
-            {% endfor %}
-          </select>
+          <div class="position-relative" id="donaturSearch">
+            <input type="hidden" name="donatur_id" id="donaturId">
+            <input type="text" id="donaturInput" class="form-control" placeholder="Ketik nama donatur..."
+                   autocomplete="off">
+            <div id="donaturDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1060;
+                 background:#fff;border:1px solid #dee2e6;border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;
+                 box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+          </div>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Penerima Manfaat <span class="text-muted fw-normal">(untuk penyaluran)</span></label>
@@ -127,7 +126,8 @@
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Jumlah (Rp)</label>
-          <input type="text" name="jumlah" class="form-control" placeholder="contoh: 500000" required>
+          <input type="text" name="jumlah" class="form-control" placeholder="contoh: 500.000" required
+                 inputmode="numeric" oninput="formatRibuan(this)">
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Keterangan</label>
@@ -145,13 +145,161 @@
 
 {% block scripts %}
 <script>
-function filterCoa() {
-  const jenis = document.getElementById('selJenis').value;
-  const opts = document.querySelectorAll('#selCoa option[data-jenis]');
-  opts.forEach(o => { o.style.display = (o.dataset.jenis === jenis) ? '' : 'none'; });
-  const first = [...opts].find(o => o.dataset.jenis === jenis);
-  document.getElementById('selCoa').value = first ? first.value : '';
+const COA_ALL = {
+  {% for p in coa_parents %}
+  {{ p.kode|tojson }}: {{ p.nama|tojson }},
+  {% endfor %}
+};
+
+const COA_LEAVES = [
+  {% for c in coa_list %}
+  {id:{{ c.id }}, kode:{{ c.kode|tojson }}, nama:{{ c.nama|tojson }},
+   jenis:{{ c.jenis_transaksi|tojson }}, parent:{{ c.parent_kode|tojson }}},
+  {% endfor %}
+];
+
+const trueLeaves = COA_LEAVES.filter(c => !COA_LEAVES.some(x => x.parent === c.kode));
+const kelompokKodes = Object.keys(COA_ALL).filter(k => /^[45]\.[0-9]+$/.test(k)).sort();
+
+const selInduk = document.getElementById('selInduk');
+
+[
+  {label: '📥 PENERIMAAN', prefix: '4'},
+  {label: '📤 PENYALURAN / BEBAN', prefix: '5'}
+].forEach(section => {
+  const items = kelompokKodes.filter(k => k.startsWith(section.prefix + '.'));
+  if (!items.length) return;
+  const grp = document.createElement('optgroup');
+  grp.label = section.label;
+  items.forEach(kode => {
+    const opt  = document.createElement('option');
+    opt.value  = kode;
+    opt.textContent = '['+kode+'] '+(COA_ALL[kode] || kode);
+    grp.appendChild(opt);
+  });
+  selInduk.appendChild(grp);
+});
+
+function filterSub() {
+  const parent = document.getElementById('selInduk').value;
+  const selCoa = document.getElementById('selCoa');
+  selCoa.innerHTML = '<option value="">— Pilih Sub Akun —</option>';
+  document.getElementById('hiddenJenis').value = '';
+  updateJenisLabel('');
+  if (!parent) return;
+
+  const items = trueLeaves.filter(c => c.kode.startsWith(parent + '.'));
+  const groups = {};
+  items.forEach(c => {
+    const gk = (c.parent === parent) ? '' : c.parent;
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(c);
+  });
+
+  const sortedKeys = Object.keys(groups).sort();
+  sortedKeys.forEach(gk => {
+    if (gk && sortedKeys.length > 1) {
+      const grp = document.createElement('optgroup');
+      grp.label = COA_ALL[gk] || gk;
+      groups[gk].forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.dataset.jenis = c.jenis;
+        opt.textContent = '['+c.kode+'] '+c.nama;
+        grp.appendChild(opt);
+      });
+      selCoa.appendChild(grp);
+    } else {
+      groups[gk].forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.dataset.jenis = c.jenis;
+        opt.textContent = '['+c.kode+'] '+c.nama;
+        selCoa.appendChild(opt);
+      });
+    }
+  });
 }
-filterCoa();
+
+document.getElementById('selCoa').addEventListener('change', function() {
+  const jenis = this.selectedOptions[0]?.dataset.jenis || '';
+  document.getElementById('hiddenJenis').value = jenis;
+  updateJenisLabel(jenis);
+});
+
+function updateJenisLabel(jenis) {
+  const el = document.getElementById('jenisLabel');
+  if (jenis === 'masuk')   { el.className='badge bg-success fs-6 py-2 px-3'; el.textContent='Penerimaan'; }
+  else if (jenis==='keluar'){ el.className='badge bg-danger fs-6 py-2 px-3';  el.textContent='Penyaluran / Beban'; }
+  else                      { el.className='badge bg-secondary fs-6 py-2 px-3'; el.textContent='— Pilih akun —'; }
+}
+
+function formatRibuan(el) {
+  let raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw).toLocaleString('id-ID') : '';
+}
+document.querySelector('#modalTambah form').addEventListener('submit', function() {
+  this.querySelectorAll('input[name="jumlah"]').forEach(el => {
+    el.value = el.value.replace(/\./g, '').replace(/,/g, '');
+  });
+});
+
+// Reset modal tiap dibuka
+document.getElementById('modalTambah').addEventListener('show.bs.modal', () => {
+  document.getElementById('selInduk').value = '';
+  document.getElementById('selCoa').innerHTML = '<option value="">— Pilih Sub Akun —</option>';
+  document.getElementById('hiddenJenis').value = '';
+  updateJenisLabel('');
+  document.getElementById('donaturId').value = '';
+  document.getElementById('donaturInput').value = '';
+  document.getElementById('donaturDropdown').style.display = 'none';
+});
+
+/* ── Donatur search ── */
+const DONATUR = [
+  {% for d in donatur_list %}
+  {id:{{ d.id }}, nama:{{ d.nama|tojson }}, area:{{ (d.area or '')|tojson }}},
+  {% endfor %}
+];
+
+const dInput = document.getElementById('donaturInput');
+const dDrop  = document.getElementById('donaturDropdown');
+const dHidden = document.getElementById('donaturId');
+
+function escH(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+dInput.addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  dDrop.innerHTML = '';
+  if (!q) { dDrop.style.display = 'none'; return; }
+  const matches = DONATUR.filter(d =>
+    d.nama.toLowerCase().includes(q) || d.area.toLowerCase().includes(q)
+  ).slice(0, 15);
+  if (!matches.length) { dDrop.style.display = 'none'; return; }
+  if (dHidden.value) {
+    const cl = document.createElement('div');
+    cl.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:.8rem;color:#e74c3c;text-align:center;border-bottom:1px solid #f0f4f8';
+    cl.textContent = '✕ Hapus pilihan';
+    cl.onclick = () => { dHidden.value=''; dInput.value=''; dDrop.style.display='none'; };
+    dDrop.appendChild(cl);
+  }
+  matches.forEach(d => {
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:.88rem;border-bottom:1px solid #f0f4f8';
+    div.innerHTML = escH(d.nama) + (d.area ? ' <span style="font-size:.7rem;color:#94a3b8">'+escH(d.area)+'</span>' : '');
+    div.onmouseover = () => div.style.background='#eaf4fb';
+    div.onmouseout = () => div.style.background='';
+    div.onclick = () => {
+      dHidden.value = d.id;
+      dInput.value = d.nama;
+      dDrop.style.display = 'none';
+    };
+    dDrop.appendChild(div);
+  });
+  dDrop.style.display = '';
+});
+
+dInput.addEventListener('focus', function() { if(this.value) this.dispatchEvent(new Event('input')); });
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#donaturSearch')) dDrop.style.display = 'none';
+});
 </script>
 {% endblock %}

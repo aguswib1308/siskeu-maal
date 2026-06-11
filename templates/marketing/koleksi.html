@@ -25,26 +25,51 @@
 </div>
 {% endif %}
 
+{# ── Search ────────────────────────────────────────────── #}
+<form class="mb-3" style="display:flex;gap:6px">
+  <input type="hidden" name="bulan" value="{{ bulan }}">
+  {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+  <input type="text" name="q" value="{{ q }}" placeholder="Cari nama donatur..."
+         style="flex:1;border-radius:10px;border:1.5px solid #d0dde8;padding:.4rem .75rem;
+                font-size:.85rem;outline:none">
+  <button style="border:none;background:#1a5276;color:#fff;border-radius:10px;
+                 padding:.4rem .7rem;font-size:.85rem;cursor:pointer">
+    <i class="bi bi-search"></i>
+  </button>
+  {% if q %}
+  <a href="/marketing/koleksi?bulan={{ bulan }}{% if area %}&area={{ area }}{% endif %}"
+     style="border:1.5px solid #d0dde8;background:#fff;color:#64748b;border-radius:10px;
+            padding:.4rem .7rem;font-size:.85rem;text-decoration:none;display:flex;align-items:center">
+    <i class="bi bi-x-lg"></i>
+  </a>
+  {% endif %}
+</form>
+
 {# ── Filter area chips ─────────────────────────────────── #}
-<div style="overflow-x:auto;white-space:nowrap;margin:0 -1rem .9rem;padding:0 1rem">
-  <a href="/marketing/koleksi?bulan={{ bulan }}"
-     class="d-inline-block me-2" style="
-       padding:.35rem .85rem;border-radius:99px;font-size:.8rem;font-weight:600;
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.9rem">
+  <a href="/marketing/koleksi?bulan={{ bulan }}{% if q %}&q={{ q }}{% endif %}"
+     style="padding:.3rem .7rem;border-radius:99px;font-size:.75rem;font-weight:600;
        text-decoration:none;border:1.5px solid;
        {% if not area %}background:#1a5276;color:#fff;border-color:#1a5276
        {% else %}background:#fff;color:#64748b;border-color:#d0dde8{% endif %}">
     Semua
   </a>
   {% for a in areas %}
-  <a href="/marketing/koleksi?bulan={{ bulan }}&area={{ a.area }}"
-     class="d-inline-block me-2" style="
-       padding:.35rem .85rem;border-radius:99px;font-size:.8rem;font-weight:600;
+  <a href="/marketing/koleksi?bulan={{ bulan }}&area={{ a.area }}{% if q %}&q={{ q }}{% endif %}"
+     style="padding:.3rem .7rem;border-radius:99px;font-size:.75rem;font-weight:600;
        text-decoration:none;border:1.5px solid;
        {% if area == a.area %}background:#1a5276;color:#fff;border-color:#1a5276
        {% else %}background:#fff;color:#64748b;border-color:#d0dde8{% endif %}">
     {{ a.area }}
   </a>
   {% endfor %}
+  <a href="/marketing/koleksi?bulan={{ bulan }}&area=__none__{% if q %}&q={{ q }}{% endif %}"
+     style="padding:.3rem .7rem;border-radius:99px;font-size:.75rem;font-weight:600;
+       text-decoration:none;border:1.5px solid;
+       {% if area == '__none__' %}background:#e67e22;color:#fff;border-color:#e67e22
+       {% else %}background:#fff;color:#d35400;border-color:#fde8d0{% endif %}">
+    Tanpa Area
+  </a>
 </div>
 
 {% if not koleksi %}
