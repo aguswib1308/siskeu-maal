@@ -748,6 +748,7 @@ def donatur_import():
     conn = get_db()
     imported = 0
     skipped = 0
+    incomplete = 0
     for row in rows[1:]:
         nama = str(row[col_map['nama']]).strip() if col_map.get('nama') is not None and row[col_map['nama']] else ''
         if not nama or nama.lower() in ('none', 'catatan:', 'catatan'):
@@ -767,13 +768,18 @@ def donatur_import():
         if existing:
             skipped += 1
             continue
+        if not no_hp or not alamat or not area_val:
+            incomplete += 1
         conn.execute("""INSERT INTO donatur (nama,no_hp,nik,alamat,jenis,sumber_infaq,area,lokasi_nama)
                         VALUES (?,?,?,?,?,?,?,?)""",
                      (nama, no_hp, nik, alamat, jenis, sumber, area_val, lokasi))
         imported += 1
     conn.commit()
     conn.close()
-    flash(f'Import selesai: {imported} donatur ditambahkan, {skipped} duplikat dilewati.', 'success')
+    msg = f'Import selesai: {imported} donatur ditambahkan, {skipped} duplikat dilewati.'
+    if incomplete:
+        msg += f' ({incomplete} dari {imported} data tidak lengkap — no_hp/alamat/area kosong)'
+    flash(msg, 'success' if not incomplete else 'warning')
     return redirect(url_for('master_donatur'))
 
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
@@ -888,6 +894,7 @@ def penerima_import():
     conn = get_db()
     imported = 0
     skipped = 0
+    incomplete = 0
     for row in rows[1:]:
         nama = str(row[col_map['nama']]).strip() if col_map.get('nama') is not None and row[col_map['nama']] else ''
         if not nama or nama.lower() in ('none', 'catatan:', 'catatan'):
@@ -903,12 +910,17 @@ def penerima_import():
         if existing:
             skipped += 1
             continue
+        if not alamat or not asnaf or not no_hp:
+            incomplete += 1
         conn.execute("INSERT INTO penerima_manfaat (nama,nik,no_hp,alamat,asnaf,keterangan) VALUES (?,?,?,?,?,?)",
                      (nama, nik, no_hp, alamat, asnaf, keterangan))
         imported += 1
     conn.commit()
     conn.close()
-    flash(f'Import selesai: {imported} penerima ditambahkan, {skipped} duplikat dilewati.', 'success')
+    msg = f'Import selesai: {imported} penerima ditambahkan, {skipped} duplikat dilewati.'
+    if incomplete:
+        msg += f' ({incomplete} dari {imported} data tidak lengkap — alamat/asnaf/no_hp kosong)'
+    flash(msg, 'success' if not incomplete else 'warning')
     return redirect(url_for('master_penerima'))
 
 # ── Master: Area ─────────────────────────────────────────────────────────────
