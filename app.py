@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-import sqlite3, hashlib, os, re, json, calendar as cal_mod
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
+import sqlite3, hashlib, os, re, json, calendar as cal_mod, io
 from datetime import datetime, date
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from functools import wraps
 
 app = Flask(__name__)
@@ -682,6 +684,98 @@ def master_donatur_quick(id):
     conn.commit(); conn.close()
     return jsonify(ok=True, field=field, value=value)
 
+@app.route('/admin/master/donatur/template')
+@admin_required
+def donatur_template():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Donatur'
+    headers = ['nama', 'no_hp', 'nik', 'alamat', 'jenis', 'sumber_infaq', 'area', 'lokasi_nama']
+    hdr_font = Font(bold=True, color='FFFFFF')
+    hdr_fill = PatternFill('solid', fgColor='27AE60')
+    thin = Side(style='thin', color='CCCCCC')
+    border = Border(bottom=thin)
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = Alignment(horizontal='center')
+    examples = [
+        ['Ahmad Fauzi', '6281234567890', '3301010101010001', 'Jl. Mawar No. 5', 'perorangan', 'kencleng', 'Giriwono', 'Rumah Pak Ahmad'],
+        ['Toko Berkah', '6289876543210', '', 'Pasar Wonogiri', 'lembaga', 'kotak_infaq', 'Wonokarto', 'Toko Berkah - Pasar'],
+    ]
+    for r, row in enumerate(examples, 2):
+        for c, val in enumerate(row, 1):
+            cell = ws.cell(row=r, column=c, value=val)
+            cell.font = Font(italic=True, color='999999')
+            cell.border = border
+    note = ws.cell(row=4, column=1, value='Catatan: Hapus baris contoh di atas, lalu isi data Anda.')
+    note.font = Font(italic=True, color='FF0000')
+    note2 = ws.cell(row=5, column=1, value='jenis: perorangan / lembaga | sumber_infaq: tunai / kencleng / kotak_infaq / zakat / infaq_terikat / wakaf')
+    note2.font = Font(italic=True, color='666666')
+    for col in range(1, len(headers)+1):
+        ws.column_dimensions[chr(64+col)].width = 20
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, download_name='template_donatur.xlsx',
+                     as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/admin/master/donatur/import', methods=['POST'])
+@admin_required
+def donatur_import():
+    f = request.files.get('file')
+    if not f or not f.filename.endswith(('.xlsx', '.xls')):
+        flash('Upload file Excel (.xlsx) yang valid.', 'danger')
+        return redirect(url_for('master_donatur'))
+    try:
+        wb = load_workbook(f, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(min_row=1, values_only=True))
+        wb.close()
+    except Exception as e:
+        flash(f'Gagal membaca file: {e}', 'danger')
+        return redirect(url_for('master_donatur'))
+    if len(rows) < 2:
+        flash('File kosong atau hanya berisi header.', 'warning')
+        return redirect(url_for('master_donatur'))
+    header = [str(h).strip().lower() if h else '' for h in rows[0]]
+    required = {'nama'}
+    if not required.issubset(set(header)):
+        flash('Kolom "nama" wajib ada di header.', 'danger')
+        return redirect(url_for('master_donatur'))
+    col_map = {h: i for i, h in enumerate(header) if h}
+    conn = get_db()
+    imported = 0
+    skipped = 0
+    for row in rows[1:]:
+        nama = str(row[col_map['nama']]).strip() if col_map.get('nama') is not None and row[col_map['nama']] else ''
+        if not nama or nama.lower() in ('none', 'catatan:', 'catatan'):
+            continue
+        no_hp = str(row[col_map.get('no_hp', -1)] or '').strip() if 'no_hp' in col_map else ''
+        nik = str(row[col_map.get('nik', -1)] or '').strip() if 'nik' in col_map else ''
+        alamat = str(row[col_map.get('alamat', -1)] or '').strip() if 'alamat' in col_map else ''
+        jenis = str(row[col_map.get('jenis', -1)] or '').strip().lower() if 'jenis' in col_map else 'perorangan'
+        if jenis not in ('perorangan', 'lembaga'):
+            jenis = 'perorangan'
+        sumber = str(row[col_map.get('sumber_infaq', -1)] or '').strip().lower() if 'sumber_infaq' in col_map else 'tunai'
+        if sumber not in ('tunai', 'kencleng', 'kotak_infaq', 'zakat', 'infaq_terikat', 'wakaf'):
+            sumber = 'tunai'
+        area_val = str(row[col_map.get('area', -1)] or '').strip() if 'area' in col_map else ''
+        lokasi = str(row[col_map.get('lokasi_nama', -1)] or '').strip() if 'lokasi_nama' in col_map else ''
+        existing = conn.execute("SELECT id FROM donatur WHERE LOWER(TRIM(nama))=LOWER(?)", (nama,)).fetchone()
+        if existing:
+            skipped += 1
+            continue
+        conn.execute("""INSERT INTO donatur (nama,no_hp,nik,alamat,jenis,sumber_infaq,area,lokasi_nama)
+                        VALUES (?,?,?,?,?,?,?,?)""",
+                     (nama, no_hp, nik, alamat, jenis, sumber, area_val, lokasi))
+        imported += 1
+    conn.commit()
+    conn.close()
+    flash(f'Import selesai: {imported} donatur ditambahkan, {skipped} duplikat dilewati.', 'success')
+    return redirect(url_for('master_donatur'))
+
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
 @app.route('/admin/master/penerima')
@@ -728,6 +822,93 @@ def master_penerima_toggle(id):
     conn = get_db()
     conn.execute("UPDATE penerima_manfaat SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
     conn.commit(); conn.close()
+    return redirect(url_for('master_penerima'))
+
+@app.route('/admin/master/penerima/template')
+@admin_required
+def penerima_template():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Penerima Manfaat'
+    headers = ['nama', 'nik', 'no_hp', 'alamat', 'asnaf', 'keterangan']
+    hdr_font = Font(bold=True, color='FFFFFF')
+    hdr_fill = PatternFill('solid', fgColor='E74C3C')
+    thin = Side(style='thin', color='CCCCCC')
+    border = Border(bottom=thin)
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = Alignment(horizontal='center')
+    examples = [
+        ['Siti Aminah', '3301010203040005', '6281234000111', 'Dusun Bakaran RT 02/05', 'fakir', 'Janda, 3 anak'],
+        ['Ahmad Soleh', '3301010203040006', '6289876000222', 'Ds. Krisak RT 01/03', 'miskin', 'Buruh tani'],
+    ]
+    for r, row in enumerate(examples, 2):
+        for c, val in enumerate(row, 1):
+            cell = ws.cell(row=r, column=c, value=val)
+            cell.font = Font(italic=True, color='999999')
+            cell.border = border
+    note = ws.cell(row=4, column=1, value='Catatan: Hapus baris contoh di atas, lalu isi data Anda.')
+    note.font = Font(italic=True, color='FF0000')
+    note2 = ws.cell(row=5, column=1, value='asnaf: fakir / miskin / amil / muallaf / riqab / gharim / fisabilillah / ibnu_sabil')
+    note2.font = Font(italic=True, color='666666')
+    for col in range(1, len(headers)+1):
+        ws.column_dimensions[chr(64+col)].width = 22
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, download_name='template_penerima_manfaat.xlsx',
+                     as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/admin/master/penerima/import', methods=['POST'])
+@admin_required
+def penerima_import():
+    f = request.files.get('file')
+    if not f or not f.filename.endswith(('.xlsx', '.xls')):
+        flash('Upload file Excel (.xlsx) yang valid.', 'danger')
+        return redirect(url_for('master_penerima'))
+    try:
+        wb = load_workbook(f, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(min_row=1, values_only=True))
+        wb.close()
+    except Exception as e:
+        flash(f'Gagal membaca file: {e}', 'danger')
+        return redirect(url_for('master_penerima'))
+    if len(rows) < 2:
+        flash('File kosong atau hanya berisi header.', 'warning')
+        return redirect(url_for('master_penerima'))
+    header = [str(h).strip().lower() if h else '' for h in rows[0]]
+    if 'nama' not in header:
+        flash('Kolom "nama" wajib ada di header.', 'danger')
+        return redirect(url_for('master_penerima'))
+    col_map = {h: i for i, h in enumerate(header) if h}
+    valid_asnaf = {'fakir', 'miskin', 'amil', 'muallaf', 'riqab', 'gharim', 'fisabilillah', 'ibnu_sabil'}
+    conn = get_db()
+    imported = 0
+    skipped = 0
+    for row in rows[1:]:
+        nama = str(row[col_map['nama']]).strip() if col_map.get('nama') is not None and row[col_map['nama']] else ''
+        if not nama or nama.lower() in ('none', 'catatan:', 'catatan'):
+            continue
+        nik = str(row[col_map.get('nik', -1)] or '').strip() if 'nik' in col_map else ''
+        no_hp = str(row[col_map.get('no_hp', -1)] or '').strip() if 'no_hp' in col_map else ''
+        alamat = str(row[col_map.get('alamat', -1)] or '').strip() if 'alamat' in col_map else ''
+        asnaf = str(row[col_map.get('asnaf', -1)] or '').strip().lower() if 'asnaf' in col_map else ''
+        if asnaf not in valid_asnaf:
+            asnaf = ''
+        keterangan = str(row[col_map.get('keterangan', -1)] or '').strip() if 'keterangan' in col_map else ''
+        existing = conn.execute("SELECT id FROM penerima_manfaat WHERE LOWER(TRIM(nama))=LOWER(?)", (nama,)).fetchone()
+        if existing:
+            skipped += 1
+            continue
+        conn.execute("INSERT INTO penerima_manfaat (nama,nik,no_hp,alamat,asnaf,keterangan) VALUES (?,?,?,?,?,?)",
+                     (nama, nik, no_hp, alamat, asnaf, keterangan))
+        imported += 1
+    conn.commit()
+    conn.close()
+    flash(f'Import selesai: {imported} penerima ditambahkan, {skipped} duplikat dilewati.', 'success')
     return redirect(url_for('master_penerima'))
 
 # ── Master: Area ─────────────────────────────────────────────────────────────

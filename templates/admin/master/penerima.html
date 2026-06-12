@@ -31,7 +31,10 @@
       {% endif %}
     </form>
   </div>
-  <div class="col-auto">
+  <div class="col-auto d-flex gap-2">
+    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalImport">
+      <i class="bi bi-upload"></i> Import Excel
+    </button>
     <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambah">
       <i class="bi bi-plus-lg"></i> Tambah Penerima
     </button>
@@ -198,4 +201,36 @@
   </div></div>
 </div>
 {% endfor %}
+
+<!-- Modal Import -->
+<div class="modal fade" id="modalImport" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="/admin/master/penerima/import" enctype="multipart/form-data">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold"><i class="bi bi-upload"></i> Import Penerima Manfaat dari Excel</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info py-2 small mb-3">
+          <i class="bi bi-info-circle"></i>
+          Download template terlebih dahulu, isi data, lalu upload kembali.
+          Penerima dengan nama yang sudah ada akan dilewati (tidak duplikat).
+        </div>
+        <a href="/admin/master/penerima/template" class="btn btn-sm btn-outline-danger mb-3">
+          <i class="bi bi-download"></i> Download Template Excel
+        </a>
+        <div class="mb-2">
+          <label class="form-label fw-semibold">Pilih File Excel (.xlsx)</label>
+          <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-upload"></i> Import
+        </button>
+      </div>
+    </form>
+  </div></div>
+</div>
 {% endblock %}
