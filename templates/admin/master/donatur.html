@@ -43,7 +43,7 @@
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>#</th><th>Nama / Lokasi</th><th>Area</th><th>Kategori</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
+        <tr><th>#</th><th>Nama / Lokasi</th><th>Alamat</th><th>Area</th><th>Kategori</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
       </thead>
       <tbody>
         {% for d in donatur %}
@@ -57,6 +57,10 @@
             <div class="small text-muted qe-sub" data-field="lokasi_nama" data-val="{{ d.lokasi_nama or '' }}"
                  style="cursor:pointer;border-bottom:1px dashed #eee">{{ d.lokasi_nama }}</div>
             {% endif %}
+          </td>
+          <td class="small qe-cell" data-field="alamat" data-val="{{ d.alamat or '' }}">
+            <span class="qe-label" style="cursor:pointer;border-bottom:1px dashed #ccc"
+                  title="Klik untuk edit">{{ d.alamat or '—' }}</span>
           </td>
           <td class="small qe-cell" data-field="area" data-val="{{ d.area or '' }}" data-list="areaListInline">
             <span class="qe-label" style="cursor:pointer;border-bottom:1px dashed #aaa"
@@ -118,7 +122,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data</td></tr>
+        <tr><td colspan="9" class="text-center text-muted py-4">Tidak ada data</td></tr>
         {% endfor %}
       </tbody>
     </table>

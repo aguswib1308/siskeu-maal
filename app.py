@@ -671,7 +671,7 @@ def master_donatur_toggle(id):
 @app.route('/admin/master/donatur/quick/<int:id>', methods=['POST'])
 @admin_required
 def master_donatur_quick(id):
-    ALLOWED = {'nama', 'area', 'no_hp', 'sumber_infaq', 'lokasi_nama'}
+    ALLOWED = {'nama', 'alamat', 'area', 'no_hp', 'sumber_infaq', 'lokasi_nama'}
     data = request.json or {}
     field = data.get('field', '')
     value = data.get('value', '').strip()
