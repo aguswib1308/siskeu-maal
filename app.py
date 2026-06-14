@@ -43,6 +43,39 @@ def format_rupiah(angka):
     except (TypeError, ValueError):
         return "Rp 0"
 
+def terbilang(n):
+    """Konversi angka ke kata-kata bahasa Indonesia (untuk slip)."""
+    try:
+        n = int(round(float(n)))
+    except (TypeError, ValueError):
+        return 'nol'
+    if n == 0:
+        return 'nol'
+    angka = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh',
+             'delapan', 'sembilan', 'sepuluh', 'sebelas']
+    def helper(x):
+        if x < 12:
+            return angka[x]
+        elif x < 20:
+            return helper(x - 10) + ' belas'
+        elif x < 100:
+            return helper(x // 10) + ' puluh' + ((' ' + helper(x % 10)) if x % 10 else '')
+        elif x < 200:
+            return 'seratus' + ((' ' + helper(x - 100)) if x - 100 else '')
+        elif x < 1000:
+            return helper(x // 100) + ' ratus' + ((' ' + helper(x % 100)) if x % 100 else '')
+        elif x < 2000:
+            return 'seribu' + ((' ' + helper(x - 1000)) if x - 1000 else '')
+        elif x < 1000000:
+            return helper(x // 1000) + ' ribu' + ((' ' + helper(x % 1000)) if x % 1000 else '')
+        elif x < 1000000000:
+            return helper(x // 1000000) + ' juta' + ((' ' + helper(x % 1000000)) if x % 1000000 else '')
+        elif x < 1000000000000:
+            return helper(x // 1000000000) + ' miliar' + ((' ' + helper(x % 1000000000)) if x % 1000000000 else '')
+        else:
+            return helper(x // 1000000000000) + ' triliun' + ((' ' + helper(x % 1000000000000)) if x % 1000000000000 else '')
+    return helper(n).strip()
+
 app.jinja_env.filters['rupiah'] = format_rupiah
 
 LABEL_DANA  = {'zakat':'Zakat','infak_sedekah':'Infak/Sedekah','amil':'Amil','wakaf':'Wakaf','umum':'Umum'}
@@ -1333,10 +1366,12 @@ def marketing_koleksi_catat(id):
             return redirect(url_for('marketing_koleksi'))
 
         donatur = conn.execute("SELECT * FROM donatur WHERE id=?", (kol['donatur_id'],)).fetchone()
-        auto_transaksi_koleksi(conn, id, kol['donatur_id'], kol['bulan'],
+        trx_id = auto_transaksi_koleksi(conn, id, kol['donatur_id'], kol['bulan'],
                                donatur['sumber_infaq'], jumlah, today, session['user_id'])
         conn.commit(); conn.close()
         flash(f'Koleksi berhasil dicatat: {format_rupiah(jumlah)}', 'success')
+        if jumlah > 0:
+            return redirect(url_for('slip', transaksi_id=trx_id))
 
     elif aksi == 'tidak_ada':
         conn.execute(
@@ -1444,15 +1479,18 @@ def marketing_catat():
         if coa_id:
             row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
             if row: jenis_dana = row['jenis_dana']
-        conn.execute('''INSERT INTO transaksi
+        cur = conn.execute('''INSERT INTO transaksi
             (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
             VALUES (?,?,?,?,?,?,?,?,?)''',
             (data['tanggal'], data['jenis'], jenis_dana, coa_id,
              data.get('donatur_id') or None, data.get('penerima_id') or None,
              float(data['jumlah'].replace('.','').replace(',','')),
              data.get('keterangan',''), session['user_id']))
+        trx_id = cur.lastrowid
         conn.commit(); conn.close()
         flash('Transaksi berhasil dicatat!', 'success')
+        if data['jenis'] == 'masuk':
+            return redirect(url_for('slip', transaksi_id=trx_id))
         return redirect(url_for('marketing_dashboard'))
     coa_list      = conn.execute("SELECT * FROM chart_of_accounts WHERE jenis_transaksi IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
     coa_parents   = conn.execute("SELECT kode, nama FROM chart_of_accounts WHERE parent_kode IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
@@ -1480,6 +1518,52 @@ def marketing_riwayat():
     total = sum(r['jumlah'] for r in transaksi if r['jenis']=='masuk')
     conn.close()
     return render_template('marketing/riwayat.html', transaksi=transaksi, bulan=bulan, total=total)
+
+# ── Slip Penerimaan (Cetak Thermal 58mm) ──────────────────────────────────────
+
+@app.route('/slip/<int:transaksi_id>')
+@login_required
+def slip(transaksi_id):
+    conn = get_db()
+    t = conn.execute('''
+        SELECT t.*, c.nama AS coa_nama, c.jenis_dana AS coa_dana,
+               d.nama AS donatur_nama, u.nama AS petugas_nama
+        FROM transaksi t
+        LEFT JOIN chart_of_accounts c ON t.coa_id=c.id
+        LEFT JOIN donatur d ON t.donatur_id=d.id
+        LEFT JOIN users u ON t.user_id=u.id
+        WHERE t.id=?''', (transaksi_id,)).fetchone()
+    if not t:
+        conn.close(); flash('Transaksi tidak ditemukan.', 'danger')
+        return redirect(url_for('marketing_dashboard'))
+    inst = get_instansi(conn)
+    conn.close()
+
+    jumlah = t['jumlah'] or 0
+    created = t['created_at'] or ''
+    try:
+        tgl = datetime.strptime(created, '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M')
+    except (ValueError, TypeError):
+        tgl = t['tanggal'] or ''
+    dana_label = LABEL_DANA.get(t['jenis_dana'] or t['coa_dana'] or '', '')
+
+    s = {
+        'instansi':  (inst.get('nama_lembaga') or inst.get('nama') or 'BAITUL MAAL').upper(),
+        'alamat':    inst.get('alamat', '') or '',
+        'telepon':   inst.get('telepon', '') or '',
+        'website':   inst.get('website', '') or '',
+        'judul':     'BUKTI PENERIMAAN DONASI' if t['jenis'] == 'masuk' else 'BUKTI PENYALURAN',
+        'no':        f"TRX-{transaksi_id:05d}",
+        'tanggal':   tgl,
+        'donatur':   t['donatur_nama'] or 'Umum',
+        'dana':      t['coa_nama'] or dana_label or '-',
+        'metode':    'Tunai',
+        'jumlah_fmt': format_rupiah(jumlah),
+        'terbilang': (terbilang(jumlah).capitalize() + ' rupiah'),
+        'petugas':   t['petugas_nama'] or '-',
+        'jenis':     t['jenis'],
+    }
+    return render_template('marketing/slip.html', s=s)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

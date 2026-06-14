@@ -74,10 +74,17 @@
           </span>
         </div>
       </div>
-      <div class="fw-bold text-end flex-shrink-0
-                  {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %}"
-           style="font-size:.95rem;white-space:nowrap">
-        {% if t.jenis=='keluar' %}−{% endif %}{{ t.jumlah|rupiah }}
+      <div class="text-end flex-shrink-0">
+        <div class="fw-bold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %}"
+             style="font-size:.95rem;white-space:nowrap">
+          {% if t.jenis=='keluar' %}−{% endif %}{{ t.jumlah|rupiah }}
+        </div>
+        {% if t.jenis=='masuk' %}
+        <a href="/slip/{{ t.id }}" class="d-inline-block mt-1"
+           style="font-size:.7rem;color:#1a5276;text-decoration:none">
+          <i class="bi bi-printer"></i> Cetak
+        </a>
+        {% endif %}
       </div>
     </div>
   </div>

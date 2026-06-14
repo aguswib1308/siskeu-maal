@@ -1,0 +1,135 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Slip Donasi{% endblock %}
+
+{% block content %}
+<div class="text-center mb-3 no-print">
+  <div style="width:56px;height:56px;border-radius:50%;background:#d5f5e3;
+              display:flex;align-items:center;justify-content:center;margin:0 auto;
+              font-size:1.8rem;color:#1e8449">
+    <i class="bi bi-check-lg"></i>
+  </div>
+  <div class="fw-bold mt-2" style="font-size:1.05rem">Tersimpan</div>
+  <div class="text-muted" style="font-size:.8rem">Cetak slip untuk donatur</div>
+</div>
+
+{# ── Preview struk (tampak seperti kertas thermal) ── #}
+<div id="printArea" class="d-flex justify-content-center mb-3">
+  <pre id="preview" style="
+    background:#fff;border-radius:10px;padding:14px 12px;margin:0;
+    font-family:'Courier New',monospace;font-size:12px;line-height:1.45;
+    color:#1a1a1a;white-space:pre;overflow-x:auto;
+    box-shadow:0 1px 6px rgba(0,0,0,.12);width:300px;max-width:100%"></pre>
+</div>
+
+{# ── Tombol aksi ── #}
+<div class="no-print">
+  <button onclick="cetak()" class="btn btn-success w-100 btn-lg mb-2">
+    <i class="bi bi-printer-fill"></i> Cetak Slip (Printer Thermal)
+  </button>
+  <button onclick="window.print()" class="btn btn-outline-secondary w-100 mb-2">
+    <i class="bi bi-file-earmark-pdf"></i> Cetak Biasa / Simpan PDF
+  </button>
+  <a href="/marketing" class="btn btn-link w-100 text-muted" style="text-decoration:none">
+    Selesai
+  </a>
+
+  <div class="card-flat p-3 mt-2" style="background:#fff">
+    <div class="section-label mb-1">Cara cetak thermal</div>
+    <ol class="mb-0 ps-3" style="font-size:.78rem;color:#64748b;line-height:1.6">
+      <li>Pasang aplikasi <b>RawBT</b> dari Play Store.</li>
+      <li>Sambungkan printer Bluetooth 58mm di pengaturan RawBT.</li>
+      <li>Tekan <b>Cetak Slip</b> — RawBT akan terbuka & mencetak.</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const S = {{ s|tojson }};
+const W = 32;
+
+function rep(ch, n){ return n > 0 ? ch.repeat(n) : ''; }
+function center(t){
+  t = String(t);
+  if (t.length >= W) return t.slice(0, W);
+  return rep(' ', Math.floor((W - t.length) / 2)) + t;
+}
+function wrap(t){
+  t = String(t); const out = [];
+  while (t.length > W){ out.push(t.slice(0, W)); t = t.slice(W); }
+  out.push(t); return out;
+}
+function row(l, r){
+  l = String(l); r = String(r);
+  const space = W - l.length - r.length;
+  return space >= 1 ? l + rep(' ', space) + r : (l + ' ' + r).slice(0, W);
+}
+
+function buildLines(){
+  const L = [];
+  wrap(S.instansi).forEach(x => { if (x.trim()) L.push(center(x)); });
+  wrap(S.alamat).forEach(x => { if (x.trim()) L.push(center(x)); });
+  if (S.telepon) L.push(center(S.telepon));
+  L.push(rep('-', W));
+  L.push(center(S.judul));
+  L.push(rep('-', W));
+  L.push(row('No', S.no));
+  L.push(row('Tgl', S.tanggal));
+  L.push('Donatur:');
+  wrap(S.donatur).forEach(x => L.push(' ' + x));
+  L.push('Dana:');
+  wrap(S.dana).forEach(x => L.push(' ' + x));
+  L.push(row('Metode', S.metode));
+  L.push(rep('-', W));
+  L.push(row('Jumlah', S.jumlah_fmt));
+  L.push('Terbilang:');
+  wrap(S.terbilang).forEach(x => L.push(' ' + x));
+  L.push(rep('-', W));
+  L.push('Status: ' + (S.jenis === 'masuk' ? 'LUNAS' : 'TERSALUR'));
+  L.push(row('Petugas', S.petugas));
+  L.push(rep('-', W));
+  L.push(center('Jazakumullahu khairan'));
+  L.push(center('Semoga jadi amal jariyah'));
+  L.push(rep('-', W));
+  L.push(center('Bukti sah tanpa tanda tangan'));
+  if (S.website) L.push(center(S.website));
+  return L;
+}
+
+function escposData(){
+  const ESC = '\x1B', GS = '\x1D';
+  const boldOn = ESC + 'E' + '\x01', boldOff = ESC + 'E' + '\x00';
+  const LF = '\x0A';
+  let o = ESC + '@';                       // init
+  buildLines().forEach(line => {
+    if (line.indexOf(S.judul) >= 0 || line.indexOf('Jumlah') === 0 || line.indexOf('Status:') === 0) {
+      o += boldOn + line + LF + boldOff;
+    } else {
+      o += line + LF;
+    }
+  });
+  o += LF + LF + LF + GS + 'V' + '\x00';   // feed + cut (diabaikan bila tanpa cutter)
+  return o;
+}
+
+function cetak(){
+  try {
+    window.location.href = 'rawbt:' + encodeURIComponent(escposData());
+  } catch (e) {
+    alert('Gagal memanggil RawBT. Pastikan aplikasi RawBT terpasang.\n' + e);
+  }
+}
+
+document.getElementById('preview').textContent = buildLines().join('\n');
+</script>
+<style>
+@media print {
+  body * { visibility: hidden; }
+  #printArea, #printArea * { visibility: visible; }
+  #printArea { position: absolute; left: 0; top: 0; }
+  #preview { box-shadow: none; width: 58mm; font-size: 11px; }
+  .no-print, .bottom-nav, .topbar { display: none !important; }
+}
+</style>
+{% endblock %}
