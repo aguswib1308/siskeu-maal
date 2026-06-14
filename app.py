@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
-import sqlite3, hashlib, os, re, json, calendar as cal_mod, io
+import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod
 from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1094,6 +1094,117 @@ def admin_jurnal_hapus(id):
     conn.commit(); conn.close()
     flash('Jurnal dan transaksi terkait dihapus.', 'warning')
     return redirect(url_for('admin_jurnal'))
+
+# ── Backup Database ──────────────────────────────────────────────────────────
+
+BACKUP_DIR = os.path.join('data', 'backups')
+
+def get_backup_list():
+    if not os.path.exists(BACKUP_DIR):
+        return []
+    files = glob_mod.glob(os.path.join(BACKUP_DIR, 'backup_*.db'))
+    backups = []
+    for f in sorted(files, reverse=True):
+        fname = os.path.basename(f)
+        size = os.path.getsize(f)
+        mtime = datetime.fromtimestamp(os.path.getmtime(f))
+        label = 'Manual'
+        if '_auto_' in fname:
+            label = 'Otomatis'
+        backups.append({'filename': fname, 'size': size, 'date': mtime, 'label': label})
+    return backups
+
+def create_backup(prefix='manual'):
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    fname = f'backup_{prefix}_{ts}.db'
+    dst = os.path.join(BACKUP_DIR, fname)
+    src = DB_PATH
+    conn = sqlite3.connect(src)
+    bak = sqlite3.connect(dst)
+    conn.backup(bak)
+    bak.close()
+    conn.close()
+    return fname
+
+@app.route('/admin/backup')
+@admin_required
+def admin_backup():
+    backups = get_backup_list()
+    total_size = sum(b['size'] for b in backups)
+    conn = get_db()
+    stats = {
+        'donatur': conn.execute("SELECT COUNT(*) FROM donatur").fetchone()[0],
+        'penerima': conn.execute("SELECT COUNT(*) FROM penerima_manfaat").fetchone()[0],
+        'transaksi': conn.execute("SELECT COUNT(*) FROM transaksi").fetchone()[0],
+        'jurnal': conn.execute("SELECT COUNT(*) FROM jurnal").fetchone()[0],
+        'db_size': os.path.getsize(DB_PATH),
+    }
+    conn.close()
+    return render_template('admin/backup.html', backups=backups, stats=stats, total_size=total_size)
+
+@app.route('/admin/backup/create', methods=['POST'])
+@admin_required
+def admin_backup_create():
+    fname = create_backup('manual')
+    flash(f'Backup berhasil dibuat: {fname}', 'success')
+    return redirect(url_for('admin_backup'))
+
+@app.route('/admin/backup/download/<filename>')
+@admin_required
+def admin_backup_download(filename):
+    if '..' in filename or '/' in filename or '\\' in filename:
+        flash('Nama file tidak valid.', 'danger')
+        return redirect(url_for('admin_backup'))
+    fpath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(fpath):
+        flash('File backup tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_backup'))
+    return send_file(fpath, download_name=filename, as_attachment=True)
+
+@app.route('/admin/backup/delete/<filename>', methods=['POST'])
+@admin_required
+def admin_backup_delete(filename):
+    if '..' in filename or '/' in filename or '\\' in filename:
+        flash('Nama file tidak valid.', 'danger')
+        return redirect(url_for('admin_backup'))
+    fpath = os.path.join(BACKUP_DIR, filename)
+    if os.path.exists(fpath):
+        os.remove(fpath)
+        flash(f'Backup {filename} dihapus.', 'warning')
+    return redirect(url_for('admin_backup'))
+
+@app.route('/admin/backup/restore/<filename>', methods=['POST'])
+@admin_required
+def admin_backup_restore(filename):
+    if '..' in filename or '/' in filename or '\\' in filename:
+        flash('Nama file tidak valid.', 'danger')
+        return redirect(url_for('admin_backup'))
+    fpath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(fpath):
+        flash('File backup tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_backup'))
+    create_backup('pre_restore')
+    src = sqlite3.connect(fpath)
+    dst = sqlite3.connect(DB_PATH)
+    src.backup(dst)
+    dst.close()
+    src.close()
+    flash(f'Database berhasil di-restore dari {filename}. Backup sebelum restore juga dibuat.', 'success')
+    return redirect(url_for('admin_backup'))
+
+@app.route('/api/backup/auto', methods=['POST'])
+def api_backup_auto():
+    key = request.headers.get('X-Backup-Key', '')
+    if key != app.secret_key:
+        return jsonify(ok=False, msg='Unauthorized'), 401
+    fname = create_backup('auto')
+    cleanup = 0
+    backups = sorted(glob_mod.glob(os.path.join(BACKUP_DIR, 'backup_auto_*.db')))
+    while len(backups) > 12:
+        os.remove(backups.pop(0))
+        cleanup += 1
+    return jsonify(ok=True, filename=fname, cleaned=cleanup)
 
 # ── Marketing Dashboard ───────────────────────────────────────────────────────
 
