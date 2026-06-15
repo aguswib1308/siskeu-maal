@@ -1,0 +1,6 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#1a5276"/>
+  <text x="256" y="200" text-anchor="middle" fill="white" font-size="120" font-family="Arial, sans-serif" font-weight="bold">BM</text>
+  <text x="256" y="340" text-anchor="middle" fill="#85c1e9" font-size="55" font-family="Arial, sans-serif" font-weight="600">MAAL</text>
+  <path d="M 180 380 Q 256 420 332 380" stroke="#f39c12" stroke-width="8" fill="none" stroke-linecap="round"/>
+</svg>

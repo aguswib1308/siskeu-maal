@@ -7,11 +7,16 @@ app = Flask(__name__)
 app.secret_key = 'BmtMaal@2026!'
 DB_PATH = os.path.join('data', 'keuangan.db')
 
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'amalmuslim.bmt@gmail.com')
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
 def hash_pw(pw):
@@ -906,6 +911,431 @@ def marketing_riwayat():
     total = sum(r['jumlah'] for r in transaksi if r['jenis']=='masuk')
     conn.close()
     return render_template('marketing/riwayat.html', transaksi=transaksi, bulan=bulan, total=total)
+
+# ── PWA Service Worker ────────────────────────────────────────────────────────
+
+@app.route('/marketing/sw.js')
+def marketing_sw():
+    return app.send_static_file('sw.js'), 200, {
+        'Content-Type': 'application/javascript',
+        'Service-Worker-Allowed': '/marketing/'
+    }
+
+# ── Marketing API (JSON) ─────────────────────────────────────────────────────
+
+def api_login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'error': 'unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/api/marketing/dashboard')
+@api_login_required
+def api_marketing_dashboard():
+    conn = get_db()
+    bulan = date.today().strftime('%Y-%m')
+    total_masuk_bulan = conn.execute(
+        "SELECT COALESCE(SUM(jumlah),0) FROM transaksi WHERE jenis='masuk' AND strftime('%Y-%m',tanggal)=? AND user_id=?",
+        (bulan, session['user_id'])
+    ).fetchone()[0]
+    koleksi_bulan = conn.execute(
+        "SELECT COUNT(*) as jumlah, COALESCE(SUM(jumlah),0) as nominal FROM koleksi_bulanan "
+        "WHERE bulan=? AND marketing_id=? AND status='terkumpul'",
+        (bulan, session['user_id'])
+    ).fetchone()
+    transaksi_hari = conn.execute('''
+        SELECT t.id, t.tanggal, t.jenis, t.jumlah, t.keterangan,
+               c.nama as coa_nama, c.jenis_dana, d.nama as donatur_nama
+        FROM transaksi t
+        LEFT JOIN chart_of_accounts c ON t.coa_id=c.id
+        LEFT JOIN donatur d ON t.donatur_id=d.id
+        WHERE t.user_id=? AND t.tanggal=? ORDER BY t.created_at DESC
+    ''', (session['user_id'], date.today().isoformat())).fetchall()
+    conn.close()
+    return jsonify({
+        'bulan': bulan,
+        'total_masuk_bulan': total_masuk_bulan,
+        'koleksi_jumlah': koleksi_bulan['jumlah'],
+        'koleksi_nominal': koleksi_bulan['nominal'],
+        'transaksi_hari': [dict(r) for r in transaksi_hari],
+        'hari_ini': date.today().isoformat(),
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/marketing/koleksi')
+@api_login_required
+def api_marketing_koleksi():
+    conn = get_db()
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    area  = request.args.get('area', '')
+    query = '''
+        SELECT kb.id, kb.donatur_id, kb.bulan, kb.status, kb.jumlah,
+               kb.jumlah_kunjungan, kb.kunjungan_terakhir, kb.keterangan,
+               d.nama as donatur_nama, d.sumber_infaq, d.area,
+               d.lokasi_nama, d.lat, d.lng, u.nama as marketing_nama
+        FROM koleksi_bulanan kb
+        JOIN donatur d ON kb.donatur_id=d.id
+        LEFT JOIN users u ON kb.marketing_kunjungi_terakhir=u.id
+        WHERE kb.bulan=? AND kb.status != 'terkumpul' '''
+    params = [bulan]
+    if area:
+        query += ' AND d.area=?'; params.append(area)
+    query += ' ORDER BY d.area, d.sumber_infaq, d.nama'
+    koleksi = conn.execute(query, params).fetchall()
+    areas = conn.execute(
+        "SELECT DISTINCT d.area FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id=d.id "
+        "WHERE kb.bulan=? AND kb.status!='terkumpul' AND d.area IS NOT NULL ORDER BY d.area",
+        (bulan,)
+    ).fetchall()
+    stats = conn.execute(
+        "SELECT COUNT(*) as total, SUM(CASE WHEN status='terkumpul' THEN 1 ELSE 0 END) as terkumpul "
+        "FROM koleksi_bulanan WHERE bulan=?", (bulan,)
+    ).fetchone()
+    conn.close()
+    return jsonify({
+        'koleksi': [dict(r) for r in koleksi],
+        'areas': [r['area'] for r in areas],
+        'stats': dict(stats),
+        'bulan': bulan,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/marketing/koleksi/<int:id>')
+@api_login_required
+def api_marketing_koleksi_detail(id):
+    conn = get_db()
+    koleksi = conn.execute('''
+        SELECT kb.*, d.nama as donatur_nama, d.sumber_infaq, d.area,
+               d.lokasi_nama, d.lat, d.lng
+        FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id=d.id
+        WHERE kb.id=?
+    ''', (id,)).fetchone()
+    if not koleksi:
+        conn.close()
+        return jsonify({'error': 'not_found'}), 404
+    riwayat = conn.execute('''
+        SELECT kb.bulan, kb.status, kb.jumlah, kb.tanggal_koleksi, u.nama as marketing_nama
+        FROM koleksi_bulanan kb LEFT JOIN users u ON kb.marketing_id=u.id
+        WHERE kb.donatur_id=? AND kb.status='terkumpul'
+        ORDER BY kb.bulan DESC LIMIT 6
+    ''', (koleksi['donatur_id'],)).fetchall()
+    conn.close()
+    return jsonify({
+        'koleksi': dict(koleksi),
+        'riwayat': [dict(r) for r in riwayat]
+    })
+
+@app.route('/api/marketing/koleksi/<int:id>/catat', methods=['POST'])
+@api_login_required
+def api_marketing_koleksi_catat(id):
+    data  = request.get_json(silent=True) or {}
+    aksi  = data.get('aksi')
+    today = date.today().isoformat()
+    conn  = get_db()
+
+    lat_k = data.get('lat_kunjungan')
+    lng_k = data.get('lng_kunjungan')
+
+    if aksi == 'terkumpul':
+        jumlah = float(data.get('jumlah', 0) or 0)
+        kol = conn.execute("SELECT * FROM koleksi_bulanan WHERE id=?", (id,)).fetchone()
+        if not kol:
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Data tidak ditemukan.'}), 404
+
+        rows = conn.execute(
+            "UPDATE koleksi_bulanan SET status='terkumpul', marketing_id=?, "
+            "tanggal_koleksi=?, jumlah=?, keterangan=?, lat_kunjungan=?, lng_kunjungan=? "
+            "WHERE id=? AND status != 'terkumpul'",
+            (session['user_id'], today, jumlah, data.get('keterangan',''), lat_k, lng_k, id)
+        ).rowcount
+
+        if rows == 0:
+            other = conn.execute(
+                "SELECT u.nama, kb.tanggal_koleksi FROM koleksi_bulanan kb "
+                "JOIN users u ON kb.marketing_id=u.id WHERE kb.id=?", (id,)
+            ).fetchone()
+            conn.close()
+            msg = f"Sudah dikoleksi oleh {other['nama']} pada {other['tanggal_koleksi']}." if other else "Sudah dikoleksi."
+            return jsonify({'status': 'conflict', 'message': msg}), 409
+
+        donatur = conn.execute("SELECT * FROM donatur WHERE id=?", (kol['donatur_id'],)).fetchone()
+        trx_id = auto_transaksi_koleksi(conn, id, kol['donatur_id'], kol['bulan'],
+                                        donatur['sumber_infaq'], jumlah, today, session['user_id'])
+        conn.commit(); conn.close()
+        return jsonify({'status': 'ok', 'message': f'Koleksi berhasil: {format_rupiah(jumlah)}', 'transaksi_id': trx_id})
+
+    elif aksi == 'tidak_ada':
+        conn.execute(
+            "UPDATE koleksi_bulanan SET status='tidak_ada', "
+            "jumlah_kunjungan = jumlah_kunjungan + 1, "
+            "kunjungan_terakhir=?, marketing_kunjungi_terakhir=?, keterangan=?, "
+            "lat_kunjungan=?, lng_kunjungan=? "
+            "WHERE id=?",
+            (today, session['user_id'], data.get('keterangan',''), lat_k, lng_k, id)
+        )
+        conn.commit(); conn.close()
+        return jsonify({'status': 'ok', 'message': 'Kunjungan dicatat.'})
+
+    conn.close()
+    return jsonify({'status': 'error', 'message': 'Aksi tidak valid.'}), 400
+
+@app.route('/api/marketing/transaksi', methods=['POST'])
+@api_login_required
+def api_marketing_transaksi():
+    data = request.get_json(silent=True) or {}
+    conn = get_db()
+    coa_id = data.get('coa_id') or None
+    jenis_dana = None
+    if coa_id:
+        row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
+        if row: jenis_dana = row['jenis_dana']
+    jumlah_raw = str(data.get('jumlah', '0'))
+    jumlah = float(jumlah_raw.replace('.','').replace(',',''))
+    cur = conn.execute('''INSERT INTO transaksi
+        (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
+        VALUES (?,?,?,?,?,?,?,?,?)''',
+        (data.get('tanggal', date.today().isoformat()),
+         data['jenis'], jenis_dana, coa_id,
+         data.get('donatur_id') or None, data.get('penerima_id') or None,
+         jumlah, data.get('keterangan',''), session['user_id']))
+    conn.commit()
+    trx_id = cur.lastrowid
+    conn.close()
+    return jsonify({'status': 'ok', 'message': 'Transaksi berhasil dicatat.', 'transaksi_id': trx_id})
+
+@app.route('/api/marketing/sync', methods=['POST'])
+@api_login_required
+def api_marketing_sync():
+    items = (request.get_json(silent=True) or {}).get('items', [])
+    results = []
+    for item in items:
+        try:
+            item_type = item.get('type')
+            body = item.get('body', {})
+            if item_type == 'koleksi_catat':
+                with app.test_request_context(
+                    f"/api/marketing/koleksi/{item['koleksi_id']}/catat",
+                    method='POST', json=body
+                ):
+                    session.update({'user_id': session.get('user_id'), 'role': session.get('role'), 'nama': session.get('nama')})
+                    resp = api_marketing_koleksi_catat(item['koleksi_id'])
+                    if isinstance(resp, tuple):
+                        results.append({'id': item.get('id'), 'status': 'ok' if resp[1] < 400 else 'error',
+                                        'response': resp[0].get_json()})
+                    else:
+                        results.append({'id': item.get('id'), 'status': 'ok', 'response': resp.get_json()})
+            elif item_type == 'transaksi':
+                conn = get_db()
+                coa_id = body.get('coa_id') or None
+                jenis_dana = None
+                if coa_id:
+                    row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
+                    if row: jenis_dana = row['jenis_dana']
+                jumlah_raw = str(body.get('jumlah', '0'))
+                jumlah = float(jumlah_raw.replace('.','').replace(',',''))
+                cur = conn.execute('''INSERT INTO transaksi
+                    (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
+                    VALUES (?,?,?,?,?,?,?,?,?)''',
+                    (body.get('tanggal', date.today().isoformat()),
+                     body['jenis'], jenis_dana, coa_id,
+                     body.get('donatur_id') or None, body.get('penerima_id') or None,
+                     jumlah, body.get('keterangan',''), session['user_id']))
+                conn.commit(); conn.close()
+                results.append({'id': item.get('id'), 'status': 'ok', 'transaksi_id': cur.lastrowid})
+            else:
+                results.append({'id': item.get('id'), 'status': 'error', 'message': 'Unknown type'})
+        except Exception as ex:
+            results.append({'id': item.get('id'), 'status': 'error', 'message': str(ex)})
+    return jsonify({'results': results, 'synced': len([r for r in results if r['status']=='ok']), 'total': len(items)})
+
+@app.route('/api/marketing/coa')
+@api_login_required
+def api_marketing_coa():
+    conn = get_db()
+    coa_list = conn.execute(
+        "SELECT id, kode, nama, kelompok, jenis_dana, jenis_transaksi, parent_kode "
+        "FROM chart_of_accounts WHERE aktif=1 ORDER BY kode"
+    ).fetchall()
+    conn.close()
+    return jsonify({'coa': [dict(r) for r in coa_list]})
+
+@app.route('/api/marketing/donatur')
+@api_login_required
+def api_marketing_donatur():
+    conn = get_db()
+    donatur = conn.execute(
+        "SELECT id, nama, area, sumber_infaq FROM donatur WHERE aktif=1 ORDER BY nama"
+    ).fetchall()
+    penerima = conn.execute(
+        "SELECT id, nama, asnaf FROM penerima_manfaat WHERE aktif=1 ORDER BY nama"
+    ).fetchall()
+    conn.close()
+    return jsonify({'donatur': [dict(r) for r in donatur], 'penerima': [dict(r) for r in penerima]})
+
+# ── Push Notification API ────────────────────────────────────────────────────
+
+@app.route('/api/push/vapid-key')
+def api_push_vapid_key():
+    return jsonify({'publicKey': VAPID_PUBLIC_KEY})
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@api_login_required
+def api_push_subscribe():
+    data = request.get_json(silent=True) or {}
+    sub_json = json.dumps(data.get('subscription', {}))
+    if not sub_json or sub_json == '{}':
+        return jsonify({'error': 'No subscription data'}), 400
+    conn = get_db()
+    conn.execute(
+        "INSERT OR IGNORE INTO push_subscriptions (user_id, subscription_json) VALUES (?, ?)",
+        (session['user_id'], sub_json))
+    conn.commit(); conn.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/push/unsubscribe', methods=['POST'])
+@api_login_required
+def api_push_unsubscribe():
+    data = request.get_json(silent=True) or {}
+    sub_json = json.dumps(data.get('subscription', {}))
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM push_subscriptions WHERE user_id=? AND subscription_json=?",
+        (session['user_id'], sub_json))
+    conn.commit(); conn.close()
+    return jsonify({'status': 'ok'})
+
+def send_push_to_user(user_id, title, body, url='/marketing'):
+    if not VAPID_PRIVATE_KEY:
+        return
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        return
+    conn = get_db()
+    subs = conn.execute(
+        "SELECT subscription_json FROM push_subscriptions WHERE user_id=?", (user_id,)
+    ).fetchall()
+    conn.close()
+    payload = json.dumps({'title': title, 'body': body, 'url': url})
+    for s in subs:
+        try:
+            webpush(
+                subscription_info=json.loads(s['subscription_json']),
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={'sub': f'mailto:{VAPID_CLAIM_EMAIL}'}
+            )
+        except Exception:
+            pass
+
+def send_push_to_all_marketing(title, body, url='/marketing'):
+    if not VAPID_PRIVATE_KEY:
+        return
+    conn = get_db()
+    users = conn.execute("SELECT id FROM users WHERE role='marketing' AND aktif=1").fetchall()
+    conn.close()
+    for u in users:
+        send_push_to_user(u['id'], title, body, url)
+
+# ── Target Bulanan API ───────────────────────────────────────────────────────
+
+@app.route('/api/marketing/target')
+@api_login_required
+def api_marketing_target():
+    conn = get_db()
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    uid = session['user_id']
+
+    targets = conn.execute(
+        "SELECT * FROM target_bulanan WHERE bulan=? AND (user_id=? OR user_id IS NULL) ORDER BY user_id DESC",
+        (bulan, uid)
+    ).fetchall()
+
+    result = {}
+    for jenis in ('fundraising', 'pentasharufan'):
+        t = next((dict(r) for r in targets if r['jenis'] == jenis), None)
+        if not t:
+            result[jenis] = None
+            continue
+
+        if jenis == 'fundraising':
+            realisasi = conn.execute(
+                "SELECT COALESCE(SUM(jumlah),0) FROM transaksi "
+                "WHERE jenis='masuk' AND strftime('%Y-%m',tanggal)=? AND user_id=?",
+                (bulan, uid)
+            ).fetchone()[0]
+            result[jenis] = {
+                'target_nominal': t['target_nominal'],
+                'realisasi_nominal': realisasi,
+                'persen': round(realisasi / t['target_nominal'] * 100, 1) if t['target_nominal'] > 0 else 0
+            }
+        else:
+            realisasi_nominal = conn.execute(
+                "SELECT COALESCE(SUM(jumlah),0) FROM transaksi "
+                "WHERE jenis='keluar' AND strftime('%Y-%m',tanggal)=? AND user_id=?",
+                (bulan, uid)
+            ).fetchone()[0]
+            realisasi_kegiatan = conn.execute(
+                "SELECT COUNT(DISTINCT tanggal || coa_id) FROM transaksi "
+                "WHERE jenis='keluar' AND strftime('%Y-%m',tanggal)=? AND user_id=?",
+                (bulan, uid)
+            ).fetchone()[0]
+            result[jenis] = {
+                'target_nominal': t['target_nominal'],
+                'target_kegiatan': t['target_kegiatan'],
+                'realisasi_nominal': realisasi_nominal,
+                'realisasi_kegiatan': realisasi_kegiatan,
+                'persen_nominal': round(realisasi_nominal / t['target_nominal'] * 100, 1) if t['target_nominal'] > 0 else 0,
+                'persen_kegiatan': round(realisasi_kegiatan / t['target_kegiatan'] * 100, 1) if t['target_kegiatan'] > 0 else 0
+            }
+
+    conn.close()
+    return jsonify({'bulan': bulan, 'target': result})
+
+@app.route('/admin/target', methods=['GET', 'POST'])
+@admin_required
+def admin_target():
+    conn = get_db()
+    if request.method == 'POST':
+        data = request.form
+        bulan = data['bulan']
+        user_id = int(data['user_id']) if data.get('user_id') else None
+        jenis = data['jenis']
+        nominal = int(data.get('target_nominal', 0) or 0)
+        kegiatan = int(data.get('target_kegiatan', 0) or 0)
+        conn.execute(
+            "INSERT INTO target_bulanan (bulan, user_id, jenis, target_nominal, target_kegiatan) "
+            "VALUES (?,?,?,?,?) ON CONFLICT(bulan, user_id, jenis) DO UPDATE SET "
+            "target_nominal=excluded.target_nominal, target_kegiatan=excluded.target_kegiatan",
+            (bulan, user_id, jenis, nominal, kegiatan))
+        conn.commit()
+        flash('Target berhasil disimpan.', 'success')
+        return redirect(url_for('admin_target'))
+
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    targets = conn.execute(
+        "SELECT t.*, u.nama as user_nama FROM target_bulanan t "
+        "LEFT JOIN users u ON t.user_id=u.id WHERE t.bulan=? ORDER BY t.jenis, u.nama",
+        (bulan,)
+    ).fetchall()
+    marketing_users = conn.execute(
+        "SELECT id, nama FROM users WHERE role='marketing' AND aktif=1 ORDER BY nama"
+    ).fetchall()
+    conn.close()
+    return render_template('admin/target.html',
+        targets=targets, marketing_users=marketing_users, bulan=bulan)
+
+@app.route('/admin/target/delete/<int:id>', methods=['POST'])
+@admin_required
+def admin_target_delete(id):
+    conn = get_db()
+    conn.execute("DELETE FROM target_bulanan WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    flash('Target dihapus.', 'success')
+    return redirect(url_for('admin_target'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

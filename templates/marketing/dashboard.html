@@ -19,6 +19,73 @@
   </div>
 </div>
 
+{# ── Target Bulanan ────────────────────────────────────── #}
+<div id="targetCards" class="mb-3" style="display:none"></div>
+<script>
+(function() {
+  fetch('/api/marketing/target', { credentials: 'same-origin' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var html = '';
+      var t = data.target || {};
+
+      if (t.fundraising) {
+        var f = t.fundraising;
+        var pct = Math.min(f.persen, 100);
+        var clr = pct >= 80 ? '#27ae60' : pct >= 50 ? '#f39c12' : '#e74c3c';
+        html += '<div class="card mb-2 p-3">' +
+          '<div class="d-flex justify-content-between align-items-center mb-1">' +
+          '<div style="font-size:.78rem;font-weight:700;color:#1a5276">' +
+          '<i class="bi bi-arrow-down-circle"></i> Fundraising</div>' +
+          (pct >= 100 ? '<span class="badge" style="background:#27ae60;color:#fff;font-size:.65rem">TARGET TERCAPAI</span>' : '') +
+          '</div>' +
+          '<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">' +
+          'Rp ' + Number(f.realisasi_nominal).toLocaleString('id') + ' / Rp ' + Number(f.target_nominal).toLocaleString('id') +
+          ' (' + f.persen + '%)</div>' +
+          '<div style="background:#e9eef4;border-radius:6px;height:8px;overflow:hidden">' +
+          '<div style="width:' + pct + '%;height:100%;background:' + clr + ';border-radius:6px;transition:width .5s"></div>' +
+          '</div></div>';
+      }
+
+      if (t.pentasharufan) {
+        var p = t.pentasharufan;
+        var pctK = Math.min(p.persen_kegiatan, 100);
+        var clrK = pctK >= 80 ? '#27ae60' : pctK >= 50 ? '#f39c12' : '#e74c3c';
+        html += '<div class="card mb-2 p-3">' +
+          '<div class="d-flex justify-content-between align-items-center mb-1">' +
+          '<div style="font-size:.78rem;font-weight:700;color:#8e44ad">' +
+          '<i class="bi bi-arrow-up-circle"></i> Pentasharufan</div>' +
+          (pctK >= 100 ? '<span class="badge" style="background:#27ae60;color:#fff;font-size:.65rem">TARGET TERCAPAI</span>' : '') +
+          '</div>' +
+          '<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">' +
+          p.realisasi_kegiatan + ' / ' + p.target_kegiatan + ' kegiatan (' + p.persen_kegiatan + '%)' +
+          '</div>' +
+          '<div style="background:#e9eef4;border-radius:6px;height:8px;overflow:hidden">' +
+          '<div style="width:' + pctK + '%;height:100%;background:' + clrK + ';border-radius:6px;transition:width .5s"></div>' +
+          '</div>';
+        if (p.target_nominal > 0) {
+          var pctN = Math.min(p.persen_nominal, 100);
+          var clrN = pctN >= 80 ? '#27ae60' : pctN >= 50 ? '#f39c12' : '#e74c3c';
+          html += '<div style="font-size:.72rem;color:#64748b;margin:6px 0 4px">' +
+            'Rp ' + Number(p.realisasi_nominal).toLocaleString('id') + ' / Rp ' + Number(p.target_nominal).toLocaleString('id') +
+            ' (' + p.persen_nominal + '%)</div>' +
+            '<div style="background:#e9eef4;border-radius:6px;height:8px;overflow:hidden">' +
+            '<div style="width:' + pctN + '%;height:100%;background:' + clrN + ';border-radius:6px;transition:width .5s"></div>' +
+            '</div>';
+        }
+        html += '</div>';
+      }
+
+      if (html) {
+        var el = document.getElementById('targetCards');
+        el.innerHTML = html;
+        el.style.display = '';
+      }
+    })
+    .catch(function() {});
+})();
+</script>
+
 {# ── Quick actions ─────────────────────────────────────── #}
 <div class="d-flex gap-2 mb-4">
   <a href="/marketing/catat"

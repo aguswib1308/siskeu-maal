@@ -68,6 +68,13 @@
 </div>
 {% endif %}
 
+{# ── GPS Check-in ─────────────────────────────────────── #}
+<div id="gpsStatus" class="mb-2" style="font-size:.75rem;color:#94a3b8">
+  <i class="bi bi-geo-alt"></i> Mengambil lokasi GPS...
+</div>
+<input type="hidden" id="latKunjungan" value="">
+<input type="hidden" id="lngKunjungan" value="">
+
 {# ── Tombol pilih aksi ─────────────────────────────────── #}
 <div class="section-label">Hasil Kunjungan</div>
 
@@ -169,5 +176,73 @@ function resetAksi() {
   document.getElementById('formTerkumpul').style.display = 'none';
   document.getElementById('formTidakAda').style.display  = 'none';
 }
+
+// ── GPS Check-in ────────────────────────────────────────
+(function() {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      document.getElementById('latKunjungan').value = pos.coords.latitude;
+      document.getElementById('lngKunjungan').value = pos.coords.longitude;
+      document.getElementById('gpsStatus').innerHTML =
+        '<i class="bi bi-geo-alt-fill" style="color:#1e8449"></i> ' +
+        'Lokasi tercatat (' + pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5) + ')';
+    }, function(err) {
+      document.getElementById('gpsStatus').innerHTML =
+        '<i class="bi bi-geo-alt" style="color:#d35400"></i> GPS tidak tersedia';
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  } else {
+    document.getElementById('gpsStatus').innerHTML =
+      '<i class="bi bi-geo-alt" style="color:#d35400"></i> GPS tidak didukung';
+  }
+})();
+
+// ── Offline-capable form submission ─────────────────────
+function submitKoleksi(form, aksi) {
+  var body = { aksi: aksi, keterangan: form.keterangan.value };
+  if (aksi === 'terkumpul') body.jumlah = parseFloat(form.jumlah.value) || 0;
+  var lat = document.getElementById('latKunjungan').value;
+  var lng = document.getElementById('lngKunjungan').value;
+  if (lat) { body.lat_kunjungan = parseFloat(lat); body.lng_kunjungan = parseFloat(lng); }
+
+  var koleksiId = {{ koleksi.id }};
+  var url = '/api/marketing/koleksi/' + koleksiId + '/catat';
+
+  fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+  .then(function(res) {
+    if (res.data.status === 'conflict') {
+      OfflineStore.showToast(res.data.message, 'warning');
+    } else {
+      OfflineStore.showToast(res.data.message || 'Berhasil!', 'success');
+    }
+    setTimeout(function() { window.location.href = '/marketing/koleksi'; }, 800);
+  })
+  .catch(function() {
+    // Offline — queue for sync
+    OfflineStore.addToSyncQueue({
+      type: 'koleksi_catat',
+      koleksi_id: koleksiId,
+      body: body,
+      label: '{{ koleksi.donatur_nama }}'
+    }).then(function() {
+      OfflineStore.showToast('Tersimpan offline — akan sync otomatis', 'warning');
+      setTimeout(function() { window.location.href = '/marketing/koleksi'; }, 800);
+    });
+  });
+}
+
+document.getElementById('formTerkumpul').addEventListener('submit', function(e) {
+  e.preventDefault();
+  submitKoleksi(this, 'terkumpul');
+});
+document.getElementById('formTidakAda').addEventListener('submit', function(e) {
+  e.preventDefault();
+  submitKoleksi(this, 'tidak_ada');
+});
 </script>
 {% endblock %}

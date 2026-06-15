@@ -34,6 +34,36 @@ def migrate(conn):
         if col not in don:
             c.execute(f"ALTER TABLE donatur ADD COLUMN {col} {defn}")
 
+    # GPS check-in columns on koleksi_bulanan
+    kb = {r[1] for r in c.execute("PRAGMA table_info(koleksi_bulanan)")}
+    for col, defn in [
+        ('lat_kunjungan', 'REAL'),
+        ('lng_kunjungan', 'REAL'),
+    ]:
+        if col not in kb:
+            c.execute(f"ALTER TABLE koleksi_bulanan ADD COLUMN {col} {defn}")
+
+    # Push notification subscriptions
+    c.execute('''CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        subscription_json TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        UNIQUE(user_id, subscription_json)
+    )''')
+
+    # Target bulanan marketing
+    c.execute('''CREATE TABLE IF NOT EXISTS target_bulanan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bulan TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id),
+        jenis TEXT NOT NULL CHECK(jenis IN ('fundraising','pentasharufan')),
+        target_nominal INTEGER NOT NULL DEFAULT 0,
+        target_kegiatan INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        UNIQUE(bulan, user_id, jenis)
+    )''')
+
     conn.commit()
 
 def init():

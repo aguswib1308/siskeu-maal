@@ -1,0 +1,100 @@
+{% extends 'admin/base.html' %}
+{% block title %}Target Bulanan{% endblock %}
+{% block page_title %}Target Bulanan Marketing{% endblock %}
+
+{% block content %}
+
+<div class="card p-4 mb-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-bullseye"></i> Tambah / Edit Target</h6>
+  <form method="POST" action="/admin/target" class="row g-3">
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold">Bulan</label>
+      <input type="month" name="bulan" value="{{ bulan }}" required class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold">Marketing</label>
+      <select name="user_id" class="form-select">
+        <option value="">Semua Marketing (Global)</option>
+        {% for u in marketing_users %}
+        <option value="{{ u.id }}">{{ u.nama }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold">Jenis</label>
+      <select name="jenis" required class="form-select">
+        <option value="fundraising">Fundraising</option>
+        <option value="pentasharufan">Pentasharufan</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold">Target Nominal (Rp)</label>
+      <input type="number" name="target_nominal" min="0" value="0" class="form-control">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold">Target Kegiatan</label>
+      <input type="number" name="target_kegiatan" min="0" value="0" class="form-control">
+    </div>
+    <div class="col-md-1 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="bi bi-check2"></i> Simpan
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="card p-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="fw-bold mb-0"><i class="bi bi-list-check"></i> Daftar Target — {{ bulan }}</h6>
+    <form method="GET" class="d-flex gap-2">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" onchange="this.form.submit()">
+    </form>
+  </div>
+
+  {% if targets %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Marketing</th>
+          <th>Jenis</th>
+          <th class="text-end">Target Nominal</th>
+          <th class="text-end">Target Kegiatan</th>
+          <th class="text-center" style="width:80px">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in targets %}
+        <tr>
+          <td>{{ t.user_nama or 'Semua (Global)' }}</td>
+          <td>
+            {% if t.jenis == 'fundraising' %}
+            <span class="badge bg-success bg-opacity-10 text-success">Fundraising</span>
+            {% else %}
+            <span class="badge bg-info bg-opacity-10 text-info">Pentasharufan</span>
+            {% endif %}
+          </td>
+          <td class="text-end">{{ "{:,.0f}".format(t.target_nominal).replace(",", ".") if t.target_nominal else '—' }}</td>
+          <td class="text-end">{{ t.target_kegiatan or '—' }}</td>
+          <td class="text-center">
+            <form method="POST" action="/admin/target/delete/{{ t.id }}"
+                  onsubmit="return confirm('Hapus target ini?')" style="display:inline">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-muted text-center py-4">
+    <i class="bi bi-bullseye fs-1 d-block mb-2 opacity-25"></i>
+    Belum ada target untuk bulan ini.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

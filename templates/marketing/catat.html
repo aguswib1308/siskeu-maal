@@ -147,5 +147,49 @@ function filterCoa() {
   document.getElementById('wrapPenerima').style.display = jenis==='keluar' ? '' : 'none';
 }
 filterCoa();
+
+// ── Offline-capable form submission ─────────────────────
+var form = document.querySelector('form[action="/marketing/catat"]');
+form.addEventListener('submit', function(e) {
+  e.preventDefault();
+  var fd = new FormData(form);
+  var body = {
+    tanggal: fd.get('tanggal'),
+    jenis: fd.get('jenis'),
+    coa_id: fd.get('coa_id') || null,
+    donatur_id: fd.get('donatur_id') || null,
+    penerima_id: fd.get('penerima_id') || null,
+    jumlah: fd.get('jumlah'),
+    keterangan: fd.get('keterangan') || ''
+  };
+
+  fetch('/api/marketing/transaksi', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+  .then(function(res) {
+    if (res.status < 400) {
+      OfflineStore.showToast(res.data.message || 'Transaksi berhasil!', 'success');
+      setTimeout(function() { window.location.href = '/marketing'; }, 800);
+    } else {
+      OfflineStore.showToast(res.data.message || 'Gagal menyimpan.', 'danger');
+    }
+  })
+  .catch(function() {
+    // Offline — queue for sync
+    var coaText = document.querySelector('#selCoa option:checked');
+    OfflineStore.addToSyncQueue({
+      type: 'transaksi',
+      body: body,
+      label: (coaText ? coaText.textContent.trim() : 'Transaksi') + ' Rp ' + body.jumlah
+    }).then(function() {
+      OfflineStore.showToast('Tersimpan offline — akan sync otomatis', 'warning');
+      setTimeout(function() { window.location.href = '/marketing'; }, 800);
+    });
+  });
+});
 </script>
 {% endblock %}

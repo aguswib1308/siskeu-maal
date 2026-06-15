@@ -1,0 +1,151 @@
+:root {
+  --primary: #1a5276;
+  --primary-light: #2e86c1;
+  --success: #1e8449;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 62px;
+}
+* { -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; }
+body {
+  background: #dde4ec;
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Mobile frame: max 480px centered ───────────────── */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  background: #f0f4f8;
+  min-height: 100dvh;
+  position: relative;
+}
+
+/* ── Top bar ─────────────────────────────────────────── */
+.topbar {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff;
+  padding: .65rem 1rem;
+  padding-top: calc(.65rem + env(safe-area-inset-top, 0px));
+  position: sticky; top: 0; z-index: 99;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.topbar-title { font-size: .95rem; font-weight: 700; letter-spacing: .02em; }
+.topbar-sub   { font-size: .72rem; opacity: .8; }
+
+/* ── Bottom nav ──────────────────────────────────────── */
+.bottom-nav {
+  position: fixed; bottom: 0; z-index: 100;
+  background: #fff;
+  border-top: 1px solid #e0e6ed;
+  display: flex;
+  height: calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+  width: 100%;
+  max-width: 480px;
+  left: 50%; transform: translateX(-50%);
+}
+.bottom-nav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; color: #94a3b8; text-decoration: none;
+  font-size: .62rem; font-weight: 500; gap: 3px;
+  padding: 6px 0;
+  transition: color .15s;
+}
+.bottom-nav a.active { color: var(--primary); }
+.bottom-nav a i { font-size: 1.35rem; line-height: 1; }
+.bottom-nav a.active i { font-weight: 900; }
+
+/* ── Cards ───────────────────────────────────────────── */
+.card {
+  border: none; border-radius: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07);
+}
+.card-flat { border-radius: 14px; border: 1px solid #e9eef4; box-shadow: none; }
+
+/* ── Badges ──────────────────────────────────────────── */
+.badge-masuk  { background: #d5f5e3; color: #1e8449; }
+.badge-keluar { background: #fadbd8; color: #922b21; }
+
+/* ── Buttons ─────────────────────────────────────────── */
+.btn { border-radius: 10px; font-weight: 500; }
+.btn-lg { padding: .75rem 1.5rem; font-size: 1rem; }
+.btn-primary { background: var(--primary); border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-light); border-color: var(--primary-light); }
+
+/* ── Flash messages ──────────────────────────────────── */
+.alert { border-radius: 12px; font-size: .875rem; border: none; }
+
+/* ── Section label ───────────────────────────────────── */
+.section-label {
+  font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+  color: #94a3b8; text-transform: uppercase; margin-bottom: .5rem;
+}
+
+/* ── Offline indicator ───────────────────────────────── */
+.offline-bar {
+  display: none;
+  background: #f39c12;
+  color: #fff;
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 600;
+  padding: 4px 0;
+}
+body.is-offline .offline-bar { display: block; }
+
+/* ── Sync badge ──────────────────────────────────────── */
+.sync-badge {
+  position: absolute;
+  top: 4px; right: 50%;
+  transform: translateX(12px);
+  background: #e74c3c;
+  color: #fff;
+  font-size: .55rem;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.sync-badge.show { display: flex; }
+
+/* ── Install banner ──────────────────────────────────── */
+.install-banner {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff;
+  border-radius: 14px;
+  padding: .8rem 1rem;
+  margin-bottom: .75rem;
+  display: none;
+  align-items: center;
+  gap: .6rem;
+}
+.install-banner.show { display: flex; }
+.install-banner .btn-install {
+  background: #fff;
+  color: var(--primary);
+  border: none;
+  border-radius: 8px;
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .4rem .8rem;
+  white-space: nowrap;
+}
+.install-banner .install-text {
+  flex: 1;
+  font-size: .82rem;
+  line-height: 1.3;
+}
+.install-banner .install-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.7);
+  font-size: 1.1rem;
+  padding: 0;
+  cursor: pointer;
+}
