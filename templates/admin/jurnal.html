@@ -1,0 +1,160 @@
+{% extends 'admin/base.html' %}
+{% block title %}Jurnal Non-Tunai{% endblock %}
+{% block page_title %}<i class="bi bi-journal-bookmark"></i> Jurnal Non-Tunai{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <form class="d-flex gap-2 flex-wrap">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:160px">
+      <button class="btn btn-sm btn-primary">Filter</button>
+    </form>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalJurnal">
+      <i class="bi bi-plus-lg"></i> Tambah Jurnal
+    </button>
+  </div>
+</div>
+
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Tanggal</th>
+          <th>No. Bukti</th>
+          <th>Keterangan</th>
+          <th>Akun Debit</th>
+          <th>Akun Kredit</th>
+          <th class="text-end">Jumlah</th>
+          <th>Petugas</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in jurnal %}
+        <tr>
+          <td class="small text-muted">{{ j.tanggal }}</td>
+          <td class="small">{{ j.no_bukti or '—' }}</td>
+          <td class="small">{{ j.keterangan or '—' }}</td>
+          <td class="small">
+            <code style="font-size:.72rem">{{ j.debit_kode }}</code>
+            {{ j.debit_nama }}
+          </td>
+          <td class="small">
+            <code style="font-size:.72rem">{{ j.kredit_kode }}</code>
+            {{ j.kredit_nama }}
+          </td>
+          <td class="text-end fw-semibold small">{{ j.jumlah|rupiah }}</td>
+          <td class="small">{{ j.petugas }}</td>
+          <td>
+            <form method="POST" action="/admin/jurnal/hapus/{{ j.id }}"
+                  onsubmit="return confirm('Hapus jurnal ini beserta transaksi terkait?')">
+              <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Belum ada jurnal</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Tambah Jurnal -->
+<div class="modal fade" id="modalJurnal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="/admin/jurnal/tambah" onsubmit="return prepJurnal()">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Tambah Jurnal Non-Tunai</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Tanggal</label>
+          <input type="date" name="tanggal" class="form-control" required value="{{ bulan }}-01">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">No. Bukti <span class="text-muted fw-normal">(opsional)</span></label>
+          <input type="text" name="no_bukti" class="form-control" placeholder="JU-001">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Akun Debit (Tujuan)</label>
+          <select name="debit_coa_id" class="form-select" required id="selDebit">
+            <option value="">— Pilih akun debit —</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Akun Kredit (Sumber)</label>
+          <select name="kredit_coa_id" class="form-select" required id="selKredit">
+            <option value="">— Pilih akun kredit —</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Jumlah (Rp)</label>
+          <input type="text" name="jumlah" class="form-control" required inputmode="numeric"
+                 placeholder="contoh: 500.000" oninput="formatRibuan(this)">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Keterangan</label>
+          <input type="text" name="keterangan" class="form-control" placeholder="Transfer antar dana, penyusutan, dll">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan Jurnal</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COA_LIST = [
+  {% for c in coa_all %}
+  {id:{{ c.id }}, kode:{{ c.kode|tojson }}, nama:{{ c.nama|tojson }}, kelompok:{{ c.kelompok|tojson }}},
+  {% endfor %}
+];
+
+function buildCoaSelect(selId) {
+  const sel = document.getElementById(selId);
+  const groups = {};
+  COA_LIST.forEach(c => {
+    if (!groups[c.kelompok]) groups[c.kelompok] = [];
+    groups[c.kelompok].push(c);
+  });
+  const labels = {
+    'aset':'Aset','liabilitas':'Liabilitas','dana':'Saldo Dana',
+    'penerimaan':'Penerimaan','penyaluran_beban':'Penyaluran & Beban'
+  };
+  Object.keys(groups).forEach(k => {
+    const grp = document.createElement('optgroup');
+    grp.label = labels[k] || k;
+    groups[k].forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = '[' + c.kode + '] ' + c.nama;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  });
+}
+buildCoaSelect('selDebit');
+buildCoaSelect('selKredit');
+
+function formatRibuan(el) {
+  let raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw).toLocaleString('id-ID') : '';
+}
+
+function prepJurnal() {
+  document.querySelectorAll('#modalJurnal input[name="jumlah"]').forEach(el => {
+    el.value = el.value.replace(/\./g, '').replace(/,/g, '');
+  });
+  return true;
+}
+</script>
+{% endblock %}

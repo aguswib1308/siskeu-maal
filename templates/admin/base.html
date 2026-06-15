@@ -45,8 +45,11 @@
     <a href="/admin/transaksi" class="nav-link {% if '/transaksi' in request.path %}active{% endif %}">
       <i class="bi bi-arrow-left-right"></i> Transaksi
     </a>
+    <a href="/admin/jurnal" class="nav-link {% if '/jurnal' in request.path %}active{% endif %}">
+      <i class="bi bi-journal-bookmark"></i> Jurnal Non-Tunai
+    </a>
     <a href="/admin/koleksi" class="nav-link {% if '/koleksi' in request.path %}active{% endif %}">
-      <i class="bi bi-basket"></i> Koleksi
+      <i class="bi bi-basket"></i> Fundraising
     </a>
     <a href="/admin/peta" class="nav-link {% if request.path == '/admin/peta' %}active{% endif %}">
       <i class="bi bi-map"></i> Peta
@@ -85,6 +88,19 @@
     </a>
     <a href="/admin/master/penerima" class="nav-link {% if '/master/penerima' in request.path %}active{% endif %}">
       <i class="bi bi-heart"></i> Penerima Manfaat
+    </a>
+    <a href="/admin/master/area" class="nav-link {% if '/master/area' in request.path %}active{% endif %}">
+      <i class="bi bi-geo-alt"></i> Area
+    </a>
+    <a href="/admin/master/instansi" class="nav-link {% if '/master/instansi' in request.path %}active{% endif %}">
+      <i class="bi bi-building"></i> Instansi
+    </a>
+
+    <div style="padding:.6rem 1rem .2rem; font-size:.7rem; opacity:.5; letter-spacing:.08em; text-transform:uppercase;">
+      Sistem
+    </div>
+    <a href="/admin/backup" class="nav-link {% if '/backup' in request.path %}active{% endif %}">
+      <i class="bi bi-shield-check"></i> Backup Database
     </a>
   </nav>
 </div>

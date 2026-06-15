@@ -1,5 +1,5 @@
 {% extends 'marketing/base.html' %}
-{% block title %}Catat Koleksi{% endblock %}
+{% block title %}Catat Fundraising{% endblock %}
 
 {% block content %}
 
@@ -104,12 +104,12 @@
       <span class="input-group-text"
             style="border-radius:10px 0 0 10px;background:#f0f4f8;
                    border-color:#d0dde8;color:#64748b;font-weight:600">Rp</span>
-      <input type="number" name="jumlah" required
-             inputmode="numeric" pattern="[0-9]*"
+      <input type="text" name="jumlah" required
+             inputmode="numeric"
              placeholder="0" value="0"
              style="border-radius:0 10px 10px 0;border-color:#d0dde8;
                     font-size:1.2rem;font-weight:700;padding:.7rem .9rem"
-             class="form-control">
+             class="form-control" oninput="formatRibuan(this)">
     </div>
     <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Isi 0 jika kencleng/kotak kosong</div>
   </div>
@@ -176,6 +176,10 @@ function resetAksi() {
   document.getElementById('formTerkumpul').style.display = 'none';
   document.getElementById('formTidakAda').style.display  = 'none';
 }
+function formatRibuan(el) {
+  let raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw).toLocaleString('id-ID') : '';
+}
 
 // ── GPS Check-in ────────────────────────────────────────
 (function() {
@@ -199,7 +203,10 @@ function resetAksi() {
 // ── Offline-capable form submission ─────────────────────
 function submitKoleksi(form, aksi) {
   var body = { aksi: aksi, keterangan: form.keterangan.value };
-  if (aksi === 'terkumpul') body.jumlah = parseFloat(form.jumlah.value) || 0;
+  if (aksi === 'terkumpul') {
+    var raw = form.jumlah.value.replace(/\./g, '').replace(/,/g, '');
+    body.jumlah = parseFloat(raw) || 0;
+  }
   var lat = document.getElementById('latKunjungan').value;
   var lng = document.getElementById('lngKunjungan').value;
   if (lat) { body.lat_kunjungan = parseFloat(lat); body.lng_kunjungan = parseFloat(lng); }
@@ -223,7 +230,6 @@ function submitKoleksi(form, aksi) {
     setTimeout(function() { window.location.href = '/marketing/koleksi'; }, 800);
   })
   .catch(function() {
-    // Offline — queue for sync
     OfflineStore.addToSyncQueue({
       type: 'koleksi_catat',
       koleksi_id: koleksiId,

@@ -1,0 +1,33 @@
+<style>
+.report-card { border: none; border-radius: 8px; overflow: hidden; }
+.report-header { text-align: center; padding: 1.5rem 1.5rem .5rem; }
+.report-inst { font-weight: 800; font-size: 1.15rem; letter-spacing: .04em; text-transform: uppercase; }
+.report-sub-inst { font-size: .85rem; color: #555; margin-top: 2px; }
+.report-addr { font-size: .78rem; color: #777; margin-top: 4px; }
+.report-line { border-bottom: 3px double #1a5276; margin: .75rem auto; max-width: 90%; }
+.report-title { font-weight: 700; font-size: 1.05rem; margin-top: .5rem; }
+.report-period { font-size: .85rem; color: #555; margin-bottom: .5rem; }
+.report-table { font-size: .85rem; margin-bottom: 0; }
+.report-table th, .report-table td { padding: .45rem .75rem; }
+.report-thead th { background: #1a5276; color: #fff; font-weight: 600; font-size: .82rem; letter-spacing: .03em; }
+.report-group td { font-weight: 600; background: #f8f9fa; font-size: .82rem; }
+.report-item { color: #444; font-size: .82rem; }
+.report-amount { white-space: nowrap; font-size: .82rem; }
+.report-subtotal td { font-weight: 600; border-top: 1px solid #ccc; font-size: .82rem; }
+.report-total td { font-weight: 700; background: #eaf4fb; font-size: .85rem; border-top: 2px solid #1a5276; }
+.report-sign { padding: 2rem 2rem 1.5rem; }
+.sign-role { font-size: .8rem; color: #777; }
+.sign-name { font-weight: 700; margin-top: 3.5rem; border-bottom: 1px solid #333; display: inline-block; padding: 0 1rem; }
+.sign-label { font-size: .78rem; color: #777; margin-top: 4px; }
+.report-summary { background: #f8fafb; border-top: 2px solid #e9eef4; padding: 1.25rem 1.5rem; }
+.report-summary .sum-label { font-size: .75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; }
+.report-summary .sum-value { font-weight: 700; font-size: 1.05rem; margin-top: 2px; }
+@media print {
+  .no-print { display: none !important; }
+  .sidebar, .topbar { display: none !important; }
+  .main { margin-left: 0 !important; padding: .5rem !important; }
+  .report-card { box-shadow: none !important; border: none !important; }
+  .report-sign { page-break-inside: avoid; }
+  .card { box-shadow: none !important; page-break-inside: avoid; }
+}
+</style>

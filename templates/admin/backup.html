@@ -1,0 +1,154 @@
+{% extends 'admin/base.html' %}
+{% block title %}Backup Database{% endblock %}
+{% block page_title %}<i class="bi bi-shield-check"></i> Backup Database{% endblock %}
+
+{% block content %}
+<!-- Info Database -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Ukuran Database</div>
+      <div class="fw-bold fs-5">{{ '%.1f'|format(stats.db_size / 1024 / 1024) }} MB</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Donatur</div>
+      <div class="fw-bold fs-5">{{ stats.donatur }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Penerima</div>
+      <div class="fw-bold fs-5">{{ stats.penerima }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Transaksi</div>
+      <div class="fw-bold fs-5">{{ stats.transaksi }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Total Backup</div>
+      <div class="fw-bold fs-5">{{ backups|length }} <span class="text-muted fw-normal small">({{ '%.1f'|format(total_size / 1024 / 1024) }} MB)</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Aksi -->
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <div class="alert alert-info py-2 mb-0 small">
+      <i class="bi bi-info-circle"></i>
+      Backup otomatis berjalan setiap tanggal 1 pukul 02:00 WIB. Maksimal 12 backup otomatis disimpan (1 tahun).
+      Anda juga bisa membuat backup manual kapan saja.
+    </div>
+  </div>
+  <div class="col-auto">
+    <form method="POST" action="/admin/backup/create" class="d-inline">
+      <button class="btn btn-success">
+        <i class="bi bi-download"></i> Buat Backup Sekarang
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Daftar Backup -->
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>File</th>
+          <th>Tipe</th>
+          <th>Tanggal</th>
+          <th>Ukuran</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in backups %}
+        <tr>
+          <td class="text-muted small">{{ loop.index }}</td>
+          <td class="fw-semibold small font-monospace">{{ b.filename }}</td>
+          <td>
+            {% if b.label == 'Otomatis' %}
+            <span class="badge bg-primary">Otomatis</span>
+            {% elif 'pre_restore' in b.filename %}
+            <span class="badge bg-warning text-dark">Pre-Restore</span>
+            {% else %}
+            <span class="badge bg-success">Manual</span>
+            {% endif %}
+          </td>
+          <td class="small">{{ b.date.strftime('%d %b %Y %H:%M') }}</td>
+          <td class="small">{{ '%.1f'|format(b.size / 1024) }} KB</td>
+          <td class="d-flex gap-1">
+            <a href="/admin/backup/download/{{ b.filename }}" class="btn btn-sm btn-outline-primary py-0">
+              <i class="bi bi-download"></i> Unduh
+            </a>
+            <button class="btn btn-sm btn-outline-warning py-0"
+                    onclick="confirmRestore('{{ b.filename }}', '{{ b.date.strftime('%d %b %Y %H:%M') }}')">
+              <i class="bi bi-arrow-counterclockwise"></i> Restore
+            </button>
+            <form method="POST" action="/admin/backup/delete/{{ b.filename }}" class="d-inline"
+                  onsubmit="return confirm('Hapus backup {{ b.filename }}?')">
+              <button class="btn btn-sm btn-outline-danger py-0">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">
+            Belum ada backup. Klik "Buat Backup Sekarang" untuk membuat backup pertama.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi Restore -->
+<div class="modal fade" id="modalRestore" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header bg-warning">
+      <h6 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle"></i> Konfirmasi Restore</h6>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <p>Anda akan me-restore database dari backup:</p>
+      <p class="fw-bold font-monospace" id="restoreFile"></p>
+      <p class="text-muted small" id="restoreDate"></p>
+      <div class="alert alert-danger py-2 small">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Perhatian:</strong> Semua data saat ini akan diganti dengan data dari backup ini.
+        Backup otomatis dari data saat ini akan dibuat sebelum restore.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+      <form method="POST" id="restoreForm" class="d-inline">
+        <button type="submit" class="btn btn-warning btn-sm">
+          <i class="bi bi-arrow-counterclockwise"></i> Ya, Restore
+        </button>
+      </form>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmRestore(filename, dateStr) {
+  document.getElementById('restoreFile').textContent = filename;
+  document.getElementById('restoreDate').textContent = 'Dibuat: ' + dateStr;
+  document.getElementById('restoreForm').action = '/admin/backup/restore/' + filename;
+  new bootstrap.Modal(document.getElementById('modalRestore')).show();
+}
+</script>
+{% endblock %}

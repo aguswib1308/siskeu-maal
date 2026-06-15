@@ -10,7 +10,6 @@
 } %}
 
 {% block content %}
-{# ── Filter ───────────────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-4 no-print">
   <form class="d-flex gap-2">
     <input type="month" name="bulan" value="{{ bulan }}"
@@ -22,126 +21,112 @@
   </button>
 </div>
 
-{# ── Header ───────────────────────────────────────────── #}
-<div class="text-center mb-3 no-print">
-  <div class="fw-bold fs-5">BAITUL MAAL BMT</div>
-  <div class="fw-bold fs-4">LAPORAN SUMBER DAN PENGGUNAAN DANA ZIS</div>
-  <div class="text-muted">Periode: {{ bulan | bulan_label }}</div>
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}
+    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+    {% endif %}
+    {% if inst.alamat %}
+    <div class="report-addr">{{ inst.alamat }}
+      {% if inst.telepon %} · Telp: {{ inst.telepon }}{% endif %}
+      {% if inst.email %} · {{ inst.email }}{% endif %}
+    </div>
+    {% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">LAPORAN SUMBER DAN PENGGUNAAN DANA ZIS</div>
+    <div class="report-period">Periode: {{ bulan | bulan_label }}</div>
+  </div>
+
+  <div class="p-4">
+  {% for dana in dana_types %}
+  {% set d = data[dana] %}
+  {% if d.masuk or d.keluar or d.saldo_awal %}
+
+  <div class="mb-4" style="border:1px solid #e9eef4;border-radius:10px;overflow:hidden">
+    <div class="d-flex justify-content-between align-items-center px-3 py-2"
+         style="background:{{ dana_color.get(dana,'#aaa') }};color:#fff">
+      <span class="fw-bold" style="font-size:.88rem">DANA {{ LABEL_DANA.get(dana, dana)|upper }}</span>
+      <div style="font-size:.78rem">
+        Saldo Awal: <strong>{{ d.saldo_awal|rupiah }}</strong>
+        &nbsp;·&nbsp;
+        Saldo Akhir: <strong>{{ d.saldo_akhir|rupiah }}</strong>
+      </div>
+    </div>
+
+    <table class="table table-sm report-table mb-0">
+      <thead>
+        <tr style="background:#f8f9fa">
+          <th class="ps-3" style="width:50%;font-size:.78rem;color:#64748b">Penerimaan</th>
+          <th class="text-end pe-3" style="width:15%;font-size:.78rem;color:#64748b">Jumlah</th>
+          <th class="ps-3" style="width:20%;font-size:.78rem;color:#64748b;border-left:2px solid #e9eef4">Penyaluran / Penggunaan</th>
+          <th class="text-end pe-3" style="width:15%;font-size:.78rem;color:#64748b">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set max_rows = [d.masuk|length, d.keluar|length]|max %}
+        {% for i in range(max_rows if max_rows > 0 else 1) %}
+        <tr>
+          {% if i < d.masuk|length %}
+          <td class="ps-3 report-item">{{ d.masuk[i].nama }}</td>
+          <td class="text-end pe-3 text-success fw-semibold report-amount">{{ d.masuk[i].total|rupiah }}</td>
+          {% else %}
+          <td></td><td></td>
+          {% endif %}
+          {% if i < d.keluar|length %}
+          <td class="ps-3 report-item" style="border-left:2px solid #e9eef4">{{ d.keluar[i].nama }}</td>
+          <td class="text-end pe-3 text-danger fw-semibold report-amount">{{ d.keluar[i].total|rupiah }}</td>
+          {% else %}
+          <td style="border-left:2px solid #e9eef4"></td><td></td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        {% if not d.masuk and not d.keluar %}
+        <tr>
+          <td class="ps-3 text-muted small fst-italic" colspan="2">Tidak ada penerimaan</td>
+          <td class="ps-3 text-muted small fst-italic" colspan="2" style="border-left:2px solid #e9eef4">Tidak ada penyaluran</td>
+        </tr>
+        {% endif %}
+      </tbody>
+      <tfoot>
+        <tr style="border-top:2px solid #dee2e6;background:#f8fafb">
+          <td class="ps-3 fw-bold" style="font-size:.82rem">Total Penerimaan</td>
+          <td class="text-end pe-3 fw-bold text-success" style="font-size:.82rem">{{ d.total_masuk|rupiah }}</td>
+          <td class="ps-3 fw-bold" style="font-size:.82rem;border-left:2px solid #e9eef4">Total Penyaluran</td>
+          <td class="text-end pe-3 fw-bold text-danger" style="font-size:.82rem">{{ d.total_keluar|rupiah }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="d-flex justify-content-end gap-4 px-3 py-2" style="background:#f8fafb;border-top:1px solid #e9eef4;font-size:.82rem">
+      <span class="text-muted">Saldo Awal: <strong>{{ d.saldo_awal|rupiah }}</strong></span>
+      <span class="text-muted">+ Penerimaan: <strong class="text-success">{{ d.total_masuk|rupiah }}</strong></span>
+      <span class="text-muted">− Penyaluran: <strong class="text-danger">{{ d.total_keluar|rupiah }}</strong></span>
+      <span>= Saldo Akhir: <strong class="{{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.92rem">{{ d.saldo_akhir|rupiah }}</strong></span>
+    </div>
+  </div>
+
+  {% endif %}
+  {% endfor %}
+  </div>
+
+  {% if inst.ketua or inst.bendahara %}
+  <div class="report-sign">
+    <div class="row">
+      <div class="col-6 text-center">
+        <div class="sign-role">Mengetahui,</div>
+        <div class="sign-name">{{ inst.ketua or '_______________' }}</div>
+        <div class="sign-label">Ketua</div>
+      </div>
+      <div class="col-6 text-center">
+        <div class="sign-role">Dibuat oleh,</div>
+        <div class="sign-name">{{ inst.bendahara or '_______________' }}</div>
+        <div class="sign-label">Bendahara</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-{% for dana in dana_types %}
-{% set d = data[dana] %}
-{% if d.masuk or d.keluar or d.saldo_awal %}
-<div class="card mb-4">
-  {# header dana #}
-  <div class="card-header d-flex justify-content-between align-items-center"
-       style="background:{{ dana_color.get(dana,'#aaa') }};color:#fff;border-radius:12px 12px 0 0">
-    <span class="fw-bold">DANA {{ LABEL_DANA.get(dana, dana)|upper }}</span>
-    <div class="d-flex gap-3 small">
-      <span>Saldo Awal: <strong>{{ d.saldo_awal|rupiah }}</strong></span>
-      <span>Saldo Akhir: <strong>{{ d.saldo_akhir|rupiah }}</strong></span>
-    </div>
-  </div>
-
-  <div class="row g-0">
-
-    {# ── Penerimaan ──────────────────────────────────── #}
-    <div class="col-md-6" style="border-right:1px solid #f0f4f8">
-      <div class="p-3 pb-0">
-        <div class="fw-semibold text-success mb-2">
-          <i class="bi bi-arrow-down-circle"></i> Penerimaan
-        </div>
-      </div>
-      <table class="table table-sm mb-0">
-        <tbody>
-          {% for r in d.masuk %}
-          <tr>
-            <td class="ps-3" style="font-size:.83rem">{{ r.nama }}</td>
-            <td class="text-end pe-3 text-success fw-semibold" style="font-size:.83rem;white-space:nowrap">
-              {{ r.total|rupiah }}
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="2" class="ps-3 text-muted small fst-italic">Tidak ada penerimaan</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot>
-          <tr class="table-success fw-bold">
-            <td class="ps-3">Total Penerimaan</td>
-            <td class="text-end pe-3">{{ d.total_masuk|rupiah }}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-
-    {# ── Penyaluran ──────────────────────────────────── #}
-    <div class="col-md-6">
-      <div class="p-3 pb-0">
-        <div class="fw-semibold text-danger mb-2">
-          <i class="bi bi-arrow-up-circle"></i> Penyaluran / Penggunaan
-        </div>
-      </div>
-      <table class="table table-sm mb-0">
-        <tbody>
-          {% for r in d.keluar %}
-          <tr>
-            <td class="ps-3" style="font-size:.83rem">{{ r.nama }}</td>
-            <td class="text-end pe-3 text-danger fw-semibold" style="font-size:.83rem;white-space:nowrap">
-              {{ r.total|rupiah }}
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="2" class="ps-3 text-muted small fst-italic">Tidak ada penyaluran</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot>
-          <tr class="table-danger fw-bold">
-            <td class="ps-3">Total Penyaluran</td>
-            <td class="text-end pe-3">{{ d.total_keluar|rupiah }}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-
-  </div>
-
-  {# ── Ringkasan saldo ─────────────────────────────── #}
-  <div class="border-top p-3">
-    <div class="row text-center g-2">
-      <div class="col">
-        <div class="small text-muted">Saldo Awal</div>
-        <div class="fw-bold">{{ d.saldo_awal|rupiah }}</div>
-      </div>
-      <div class="col-auto d-flex align-items-center text-muted">+</div>
-      <div class="col">
-        <div class="small text-muted">Penerimaan</div>
-        <div class="fw-bold text-success">{{ d.total_masuk|rupiah }}</div>
-      </div>
-      <div class="col-auto d-flex align-items-center text-muted">−</div>
-      <div class="col">
-        <div class="small text-muted">Penyaluran</div>
-        <div class="fw-bold text-danger">{{ d.total_keluar|rupiah }}</div>
-      </div>
-      <div class="col-auto d-flex align-items-center text-muted">=</div>
-      <div class="col">
-        <div class="small text-muted">Saldo Akhir</div>
-        <div class="fw-bold {{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:1.05rem">
-          {{ d.saldo_akhir|rupiah }}
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
-{% endif %}
-{% endfor %}
-
-<style>
-@media print {
-  .no-print { display: none !important; }
-  .sidebar, .topbar { display: none !important; }
-  .main { margin-left: 0 !important; padding: 1rem !important; }
-  .card { box-shadow: none !important; page-break-inside: avoid; }
-}
-</style>
+{% include 'admin/_report_style.html' %}
 {% endblock %}
