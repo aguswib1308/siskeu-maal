@@ -18,7 +18,7 @@
         <option value="wakaf"         {% if sumber=='wakaf'         %}selected{% endif %}>Wakaf</option>
       </select>
       <select name="area" class="form-select form-select-sm" style="width:150px">
-        <option value="">Semua Area</option>
+        <option value="">Semua Dusun</option>
         {% for a in areas %}
         <option value="{{ a.area }}" {% if area==a.area %}selected{% endif %}>{{ a.area }}</option>
         {% endfor %}
@@ -43,7 +43,7 @@
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>#</th><th>Nama / Lokasi</th><th>Alamat</th><th>Desa</th><th>Area</th><th>Kategori</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
+        <tr><th>#</th><th>Nama / Lokasi</th><th>Alamat</th><th>Desa</th><th>Dusun</th><th>Kategori</th><th>Koordinat</th><th>No HP</th><th>Status</th><th>Aksi</th></tr>
       </thead>
       <tbody>
         {% for d in donatur %}
@@ -184,7 +184,7 @@
           <input type="text" name="lokasi_nama" class="form-control" placeholder="cth: Toko Budi - Jl. Mawar 5">
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Area / Kecamatan</label>
+          <label class="form-label fw-semibold">Dusun</label>
           <input type="text" name="area" class="form-control" list="areaList" placeholder="cth: Wonogiri Kota">
           <datalist id="areaList">{% for a in areas %}<option value="{{ a.area }}">{% endfor %}</datalist>
         </div>
@@ -274,7 +274,7 @@
           <input type="text" name="lokasi_nama" class="form-control" value="{{ d.lokasi_nama or '' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Area / Kecamatan</label>
+          <label class="form-label fw-semibold">Dusun</label>
           <input type="text" name="area" class="form-control" list="areaList" value="{{ d.area or '' }}">
         </div>
         <div class="col-12">
