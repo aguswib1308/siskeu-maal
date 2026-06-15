@@ -1,79 +1,184 @@
 {% extends 'admin/base.html' %}
 {% block title %}Peta Donatur{% endblock %}
-{% block page_title %}<i class="bi bi-map"></i> Peta Donatur Kencleng & Kotak Infaq{% endblock %}
+{% block page_title %}<i class="bi bi-map"></i> Peta Donatur & Cakupan Desa{% endblock %}
 
 {% block content %}
-<div class="row mb-3 align-items-center">
-  <div class="col">
-    <form class="d-flex gap-2">
-      <label class="form-label fw-semibold my-auto small">Status fundraising:</label>
-      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:170px">
+<div class="row mb-3 align-items-center g-2">
+  <div class="col-auto">
+    <form class="d-flex gap-2 align-items-center">
+      <label class="form-label fw-semibold my-auto small">Status bulan:</label>
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:160px">
       <button class="btn btn-sm btn-primary">Tampilkan</button>
     </form>
   </div>
-  <div class="col-auto d-flex gap-3 align-items-center small">
-    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#27ae60;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Kencleng</span>
-    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2980b9;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Kotak Infaq</span>
-    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e74c3c;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Belum/Tidak Ada</span>
-    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#bdc3c7;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span> Terkumpul</span>
+  <div class="col-auto ms-auto d-flex gap-3 align-items-center small">
+    <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
+      <input type="checkbox" id="tgHull" checked> Cakupan desa
+    </label>
+    <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
+      <input type="checkbox" id="tgColorDesa"> Warnai titik per desa
+    </label>
+    <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
+      <input type="checkbox" id="tgOnlyUnset"> Hanya "perlu set desa"
+    </label>
   </div>
 </div>
 
-<div class="card p-0 overflow-hidden">
-  <div id="map" style="height:calc(100vh - 220px); min-height:500px"></div>
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div class="card p-0 overflow-hidden">
+      <div id="map" style="height:calc(100vh - 200px); min-height:500px"></div>
+    </div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card p-3" style="max-height:calc(100vh - 200px); overflow-y:auto">
+      <div class="fw-bold mb-2"><i class="bi bi-collection"></i> Desa <span class="text-muted small" id="desaCount"></span></div>
+      <div id="legend" class="small"></div>
+    </div>
+  </div>
+</div>
+<div class="text-muted small mt-2">
+  <i class="bi bi-info-circle"></i> Klik titik untuk melihat detail & <b>set desa</b> (terutama titik abu-abu "perlu set"). Klik nama desa di panel untuk fokus.
 </div>
 {% endblock %}
 
 {% block scripts %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script>
 const donatur = {{ donatur_json | safe }};
+const UNSET = '(perlu set desa)';
 
 const map = L.map('map').setView([-7.812, 110.923], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-function makeIcon(color) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="background:${color};width:13px;height:13px;border-radius:50%;
-                border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-    iconSize: [13,13], iconAnchor: [6,6], popupAnchor: [0,-8]
+const markerLayer = L.layerGroup().addTo(map);
+const hullLayer   = L.layerGroup().addTo(map);
+
+const STATUS_WARNA = { terkumpul:'#bdc3c7', tidak_ada:'#e74c3c', terjadwal:'#e74c3c' };
+const SUMBER_WARNA = { kencleng:'#27ae60', kotak_infaq:'#2980b9' };
+
+// warna stabil dari nama desa
+function desaColor(name){
+  if(!name) return '#95a5a6';
+  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360;
+  return `hsl(${h},65%,45%)`;
+}
+function makeIcon(color){
+  return L.divIcon({className:'',
+    html:`<div style="background:${color};width:13px;height:13px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    iconSize:[13,13],iconAnchor:[6,6],popupAnchor:[0,-8]});
+}
+function dKey(d){ return (d.desa && d.desa.trim()) ? d.desa.trim() : UNSET; }
+
+function visiblePoints(){
+  const onlyUnset = document.getElementById('tgOnlyUnset').checked;
+  return donatur.filter(d => d.lat && d.lng && (!onlyUnset || dKey(d)===UNSET));
+}
+
+function buildMarkers(){
+  markerLayer.clearLayers();
+  const colorByDesa = document.getElementById('tgColorDesa').checked;
+  visiblePoints().forEach(d => {
+    let color;
+    if(colorByDesa) color = desaColor(dKey(d)===UNSET ? null : d.desa);
+    else color = d.koleksi_status ? STATUS_WARNA[d.koleksi_status] : SUMBER_WARNA[d.sumber_infaq];
+    const label = d.sumber_infaq==='kencleng' ? '🏠 Kencleng' : '🕌 Kotak Infaq';
+    const status = d.koleksi_status==='terkumpul'
+      ? `<span style="color:#27ae60;font-weight:600">✓ Terkumpul</span>`
+      : d.koleksi_status==='tidak_ada' ? `<span style="color:#e67e22">⚠ Tidak Ada</span>`
+      : d.koleksi_status==='terjadwal' ? `<span style="color:#e74c3c">● Belum Dikoleksi</span>`
+      : '<span style="color:#95a5a6">—</span>';
+    const cur = (d.desa||'').replace(/"/g,'&quot;');
+    const popup = `<div style="min-width:200px">
+        <div style="font-weight:700">${d.nama}</div>
+        <div style="font-size:.8rem;color:#666">${d.lokasi_nama||''}</div>
+        <div style="font-size:.8rem">${label} · ${status}</div>
+        <div style="margin-top:6px;font-size:.78rem;font-weight:600">Desa:</div>
+        <div class="d-flex gap-1 mt-1">
+          <input id="desa-input-${d.id}" value="${cur}" placeholder="ketik nama desa"
+                 list="desaList" style="flex:1;font-size:.8rem;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px">
+          <button onclick="saveDesa(${d.id})" style="font-size:.78rem;background:#1a5276;color:#fff;border:none;border-radius:6px;padding:3px 8px;cursor:pointer">Simpan</button>
+        </div>
+      </div>`;
+    L.marker([d.lat,d.lng],{icon:makeIcon(color||'#95a5a6')}).bindPopup(popup).addTo(markerLayer);
   });
 }
 
-const WARNA = { kencleng: '#27ae60', kotak_infaq: '#2980b9' };
-const STATUS_WARNA = { terkumpul: '#bdc3c7', tidak_ada: '#e74c3c', terjadwal: '#e74c3c' };
-
-donatur.forEach(d => {
-  if (!d.lat || !d.lng) return;
-  const statusWarna = d.koleksi_status ? STATUS_WARNA[d.koleksi_status] : WARNA[d.sumber_infaq];
-  const icon = makeIcon(statusWarna || WARNA[d.sumber_infaq]);
-  const label = d.sumber_infaq === 'kencleng' ? '🏠 Kencleng' : '🕌 Kotak Infaq';
-  const statusBadge = d.koleksi_status === 'terkumpul'
-    ? `<span style="color:#27ae60;font-weight:600">✓ Terkumpul ${d.koleksi_jumlah ? 'Rp '+parseInt(d.koleksi_jumlah).toLocaleString('id') : ''}</span>`
-    : d.koleksi_status === 'tidak_ada'
-    ? `<span style="color:#e67e22">⚠ Tidak Ada</span>`
-    : d.koleksi_status === 'terjadwal'
-    ? `<span style="color:#e74c3c">● Belum Dikoleksi</span>`
-    : '<span style="color:#95a5a6">Tidak ada jadwal</span>';
-
-  L.marker([d.lat, d.lng], { icon }).bindPopup(`
-    <div style="min-width:180px">
-      <div style="font-weight:700;margin-bottom:4px">${d.nama}</div>
-      <div style="font-size:.8rem;color:#666;margin-bottom:2px">${d.lokasi_nama || ''}</div>
-      <div style="font-size:.8rem;color:#888;margin-bottom:6px">${d.area || ''}</div>
-      <div style="font-size:.8rem">${label}</div>
-      <div style="font-size:.8rem;margin-top:4px">${statusBadge}</div>
-    </div>
-  `).addTo(map);
-});
-
-if (donatur.filter(d=>d.lat&&d.lng).length > 0) {
-  const pts = donatur.filter(d=>d.lat&&d.lng).map(d=>[d.lat,d.lng]);
-  map.fitBounds(pts, { padding: [40,40] });
+function buildHulls(){
+  hullLayer.clearLayers();
+  if(!document.getElementById('tgHull').checked) return;
+  const groups = {};
+  visiblePoints().forEach(d => {
+    const k = dKey(d);
+    if(k===UNSET) return;            // tak gambar hull utk yg belum diset
+    (groups[k]=groups[k]||[]).push(d);
+  });
+  Object.entries(groups).forEach(([desa, pts]) => {
+    const color = desaColor(desa);
+    if(pts.length >= 3){
+      const fc = turf.featureCollection(pts.map(p=>turf.point([p.lng,p.lat])));
+      const hull = turf.convex(fc);
+      if(hull){
+        L.geoJSON(hull,{style:{color,weight:2,fillColor:color,fillOpacity:0.12}})
+          .bindTooltip(`${desa} (${pts.length})`,{sticky:true}).addTo(hullLayer);
+        return;
+      }
+    }
+    // <3 titik atau hull gagal → lingkaran di centroid
+    const lat=pts.reduce((s,p)=>s+p.lat,0)/pts.length, lng=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
+    L.circle([lat,lng],{radius:160,color,weight:2,fillColor:color,fillOpacity:0.12})
+      .bindTooltip(`${desa} (${pts.length})`,{sticky:true}).addTo(hullLayer);
+  });
 }
+
+function buildLegend(){
+  const counts={}; let unset=0;
+  visiblePoints().forEach(d=>{ const k=dKey(d); if(k===UNSET) unset++; else counts[k]=(counts[k]||0)+1; });
+  const desaList=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  document.getElementById('desaCount').textContent = `(${desaList.length} desa)`;
+  let html='';
+  desaList.forEach(d=>{
+    html+=`<div class="d-flex align-items-center gap-2 mb-1" style="cursor:pointer" onclick="focusDesa('${d.replace(/'/g,"\\'")}')">
+      <span style="width:11px;height:11px;border-radius:3px;background:${desaColor(d)};display:inline-block;flex-shrink:0"></span>
+      <span style="flex:1">${d}</span><span class="text-muted">${counts[d]}</span></div>`;
+  });
+  if(unset>0){
+    html+=`<hr class="my-2"><div class="d-flex align-items-center gap-2" style="cursor:pointer" onclick="document.getElementById('tgOnlyUnset').checked=true;refresh()">
+      <span style="width:11px;height:11px;border-radius:3px;background:#95a5a6;display:inline-block"></span>
+      <span style="flex:1;color:#e74c3c;font-weight:600">${UNSET}</span><span class="text-muted">${unset}</span></div>`;
+  }
+  // datalist nama desa utk input
+  let dl='<datalist id="desaList">'+desaList.map(d=>`<option value="${d}">`).join('')+'</datalist>';
+  document.getElementById('legend').innerHTML = html + dl;
+}
+
+function focusDesa(desa){
+  const pts=donatur.filter(d=>d.lat&&d.lng&&dKey(d)===desa).map(d=>[d.lat,d.lng]);
+  if(pts.length) map.fitBounds(pts,{padding:[50,50],maxZoom:16});
+}
+
+function saveDesa(id){
+  const inp=document.getElementById('desa-input-'+id); if(!inp) return;
+  const val=inp.value.trim();
+  fetch('/admin/peta/set-desa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,desa:val})})
+    .then(r=>r.json()).then(j=>{
+      if(!j.ok){alert('Gagal: '+(j.msg||'')); return;}
+      const d=donatur.find(x=>x.id===id); if(d) d.desa=val;
+      map.closePopup(); refresh();
+    }).catch(e=>alert('Error: '+e));
+}
+
+function refresh(){ buildMarkers(); buildHulls(); buildLegend(); }
+
+['tgHull','tgColorDesa','tgOnlyUnset'].forEach(id=>
+  document.getElementById(id).addEventListener('change', refresh));
+
+refresh();
+const all=donatur.filter(d=>d.lat&&d.lng).map(d=>[d.lat,d.lng]);
+if(all.length) map.fitBounds(all,{padding:[40,40]});
 </script>
 {% endblock %}

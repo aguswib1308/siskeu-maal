@@ -6,9 +6,12 @@
   <div class="fw-bold fs-5">Peta Fundraising</div>
   <div class="small text-muted">{{ bulan }}</div>
 </div>
-<div class="d-flex gap-2 mb-2 small">
+<div class="d-flex gap-2 mb-2 small align-items-center">
   <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3498db;border:2px solid #fff"></span> Belum</span>
   <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e67e22;border:2px solid #fff"></span> Tidak Ada</span>
+  <label class="ms-auto d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
+    <input type="checkbox" id="tgHull" checked> Cakupan desa
+  </label>
 </div>
 <div class="card p-0 overflow-hidden" style="border-radius:12px">
   <div id="map" style="height:calc(100vh - 210px);min-height:400px"></div>
@@ -18,12 +21,41 @@
 {% block scripts %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script>
 const titik = {{ titik_json | safe }};
+const desaPoints = {{ desa_json | safe }};
 const map = L.map('map').setView([-7.812, 110.923], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
+
+// ── Lapisan cakupan desa (hull) ──
+const hullLayer = L.layerGroup().addTo(map);
+function desaColor(name){
+  if(!name) return '#95a5a6';
+  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360;
+  return `hsl(${h},65%,45%)`;
+}
+function buildHulls(){
+  hullLayer.clearLayers();
+  if(!document.getElementById('tgHull').checked) return;
+  const groups={};
+  desaPoints.forEach(d=>{ if(d.lat&&d.lng&&d.desa) (groups[d.desa]=groups[d.desa]||[]).push(d); });
+  Object.entries(groups).forEach(([desa,pts])=>{
+    const color=desaColor(desa);
+    if(pts.length>=3){
+      const hull=turf.convex(turf.featureCollection(pts.map(p=>turf.point([p.lng,p.lat]))));
+      if(hull){ L.geoJSON(hull,{style:{color,weight:2,fillColor:color,fillOpacity:0.10}})
+        .bindTooltip(`${desa} (${pts.length})`,{sticky:true}).addTo(hullLayer); return; }
+    }
+    const lat=pts.reduce((s,p)=>s+p.lat,0)/pts.length, lng=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
+    L.circle([lat,lng],{radius:160,color,weight:2,fillColor:color,fillOpacity:0.10})
+      .bindTooltip(`${desa} (${pts.length})`,{sticky:true}).addTo(hullLayer);
+  });
+}
+document.getElementById('tgHull').addEventListener('change', buildHulls);
+buildHulls();
 
 function makeIcon(color) {
   return L.divIcon({
