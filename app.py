@@ -1244,6 +1244,325 @@ def api_backup_auto():
         cleanup += 1
     return jsonify(ok=True, filename=fname, cleaned=cleanup)
 
+# ── Database Export / Import (Excel) ─────────────────────────────────────────
+
+DB_EXPORT_TABLES = [
+    {
+        'name': 'donatur', 'label': 'Donatur',
+        'query': "SELECT id, nama, no_hp, nik, alamat, jenis, sumber_infaq, area, lokasi_nama, lat, lng, aktif, aktif_infaq, program_id, created_at FROM donatur ORDER BY id",
+        'headers': ['id','nama','no_hp','nik','alamat','jenis','sumber_infaq','area','lokasi_nama','lat','lng','aktif','aktif_infaq','program_id','created_at'],
+        'color': '27AE60', 'import': True,
+        'required': ['nama'],
+    },
+    {
+        'name': 'penerima_manfaat', 'label': 'Penerima Manfaat',
+        'query': "SELECT id, nama, nik, no_hp, alamat, asnaf, keterangan, aktif, created_at FROM penerima_manfaat ORDER BY id",
+        'headers': ['id','nama','nik','no_hp','alamat','asnaf','keterangan','aktif','created_at'],
+        'color': 'E74C3C', 'import': True,
+        'required': ['nama'],
+    },
+    {
+        'name': 'chart_of_accounts', 'label': 'Chart of Accounts',
+        'query': "SELECT id, kode, nama, kelompok, jenis_dana, parent_kode, jenis_transaksi, aktif FROM chart_of_accounts ORDER BY kode",
+        'headers': ['id','kode','nama','kelompok','jenis_dana','parent_kode','jenis_transaksi','aktif'],
+        'color': '2980B9', 'import': True,
+        'required': ['kode','nama','kelompok'],
+    },
+    {
+        'name': 'users', 'label': 'Users',
+        'query': "SELECT id, username, nama, role, no_hp, aktif FROM users ORDER BY id",
+        'headers': ['id','username','nama','role','no_hp','aktif'],
+        'color': '8E44AD', 'import': True,
+        'required': ['username','nama','role'],
+    },
+    {
+        'name': 'area', 'label': 'Area',
+        'query': "SELECT id, nama, aktif FROM area ORDER BY nama",
+        'headers': ['id','nama','aktif'],
+        'color': 'E67E22', 'import': True,
+        'required': ['nama'],
+    },
+    {
+        'name': 'transaksi', 'label': 'Transaksi',
+        'query': '''SELECT t.id, t.tanggal, t.jenis, t.jenis_dana, t.coa_id,
+                     c.kode as coa_kode, c.nama as coa_nama,
+                     t.donatur_id, d.nama as donatur_nama,
+                     t.penerima_id, p.nama as penerima_nama,
+                     t.jumlah, t.keterangan, t.user_id, u.nama as user_nama, t.created_at
+                    FROM transaksi t
+                    LEFT JOIN chart_of_accounts c ON t.coa_id=c.id
+                    LEFT JOIN donatur d ON t.donatur_id=d.id
+                    LEFT JOIN penerima_manfaat p ON t.penerima_id=p.id
+                    LEFT JOIN users u ON t.user_id=u.id
+                    ORDER BY t.tanggal DESC, t.id DESC''',
+        'headers': ['id','tanggal','jenis','jenis_dana','coa_id','coa_kode','coa_nama',
+                     'donatur_id','donatur_nama','penerima_id','penerima_nama',
+                     'jumlah','keterangan','user_id','user_nama','created_at'],
+        'color': '1A5276', 'import': False,
+    },
+    {
+        'name': 'koleksi_bulanan', 'label': 'Koleksi Bulanan',
+        'query': '''SELECT kb.id, kb.donatur_id, d.nama as donatur_nama, kb.bulan, kb.status,
+                     kb.marketing_id, u.nama as marketing_nama,
+                     kb.tanggal_koleksi, kb.jumlah, kb.jumlah_kunjungan,
+                     kb.kunjungan_terakhir, kb.keterangan, kb.lat_kunjungan, kb.lng_kunjungan, kb.created_at
+                    FROM koleksi_bulanan kb
+                    JOIN donatur d ON kb.donatur_id=d.id
+                    LEFT JOIN users u ON kb.marketing_id=u.id
+                    ORDER BY kb.bulan DESC, d.nama''',
+        'headers': ['id','donatur_id','donatur_nama','bulan','status',
+                     'marketing_id','marketing_nama','tanggal_koleksi','jumlah',
+                     'jumlah_kunjungan','kunjungan_terakhir','keterangan',
+                     'lat_kunjungan','lng_kunjungan','created_at'],
+        'color': 'D35400', 'import': False,
+    },
+    {
+        'name': 'jurnal', 'label': 'Jurnal',
+        'query': '''SELECT j.id, j.tanggal, j.no_bukti, j.keterangan,
+                     j.debit_coa_id, cd.nama as debit_coa_nama,
+                     j.kredit_coa_id, ck.nama as kredit_coa_nama,
+                     j.jumlah, j.user_id, u.nama as user_nama, j.created_at
+                    FROM jurnal j
+                    LEFT JOIN chart_of_accounts cd ON j.debit_coa_id=cd.id
+                    LEFT JOIN chart_of_accounts ck ON j.kredit_coa_id=ck.id
+                    LEFT JOIN users u ON j.user_id=u.id
+                    ORDER BY j.tanggal DESC, j.id DESC''',
+        'headers': ['id','tanggal','no_bukti','keterangan','debit_coa_id','debit_coa_nama',
+                     'kredit_coa_id','kredit_coa_nama','jumlah','user_id','user_nama','created_at'],
+        'color': '566573', 'import': False,
+    },
+    {
+        'name': 'instansi', 'label': 'Instansi',
+        'query': "SELECT * FROM instansi",
+        'headers': ['id','nama','nama_lembaga','alamat','telepon','email','website','ketua','bendahara','sekretaris','no_izin','updated_at'],
+        'color': '34495E', 'import': True,
+        'required': ['nama'],
+    },
+    {
+        'name': 'target_bulanan', 'label': 'Target Bulanan',
+        'query': '''SELECT tb.id, tb.bulan, tb.user_id, u.nama as user_nama,
+                     tb.jenis, tb.target_nominal, tb.target_kegiatan, tb.created_at
+                    FROM target_bulanan tb
+                    LEFT JOIN users u ON tb.user_id=u.id
+                    ORDER BY tb.bulan DESC, tb.jenis''',
+        'headers': ['id','bulan','user_id','user_nama','jenis','target_nominal','target_kegiatan','created_at'],
+        'color': '16A085', 'import': True,
+        'required': ['bulan','jenis'],
+    },
+]
+
+@app.route('/admin/db')
+@admin_required
+def admin_db():
+    conn = get_db()
+    counts = {}
+    for tbl in DB_EXPORT_TABLES:
+        try:
+            counts[tbl['name']] = conn.execute(f"SELECT COUNT(*) FROM {tbl['name']}").fetchone()[0]
+        except Exception:
+            counts[tbl['name']] = 0
+    conn.close()
+    return render_template('admin/db_excel.html', tables=DB_EXPORT_TABLES, counts=counts)
+
+@app.route('/admin/db/export-all')
+@admin_required
+def admin_db_export_all():
+    conn = get_db()
+    wb = Workbook()
+    wb.remove(wb.active)
+    hdr_font = Font(bold=True, color='FFFFFF', size=10)
+    thin = Side(style='thin', color='DDDDDD')
+    border = Border(bottom=thin)
+    for tbl in DB_EXPORT_TABLES:
+        ws = wb.create_sheet(title=tbl['label'][:31])
+        fill = PatternFill('solid', fgColor=tbl['color'])
+        for col, h in enumerate(tbl['headers'], 1):
+            cell = ws.cell(row=1, column=col, value=h)
+            cell.font = hdr_font
+            cell.fill = fill
+            cell.alignment = Alignment(horizontal='center')
+        try:
+            rows = conn.execute(tbl['query']).fetchall()
+        except Exception:
+            rows = []
+        for r, row in enumerate(rows, 2):
+            for c, val in enumerate(row, 1):
+                cell = ws.cell(row=r, column=c, value=val)
+                cell.border = border
+        for col_idx in range(1, len(tbl['headers'])+1):
+            max_len = len(tbl['headers'][col_idx-1])
+            for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=True):
+                val_len = len(str(row[0] or ''))
+                if val_len > max_len:
+                    max_len = val_len
+            ws.column_dimensions[chr(64+col_idx) if col_idx <= 26 else 'A' + chr(64+col_idx-26)].width = min(max_len + 4, 40)
+        ws.auto_filter.ref = ws.dimensions
+        ws.freeze_panes = 'A2'
+    conn.close()
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return send_file(buf, download_name=f'database_maal_{ts}.xlsx',
+                     as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/admin/db/export/<table_name>')
+@admin_required
+def admin_db_export_table(table_name):
+    tbl = next((t for t in DB_EXPORT_TABLES if t['name'] == table_name), None)
+    if not tbl:
+        flash('Tabel tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_db'))
+    conn = get_db()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = tbl['label'][:31]
+    hdr_font = Font(bold=True, color='FFFFFF', size=10)
+    fill = PatternFill('solid', fgColor=tbl['color'])
+    thin = Side(style='thin', color='DDDDDD')
+    border = Border(bottom=thin)
+    for col, h in enumerate(tbl['headers'], 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hdr_font
+        cell.fill = fill
+        cell.alignment = Alignment(horizontal='center')
+    rows = conn.execute(tbl['query']).fetchall()
+    for r, row in enumerate(rows, 2):
+        for c, val in enumerate(row, 1):
+            cell = ws.cell(row=r, column=c, value=val)
+            cell.border = border
+    for col_idx in range(1, len(tbl['headers'])+1):
+        max_len = len(tbl['headers'][col_idx-1])
+        for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx, values_only=True):
+            val_len = len(str(row[0] or ''))
+            if val_len > max_len:
+                max_len = val_len
+        ws.column_dimensions[chr(64+col_idx) if col_idx <= 26 else 'A' + chr(64+col_idx-26)].width = min(max_len + 4, 40)
+    ws.auto_filter.ref = ws.dimensions
+    ws.freeze_panes = 'A2'
+    conn.close()
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, download_name=f'{table_name}.xlsx',
+                     as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/admin/db/import', methods=['POST'])
+@admin_required
+def admin_db_import():
+    f = request.files.get('file')
+    if not f or not f.filename.endswith(('.xlsx', '.xls')):
+        flash('Upload file Excel (.xlsx) yang valid.', 'danger')
+        return redirect(url_for('admin_db'))
+    try:
+        wb = load_workbook(f, data_only=True)
+    except Exception as e:
+        flash(f'Gagal membaca file: {e}', 'danger')
+        return redirect(url_for('admin_db'))
+
+    create_backup('pre_import')
+    conn = get_db()
+    report = []
+
+    importable = {t['name']: t for t in DB_EXPORT_TABLES if t.get('import')}
+    IMPORT_COLS = {
+        'donatur': ['nama','no_hp','nik','alamat','jenis','sumber_infaq','area','lokasi_nama','lat','lng','aktif','aktif_infaq','program_id'],
+        'penerima_manfaat': ['nama','nik','no_hp','alamat','asnaf','keterangan','aktif'],
+        'chart_of_accounts': ['kode','nama','kelompok','jenis_dana','parent_kode','jenis_transaksi','aktif'],
+        'users': ['username','nama','role','no_hp','aktif'],
+        'area': ['nama','aktif'],
+        'instansi': ['nama','nama_lembaga','alamat','telepon','email','website','ketua','bendahara','sekretaris','no_izin'],
+        'target_bulanan': ['bulan','user_id','jenis','target_nominal','target_kegiatan'],
+    }
+
+    for ws in wb.worksheets:
+        sheet_label = ws.title.strip()
+        tbl = next((t for t in DB_EXPORT_TABLES if t.get('import') and t['label'] == sheet_label), None)
+        if not tbl:
+            continue
+
+        rows = list(ws.iter_rows(min_row=1, values_only=True))
+        if len(rows) < 2:
+            report.append(f"{sheet_label}: kosong, dilewati")
+            continue
+
+        header = [str(h).strip().lower() if h else '' for h in rows[0]]
+        col_map = {h: i for i, h in enumerate(header) if h}
+        tbl_name = tbl['name']
+        allowed_cols = IMPORT_COLS.get(tbl_name, [])
+        required = set(tbl.get('required', []))
+
+        if not required.issubset(set(col_map.keys())):
+            missing = required - set(col_map.keys())
+            report.append(f"{sheet_label}: kolom wajib tidak ada ({', '.join(missing)})")
+            continue
+
+        has_id = 'id' in col_map
+        updated = 0
+        inserted = 0
+        skipped = 0
+
+        for row in rows[1:]:
+            row_id = None
+            if has_id:
+                raw_id = row[col_map['id']]
+                if raw_id is not None and str(raw_id).strip():
+                    try:
+                        row_id = int(float(str(raw_id)))
+                    except (ValueError, TypeError):
+                        row_id = None
+
+            vals = {}
+            for col_name in allowed_cols:
+                if col_name in col_map:
+                    v = row[col_map[col_name]]
+                    vals[col_name] = v if v is not None else None
+
+            req_ok = all(vals.get(r) not in (None, '', 'None', 'none') for r in required)
+            if not req_ok:
+                skipped += 1
+                continue
+
+            for c in ('aktif', 'aktif_infaq', 'program_id', 'target_nominal', 'target_kegiatan', 'user_id'):
+                if c in vals and vals[c] is not None:
+                    try:
+                        vals[c] = int(float(str(vals[c])))
+                    except (ValueError, TypeError):
+                        vals[c] = None
+            for c in ('lat', 'lng'):
+                if c in vals and vals[c] is not None:
+                    try:
+                        vals[c] = float(str(vals[c]))
+                    except (ValueError, TypeError):
+                        vals[c] = None
+
+            cols = list(vals.keys())
+            values = [vals[c] for c in cols]
+
+            if row_id:
+                existing = conn.execute(f"SELECT id FROM {tbl_name} WHERE id=?", (row_id,)).fetchone()
+                if existing:
+                    set_clause = ', '.join(f'{c}=?' for c in cols)
+                    conn.execute(f"UPDATE {tbl_name} SET {set_clause} WHERE id=?", values + [row_id])
+                    updated += 1
+                    continue
+
+            placeholders = ','.join(['?'] * len(cols))
+            col_names = ','.join(cols)
+            try:
+                conn.execute(f"INSERT INTO {tbl_name} ({col_names}) VALUES ({placeholders})", values)
+                inserted += 1
+            except Exception:
+                skipped += 1
+
+        report.append(f"{sheet_label}: {inserted} ditambahkan, {updated} diperbarui, {skipped} dilewati")
+
+    conn.commit()
+    conn.close()
+    wb.close()
+    flash('Import selesai. ' + ' | '.join(report), 'success' if report else 'warning')
+    return redirect(url_for('admin_db'))
+
 # ── Marketing Dashboard ───────────────────────────────────────────────────────
 
 @app.route('/marketing')

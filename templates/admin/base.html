@@ -102,6 +102,9 @@
     <a href="/admin/backup" class="nav-link {% if '/backup' in request.path %}active{% endif %}">
       <i class="bi bi-shield-check"></i> Backup Database
     </a>
+    <a href="/admin/db" class="nav-link {% if request.path == '/admin/db' %}active{% endif %}">
+      <i class="bi bi-file-earmark-spreadsheet"></i> Export / Import Excel
+    </a>
   </nav>
 </div>
 

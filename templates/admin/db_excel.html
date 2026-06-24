@@ -1,0 +1,81 @@
+{% extends 'admin/base.html' %}
+{% block title %}Export / Import Database{% endblock %}
+{% block page_title %}<i class="bi bi-database-gear"></i> Export / Import Database (Excel){% endblock %}
+
+{% block content %}
+
+<div class="row mb-4">
+  <div class="col-md-8">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-download text-primary"></i> Export Database</h6>
+      <p class="text-muted" style="font-size:.85rem">
+        Download seluruh data dalam format Excel. File bisa diedit lalu diupload kembali untuk update data.
+        Kolom <code>id</code> digunakan untuk mencocokkan data saat import — jika id ada, data di-update; jika kosong, data ditambahkan baru.
+      </p>
+      <a href="{{ url_for('admin_db_export_all') }}" class="btn btn-primary">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Export Semua Tabel (.xlsx)
+      </a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-upload text-success"></i> Import dari Excel</h6>
+      <p class="text-muted" style="font-size:.85rem">
+        Upload file Excel hasil export yang sudah diedit. Backup otomatis dibuat sebelum import.
+      </p>
+      <form method="POST" action="{{ url_for('admin_db_import') }}" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx,.xls" required class="form-control form-control-sm mb-2">
+        <button type="submit" class="btn btn-success btn-sm w-100"
+                onclick="return confirm('Yakin import? Backup otomatis akan dibuat sebelum perubahan.')">
+          <i class="bi bi-upload"></i> Upload & Import
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<h6 class="fw-bold mb-3">Tabel Database</h6>
+<div class="row g-3">
+  {% for tbl in tables %}
+  <div class="col-md-4 col-lg-3">
+    <div class="card p-3 h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <div class="fw-bold" style="font-size:.9rem">{{ tbl.label }}</div>
+          <div class="text-muted" style="font-size:.75rem">{{ tbl.name }}</div>
+        </div>
+        <span class="badge bg-secondary rounded-pill">{{ counts.get(tbl.name, 0) }}</span>
+      </div>
+      <div class="d-flex gap-1 mt-auto">
+        <a href="{{ url_for('admin_db_export_table', table_name=tbl.name) }}"
+           class="btn btn-outline-primary btn-sm flex-grow-1" style="font-size:.75rem">
+          <i class="bi bi-download"></i> Export
+        </a>
+        {% if tbl.get('import', False) %}
+        <span class="badge bg-success-subtle text-success d-flex align-items-center" style="font-size:.65rem">
+          <i class="bi bi-check-circle"></i>&nbsp;Importable
+        </span>
+        {% else %}
+        <span class="badge bg-secondary-subtle text-secondary d-flex align-items-center" style="font-size:.65rem">
+          <i class="bi bi-eye"></i>&nbsp;Read-only
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card p-3 mt-4" style="background:#fff8e1">
+  <h6 class="fw-bold mb-2" style="font-size:.85rem"><i class="bi bi-lightbulb text-warning"></i> Panduan Import</h6>
+  <ul class="mb-0" style="font-size:.8rem;color:#5d4037">
+    <li>Nama sheet harus sama persis dengan label tabel (misal <code>Donatur</code>, <code>Chart of Accounts</code>)</li>
+    <li>Baris pertama = header kolom. Data mulai baris kedua</li>
+    <li><strong>Kolom id terisi</strong> → data di-<em>update</em> (overwrite). <strong>Kolom id kosong</strong> → data ditambahkan baru</li>
+    <li>Tabel transaksi, koleksi, dan jurnal bersifat <strong>read-only</strong> (export saja, tidak bisa diimport)</li>
+    <li>Backup otomatis dibuat sebelum setiap import — bisa di-restore dari menu <a href="{{ url_for('admin_backup') }}">Backup</a></li>
+    <li>Kolom tambahan (seperti <code>coa_nama</code>, <code>donatur_nama</code>) diabaikan saat import — hanya kolom asli tabel yang diproses</li>
+  </ul>
+</div>
+
+{% endblock %}
