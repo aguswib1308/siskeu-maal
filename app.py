@@ -522,7 +522,7 @@ def admin_peta():
     conn = get_db()
     bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
     donatur = conn.execute('''
-        SELECT d.id, d.nama, d.sumber_infaq, d.area, d.lokasi_nama, d.lat, d.lng,
+        SELECT d.id, d.nama, d.sumber_infaq, d.area, d.desa, d.lokasi_nama, d.lat, d.lng,
                kb.status as koleksi_status, kb.jumlah as koleksi_jumlah
         FROM donatur d
         LEFT JOIN koleksi_bulanan kb ON kb.donatur_id=d.id AND kb.bulan=?
@@ -533,6 +533,20 @@ def admin_peta():
     donatur_json = json.dumps([dict(d) for d in donatur])
     conn.close()
     return render_template('admin/peta.html', donatur_json=donatur_json, bulan=bulan)
+
+@app.route('/admin/peta/set-desa', methods=['POST'])
+@admin_required
+def admin_peta_set_desa():
+    data = request.json or {}
+    try:
+        did = int(data.get('id'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, msg='ID tidak valid'), 400
+    desa = (data.get('desa') or '').strip()
+    conn = get_db()
+    conn.execute("UPDATE donatur SET desa=? WHERE id=?", (desa or None, did))
+    conn.commit(); conn.close()
+    return jsonify(ok=True, id=did, desa=desa)
 
 # ── Master: Users ─────────────────────────────────────────────────────────────
 
@@ -709,7 +723,7 @@ def master_donatur_toggle(id):
 @app.route('/admin/master/donatur/quick/<int:id>', methods=['POST'])
 @admin_required
 def master_donatur_quick(id):
-    ALLOWED = {'nama', 'alamat', 'area', 'no_hp', 'sumber_infaq', 'lokasi_nama'}
+    ALLOWED = {'nama', 'alamat', 'area', 'desa', 'no_hp', 'sumber_infaq', 'lokasi_nama'}
     data = request.json or {}
     field = data.get('field', '')
     value = data.get('value', '').strip()
@@ -1744,8 +1758,15 @@ def marketing_peta():
         ORDER BY d.area, d.nama
     ''', (bulan,)).fetchall()
     titik_json = json.dumps([dict(t) for t in titik])
+    desa_points = conn.execute('''
+        SELECT nama, desa, lat, lng FROM donatur
+        WHERE aktif=1 AND lat IS NOT NULL AND lng IS NOT NULL
+              AND desa IS NOT NULL AND TRIM(desa) <> ''
+    ''').fetchall()
+    desa_json = json.dumps([dict(d) for d in desa_points])
     conn.close()
-    return render_template('marketing/peta.html', titik_json=titik_json, bulan=bulan)
+    return render_template('marketing/peta.html', titik_json=titik_json,
+                           desa_json=desa_json, bulan=bulan)
 
 # ── Marketing Donatur ─────────────────────────────────────────────────────────
 

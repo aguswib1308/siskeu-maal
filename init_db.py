@@ -39,6 +39,8 @@ def migrate(conn):
         ('lng',          'REAL'),
         ('aktif_infaq',  'INTEGER DEFAULT 1'),
         ('program_id',   'INTEGER REFERENCES chart_of_accounts(id)'),
+        ('desa',         'TEXT'),
+        ('kecamatan',    'TEXT'),
     ]:
         if col not in don:
             c.execute(f"ALTER TABLE donatur ADD COLUMN {col} {defn}")
