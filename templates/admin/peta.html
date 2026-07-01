@@ -1,44 +1,82 @@
 {% extends 'admin/base.html' %}
 {% block title %}Peta Donatur{% endblock %}
-{% block page_title %}<i class="bi bi-map"></i> Peta Donatur & Cakupan Desa{% endblock %}
+{% block page_title %}<i class="bi bi-map"></i> Peta Donatur{% endblock %}
 
 {% block content %}
-<div class="row mb-3 align-items-center g-2">
-  <div class="col-auto">
-    <form class="d-flex gap-2 align-items-center">
-      <label class="form-label fw-semibold my-auto small">Status bulan:</label>
-      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:160px">
+<style>
+  /* Hapus padding main khusus halaman peta */
+  .main { padding: 0 !important; }
+  .topbar { margin: .75rem 1.25rem !important; padding: .5rem 1rem !important; }
+  #peta-root {
+    position: relative;
+    height: calc(100vh - 68px);
+  }
+  #map { width: 100%; height: 100%; }
+  .fp {
+    position: absolute;
+    z-index: 800;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.18);
+    padding: 10px 12px;
+    font-size: .82rem;
+  }
+  .fp-ctrl { top: 12px; left: 12px; }
+  .fp-legend {
+    top: 12px; right: 12px;
+    width: 190px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+  .fp-info {
+    bottom: 24px; left: 12px;
+    color: var(--text-muted);
+    font-size: .75rem;
+    pointer-events: none;
+    padding: 5px 9px;
+  }
+</style>
+
+<div id="peta-root">
+  <div id="map"></div>
+
+  <!-- Kontrol kiri atas -->
+  <div class="fp fp-ctrl">
+    <form class="d-flex gap-2 align-items-center mb-2">
+      <label class="fw-semibold my-auto mb-0" style="white-space:nowrap">Bulan:</label>
+      <input type="month" name="bulan" value="{{ bulan }}"
+             class="form-control form-control-sm" style="width:138px">
       <button class="btn btn-sm btn-primary">Tampilkan</button>
     </form>
+    <div class="d-flex flex-column gap-1">
+      <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer">
+        <input type="checkbox" id="tgHull" checked> Cakupan desa
+      </label>
+      <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer">
+        <input type="checkbox" id="tgColorDesa"> Warnai per desa
+      </label>
+      <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer">
+        <input type="checkbox" id="tgOnlyUnset"> Hanya perlu set desa
+      </label>
+    </div>
+    <button id="btnFS" class="btn btn-sm btn-outline-secondary mt-2 w-100"
+            onclick="toggleFS()" title="Layar penuh">
+      <i class="bi bi-fullscreen"></i> Layar Penuh
+    </button>
   </div>
-  <div class="col-auto ms-auto d-flex gap-3 align-items-center small">
-    <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
-      <input type="checkbox" id="tgHull" checked> Cakupan desa
-    </label>
-    <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
-      <input type="checkbox" id="tgColorDesa"> Warnai titik per desa
-    </label>
-    <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
-      <input type="checkbox" id="tgOnlyUnset"> Hanya "perlu set desa"
-    </label>
-  </div>
-</div>
 
-<div class="row g-3">
-  <div class="col-lg-9">
-    <div class="card p-0 overflow-hidden">
-      <div id="map" style="height:calc(100vh - 200px); min-height:500px"></div>
-    </div>
+  <!-- Legend kanan atas -->
+  <div class="fp fp-legend">
+    <div class="fw-bold mb-2"><i class="bi bi-collection"></i> Desa
+      <span class="text-muted fw-normal" id="desaCount"></span></div>
+    <div id="legend"></div>
   </div>
-  <div class="col-lg-3">
-    <div class="card p-3" style="max-height:calc(100vh - 200px); overflow-y:auto">
-      <div class="fw-bold mb-2"><i class="bi bi-collection"></i> Desa <span class="text-muted small" id="desaCount"></span></div>
-      <div id="legend" class="small"></div>
-    </div>
+
+  <!-- Info bawah -->
+  <div class="fp fp-info">
+    <i class="bi bi-info-circle"></i> Klik titik → detail &amp; set desa
   </div>
-</div>
-<div class="text-muted small mt-2">
-  <i class="bi bi-info-circle"></i> Klik titik untuk melihat detail & <b>set desa</b> (terutama titik abu-abu "perlu set"). Klik nama desa di panel untuk fokus.
 </div>
 {% endblock %}
 
@@ -61,7 +99,6 @@ const hullLayer   = L.layerGroup().addTo(map);
 const STATUS_WARNA = { terkumpul:'#bdc3c7', tidak_ada:'#e74c3c', terjadwal:'#e74c3c' };
 const SUMBER_WARNA = { kencleng:'#27ae60', kotak_infaq:'#2980b9' };
 
-// warna stabil dari nama desa
 function desaColor(name){
   if(!name) return '#95a5a6';
   let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360;
@@ -114,7 +151,7 @@ function buildHulls(){
   const groups = {};
   visiblePoints().forEach(d => {
     const k = dKey(d);
-    if(k===UNSET) return;            // tak gambar hull utk yg belum diset
+    if(k===UNSET) return;
     (groups[k]=groups[k]||[]).push(d);
   });
   Object.entries(groups).forEach(([desa, pts]) => {
@@ -128,7 +165,6 @@ function buildHulls(){
         return;
       }
     }
-    // <3 titik atau hull gagal → lingkaran di centroid
     const lat=pts.reduce((s,p)=>s+p.lat,0)/pts.length, lng=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
     L.circle([lat,lng],{radius:160,color,weight:2,fillColor:color,fillOpacity:0.12})
       .bindTooltip(`${desa} (${pts.length})`,{sticky:true}).addTo(hullLayer);
@@ -139,19 +175,18 @@ function buildLegend(){
   const counts={}; let unset=0;
   visiblePoints().forEach(d=>{ const k=dKey(d); if(k===UNSET) unset++; else counts[k]=(counts[k]||0)+1; });
   const desaList=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
-  document.getElementById('desaCount').textContent = `(${desaList.length} desa)`;
+  document.getElementById('desaCount').textContent = `(${desaList.length})`;
   let html='';
   desaList.forEach(d=>{
     html+=`<div class="d-flex align-items-center gap-2 mb-1" style="cursor:pointer" onclick="focusDesa('${d.replace(/'/g,"\\'")}')">
-      <span style="width:11px;height:11px;border-radius:3px;background:${desaColor(d)};display:inline-block;flex-shrink:0"></span>
+      <span style="width:10px;height:10px;border-radius:3px;background:${desaColor(d)};display:inline-block;flex-shrink:0"></span>
       <span style="flex:1">${d}</span><span class="text-muted">${counts[d]}</span></div>`;
   });
   if(unset>0){
     html+=`<hr class="my-2"><div class="d-flex align-items-center gap-2" style="cursor:pointer" onclick="document.getElementById('tgOnlyUnset').checked=true;refresh()">
-      <span style="width:11px;height:11px;border-radius:3px;background:#95a5a6;display:inline-block"></span>
+      <span style="width:10px;height:10px;border-radius:3px;background:#95a5a6;display:inline-block"></span>
       <span style="flex:1;color:#e74c3c;font-weight:600">${UNSET}</span><span class="text-muted">${unset}</span></div>`;
   }
-  // datalist nama desa utk input
   let dl='<datalist id="desaList">'+desaList.map(d=>`<option value="${d}">`).join('')+'</datalist>';
   document.getElementById('legend').innerHTML = html + dl;
 }
@@ -173,12 +208,36 @@ function saveDesa(id){
 }
 
 function refresh(){ buildMarkers(); buildHulls(); buildLegend(); }
-
 ['tgHull','tgColorDesa','tgOnlyUnset'].forEach(id=>
   document.getElementById(id).addEventListener('change', refresh));
-
 refresh();
 const all=donatur.filter(d=>d.lat&&d.lng).map(d=>[d.lat,d.lng]);
 if(all.length) map.fitBounds(all,{padding:[40,40]});
+
+// Fullscreen
+function toggleFS(){
+  const el = document.getElementById('peta-root');
+  const btn = document.getElementById('btnFS');
+  if(!document.fullscreenElement){
+    el.requestFullscreen().then(()=>{
+      btn.innerHTML='<i class="bi bi-fullscreen-exit"></i> Keluar Layar Penuh';
+      el.style.height='100vh';
+      map.invalidateSize();
+    });
+  } else {
+    document.exitFullscreen().then(()=>{
+      btn.innerHTML='<i class="bi bi-fullscreen"></i> Layar Penuh';
+      el.style.height='';
+      map.invalidateSize();
+    });
+  }
+}
+document.addEventListener('fullscreenchange', ()=>{
+  if(!document.fullscreenElement){
+    document.getElementById('btnFS').innerHTML='<i class="bi bi-fullscreen"></i> Layar Penuh';
+    document.getElementById('peta-root').style.height='';
+    map.invalidateSize();
+  }
+});
 </script>
 {% endblock %}
