@@ -8,7 +8,7 @@
   <div class="input-group">
     <input type="text" name="q" value="{{ q }}" class="form-control"
            placeholder="Cari nama / area / HP..."
-           style="border-radius:10px 0 0 10px;border-color:#d0dde8;font-size:.9rem">
+           style="border-radius:10px 0 0 10px;border-color:var(--border);font-size:.9rem">
     <button class="btn btn-primary" style="border-radius:0 10px 10px 0">
       <i class="bi bi-search"></i>
     </button>
@@ -30,13 +30,13 @@
     <div class="mb-3">
       <label class="form-label fw-semibold" style="font-size:.85rem">Nama Lengkap / Lokasi</label>
       <input type="text" name="nama" class="form-control" required
-             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
     </div>
 
     <div class="mb-3">
       <label class="form-label fw-semibold" style="font-size:.85rem">Kategori</label>
       <select name="sumber_infaq" class="form-select"
-              style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
         <option value="tunai">💵 Tunai</option>
         <option value="kencleng">🏠 Kencleng</option>
         <option value="kotak_infaq">🕌 Kotak Infaq</option>
@@ -50,7 +50,7 @@
       <label class="form-label fw-semibold" style="font-size:.85rem">Dusun</label>
       <input type="text" name="area" class="form-control" list="areaList"
              placeholder="Pilih dusun..."
-             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
       <datalist id="areaList">{% for a in areas %}<option value="{{ a.area }}">{% endfor %}</datalist>
     </div>
 
@@ -58,7 +58,7 @@
       <label class="form-label fw-semibold" style="font-size:.85rem">No HP
         <span class="text-muted fw-normal">(opsional)</span></label>
       <input type="text" name="no_hp" class="form-control" placeholder="628xxx"
-             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
     </div>
 
     <div class="mb-3">
@@ -66,7 +66,7 @@
         <span class="text-muted fw-normal">(opsional)</span></label>
       <input type="text" name="lokasi_nama" class="form-control"
              placeholder="cth: Toko Budi - Jl. Mawar 5"
-             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem">
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
     </div>
 
     <div class="mb-3">
@@ -74,7 +74,7 @@
         <span class="text-muted fw-normal">(paste link Google Maps)</span></label>
       <input type="text" name="gmaps_url" class="form-control mb-2"
              placeholder="https://maps.google.com/?q=..."
-             style="border-radius:10px;border-color:#d0dde8;font-size:.85rem">
+             style="border-radius:10px;border-color:var(--border);font-size:.85rem">
       <div class="d-flex gap-2">
         <input type="number" name="lat" class="form-control form-control-sm"
                placeholder="Latitude" step="any" style="border-radius:8px;font-size:.85rem">
@@ -89,8 +89,8 @@
 
     <div class="d-flex gap-2">
       <button type="button" onclick="document.getElementById('formTambah').style.display='none'"
-              style="flex:1;padding:.65rem;border-radius:10px;border:1.5px solid #d0dde8;
-                     background:#fff;color:#64748b;font-weight:600;font-size:.88rem;cursor:pointer">
+              style="flex:1;padding:.65rem;border-radius:10px;border:1.5px solid var(--border);
+                     background:var(--surface);color:var(--text-muted);font-weight:600;font-size:.88rem;cursor:pointer">
         Batal
       </button>
       <button type="submit"
@@ -118,7 +118,8 @@
     <div class="p-3 flex-grow-1">
       <div class="d-flex justify-content-between align-items-start gap-2">
         <div style="min-width:0;flex:1">
-          <div class="fw-semibold text-truncate" style="font-size:.9rem">{{ d.nama }}</div>
+          <a href="/marketing/donatur/{{ d.id }}" class="fw-semibold text-truncate d-block"
+             style="font-size:.9rem;color:inherit;text-decoration:none">{{ d.nama }}</a>
           {% if d.lokasi_nama and d.lokasi_nama != d.nama %}
           <div class="text-muted text-truncate" style="font-size:.75rem">{{ d.lokasi_nama }}</div>
           {% endif %}
@@ -139,7 +140,7 @@
             <span style="background:#fdf2e9;color:#e67e22;border-radius:6px;
                          padding:2px 7px;font-size:.67rem;font-weight:600">🏛️ Wakaf</span>
             {% else %}
-            <span style="background:#f0f4f8;color:#64748b;border-radius:6px;
+            <span style="background:var(--border);color:var(--text-muted);border-radius:6px;
                          padding:2px 7px;font-size:.67rem;font-weight:600">💵 Tunai</span>
             {% endif %}
             {% if d.area %}
@@ -150,6 +151,12 @@
           </div>
         </div>
         <div class="d-flex gap-1 flex-shrink-0">
+          <a href="/marketing/donatur/{{ d.id }}"
+             style="width:36px;height:36px;border-radius:9px;background:#eaf4fb;
+                    color:#1a5276;display:flex;align-items:center;justify-content:center;
+                    text-decoration:none;font-size:1rem" title="Detail & Edit">
+            <i class="bi bi-pencil-square"></i>
+          </a>
           {% if d.no_hp %}
           <a href="https://wa.me/{{ d.no_hp }}" target="_blank"
              style="width:36px;height:36px;border-radius:9px;background:#e8f8f0;
@@ -160,8 +167,8 @@
           {% endif %}
           {% if d.lat and d.lng %}
           <a href="https://www.google.com/maps?q={{ d.lat }},{{ d.lng }}" target="_blank"
-             style="width:36px;height:36px;border-radius:9px;background:#f0f4f8;
-                    color:#64748b;display:flex;align-items:center;justify-content:center;
+             style="width:36px;height:36px;border-radius:9px;background:var(--border);
+                    color:var(--text-muted);display:flex;align-items:center;justify-content:center;
                     text-decoration:none;font-size:1rem">
             <i class="bi bi-geo-alt"></i>
           </a>

@@ -72,6 +72,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body row g-3">
+        <input type="hidden" name="client_uuid" value="{{ new_form_uuid() }}">
         <div class="col-md-6">
           <label class="form-label fw-semibold">Tanggal</label>
           <input type="date" name="tanggal" class="form-control" required value="{{ bulan }}-01">
@@ -154,6 +155,10 @@ function prepJurnal() {
   document.querySelectorAll('#modalJurnal input[name="jumlah"]').forEach(el => {
     el.value = el.value.replace(/\./g, '').replace(/,/g, '');
   });
+  // Anti double-click: kunci tombol simpan setelah submit pertama
+  const btn = document.querySelector('#modalJurnal button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan…';
   return true;
 }
 </script>

@@ -5,6 +5,9 @@
 
 <form method="POST" action="/marketing/catat" autocomplete="off" onsubmit="return prepSubmit()">
 
+  {# Token idempotensi: satu render form = satu transaksi (anti double-submit) #}
+  <input type="hidden" name="client_uuid" id="clientUuid" value="{{ new_form_uuid() }}">
+
   {# ── Jenis transaksi ─────────────────────────────────── #}
   <div class="section-label">Jenis</div>
   <div class="d-flex gap-2 mb-3">
@@ -28,25 +31,25 @@
 
   {# ── Tanggal ─────────────────────────────────────────── #}
   <div class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">Tanggal</label>
+    <label class="form-label fw-semibold small">Tanggal</label>
     <input type="date" name="tanggal" required value="{{ hari_ini }}"
-           style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+           style="border-radius:10px;font-size:.9rem"
            class="form-control">
   </div>
 
   {# ── Akun / COA — 2 cascading selects ───────────────── #}
   <div class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">Kelompok Akun</label>
+    <label class="form-label fw-semibold small">Kelompok Akun</label>
     <select id="selInduk" onchange="filterSub()"
-            style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+            style="border-radius:10px;font-size:.9rem"
             class="form-select">
       <option value="">— Pilih Kelompok —</option>
     </select>
   </div>
   <div class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">Sub Akun / Produk</label>
+    <label class="form-label fw-semibold small">Sub Akun / Produk</label>
     <select name="coa_id" id="selCoa" required
-            style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+            style="border-radius:10px;font-size:.9rem"
             class="form-select">
       <option value="">— Pilih Sub Akun —</option>
     </select>
@@ -54,13 +57,13 @@
 
   {# ── Donatur (masuk) — searchable ───────────────────── #}
   <div id="wrapDonatur" class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">
+    <label class="form-label fw-semibold small">
       Donatur <span class="text-muted fw-normal">(opsional)</span>
     </label>
     <div class="position-relative" id="donaturSearch">
       <input type="hidden" name="donatur_id" id="donaturId">
       <input type="text" id="donaturInput" class="form-control" placeholder="Ketik nama donatur..."
-             style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+             style="border-radius:10px;font-size:.9rem"
              autocomplete="off">
       <div id="donaturDropdown" class="search-dropdown" style="display:none"></div>
     </div>
@@ -68,11 +71,11 @@
 
   {# ── Penerima manfaat (keluar) ───────────────────────── #}
   <div id="wrapPenerima" class="mb-3" style="display:none">
-    <label class="form-label fw-semibold" style="font-size:.85rem">
+    <label class="form-label fw-semibold small">
       Penerima Manfaat <span class="text-muted fw-normal">(opsional)</span>
     </label>
     <select name="penerima_id"
-            style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+            style="border-radius:10px;font-size:.9rem"
             class="form-select">
       <option value="">— Pilih atau kosongkan —</option>
       {% for p in penerima_list %}
@@ -85,30 +88,31 @@
 
   {# ── Jumlah — with thousands separator ──────────────── #}
   <div class="mb-3">
-    <label class="form-label fw-semibold" style="font-size:.85rem">Jumlah (Rp)</label>
+    <label class="form-label fw-semibold small">Jumlah (Rp)</label>
     <div class="input-group">
       <span class="input-group-text"
-            style="border-radius:10px 0 0 10px;background:#f0f4f8;
-                   border-color:#d0dde8;color:#64748b;font-weight:600">Rp</span>
+            style="border-radius:10px 0 0 10px;background:var(--bg);
+                   border-color:var(--border);color:var(--text-muted);font-weight:600">Rp</span>
       <input type="text" name="jumlah" required inputmode="numeric"
              placeholder="0" id="inputJumlah"
-             style="border-radius:0 10px 10px 0;border-color:#d0dde8;
-                    font-size:1.1rem;font-weight:700;padding:.65rem .9rem"
+             style="border-radius:0 10px 10px 0;
+                    font-size:1.1rem;font-weight:700;padding:.65rem .9rem;
+                    font-variant-numeric:tabular-nums"
              class="form-control" oninput="formatRibuan(this)">
     </div>
   </div>
 
   {# ── Keterangan ──────────────────────────────────────── #}
   <div class="mb-4">
-    <label class="form-label fw-semibold" style="font-size:.85rem">
+    <label class="form-label fw-semibold small">
       Keterangan <span class="text-muted fw-normal">(opsional)</span>
     </label>
     <input type="text" name="keterangan" placeholder="Opsional…"
-           style="border-radius:10px;border-color:#d0dde8;font-size:.9rem"
+           style="border-radius:10px;font-size:.9rem"
            class="form-control">
   </div>
 
-  <button type="submit" class="btn btn-primary w-100 btn-lg">
+  <button type="submit" id="btnSimpan" class="btn btn-primary w-100 btn-lg">
     <i class="bi bi-check2"></i> Simpan Transaksi
   </button>
 
@@ -116,30 +120,30 @@
 
 <style>
   .jenis-pill {
-    border: 1.5px solid #d0dde8; border-radius: 12px;
+    border: 1.5px solid var(--border); border-radius: 12px;
     padding: .75rem .5rem; text-align: center;
-    font-size: .85rem; font-weight: 600; color: #64748b;
-    background: #fff; cursor: pointer;
+    font-size: .85rem; font-weight: 600; color: var(--text-muted);
+    background: var(--surface); cursor: pointer;
     transition: background .15s, color .15s, border-color .15s;
   }
-  #jenisMasuk:checked  + .jenis-pill { background:#e8f8f0; color:#1e8449; border-color:#1e8449; }
-  #jenisKeluar:checked + .jenis-pill { background:#fde8e6; color:#922b21; border-color:#e74c3c; }
+  #jenisMasuk:checked  + .jenis-pill { background:#dcfce7; color:#166534; border-color:#166534; }
+  #jenisKeluar:checked + .jenis-pill { background:#fee2e2; color:#991b1b; border-color:#991b1b; }
   .search-dropdown {
     position:absolute; top:100%; left:0; right:0; z-index:50;
-    background:#fff; border:1px solid #d0dde8; border-radius:0 0 10px 10px;
-    max-height:220px; overflow-y:auto;
-    box-shadow:0 4px 12px rgba(0,0,0,.1);
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:0 0 10px 10px; max-height:220px; overflow-y:auto;
+    box-shadow:0 4px 12px rgba(15,37,55,.1);
   }
   .search-dropdown .dd-item {
-    padding:8px 12px; cursor:pointer; font-size:.88rem; border-bottom:1px solid #f0f4f8;
+    padding:8px 12px; cursor:pointer; font-size:.88rem; border-bottom:1px solid var(--bg);
   }
-  .search-dropdown .dd-item:hover, .search-dropdown .dd-item.active { background:#eaf4fb; }
-  .search-dropdown .dd-item .dd-area { font-size:.7rem; color:#94a3b8; }
+  .search-dropdown .dd-item:hover, .search-dropdown .dd-item.active { background:var(--bg); }
+  .search-dropdown .dd-item .dd-area { font-size:.7rem; color:var(--text-muted); }
   .search-dropdown .dd-clear {
-    padding:6px 12px; cursor:pointer; font-size:.8rem; color:#e74c3c; text-align:center;
-    border-bottom:1px solid #f0f4f8;
+    padding:6px 12px; cursor:pointer; font-size:.8rem; color:#991b1b; text-align:center;
+    border-bottom:1px solid var(--bg);
   }
-  .search-dropdown .dd-clear:hover { background:#fde8e6; }
+  .search-dropdown .dd-clear:hover { background:#fee2e2; }
 </style>
 
 {% endblock %}
@@ -301,12 +305,43 @@ document.addEventListener('click', function(e) {
 
 // ── Offline-capable form submission ─────────────────────
 var form = document.querySelector('form[action="/marketing/catat"]');
+var btnSimpan = document.getElementById('btnSimpan');
+var sedangKirim = false;
+
+function kunciTombol(kunci) {
+  sedangKirim = kunci;
+  btnSimpan.disabled = kunci;
+  btnSimpan.innerHTML = kunci
+    ? '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan…'
+    : '<i class="bi bi-check2"></i> Simpan Transaksi';
+}
+
+// UUID baru tiap page load sungguhan (termasuk HTML dari cache service worker).
+// Script TIDAK jalan ulang saat restore bfcache → uuid tetap → back + submit
+// ulang ditolak server sebagai duplikat (idempoten).
+(function() {
+  var el = document.getElementById('clientUuid');
+  if (window.crypto && crypto.randomUUID) el.value = crypto.randomUUID();
+  else el.value = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+})();
+
+// Kembali dari bfcache (tombol "kembali" browser): buka kunci tombol saja.
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) kunciTombol(false);
+});
+
 form.addEventListener('submit', function(e) {
   e.preventDefault();
+  if (sedangKirim) return;
   document.querySelectorAll('input[name="jumlah"]').forEach(el => {
     el.value = el.value.replace(/\./g, '').replace(/,/g, '');
   });
   var fd = new FormData(form);
+  if (!fd.get('jumlah') || parseInt(fd.get('jumlah'), 10) <= 0 || isNaN(parseInt(fd.get('jumlah'), 10))) {
+    OfflineStore.showToast('Jumlah harus diisi angka lebih dari 0.', 'danger');
+    return;
+  }
+  kunciTombol(true);
   var body = {
     tanggal: fd.get('tanggal'),
     jenis: fd.get('jenis'),
@@ -314,7 +349,8 @@ form.addEventListener('submit', function(e) {
     donatur_id: fd.get('donatur_id') || null,
     penerima_id: fd.get('penerima_id') || null,
     jumlah: fd.get('jumlah'),
-    keterangan: fd.get('keterangan') || ''
+    keterangan: fd.get('keterangan') || '',
+    client_uuid: fd.get('client_uuid') || null
   };
 
   fetch('/api/marketing/transaksi', {
@@ -326,10 +362,12 @@ form.addEventListener('submit', function(e) {
   .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
   .then(function(res) {
     if (res.status < 400) {
-      OfflineStore.showToast(res.data.message || 'Transaksi berhasil!', 'success');
+      OfflineStore.showToast(res.data.message || 'Transaksi berhasil!',
+                             res.data.duplicate ? 'warning' : 'success');
       setTimeout(function() { window.location.href = '/marketing'; }, 800);
     } else {
       OfflineStore.showToast(res.data.message || 'Gagal menyimpan.', 'danger');
+      kunciTombol(false);
     }
   })
   .catch(function() {

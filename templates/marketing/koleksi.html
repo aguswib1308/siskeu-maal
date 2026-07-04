@@ -11,14 +11,14 @@
   </div>
   {% if stats %}
   <div style="text-align:center">
-    <div style="font-size:1.3rem;font-weight:800;color:#1e8449">{{ stats.terkumpul }}</div>
+    <div style="font-size:1.3rem;font-weight:800;color:var(--success)">{{ stats.terkumpul }}</div>
     <div style="font-size:.68rem;color:#94a3b8">dari {{ stats.total }}</div>
   </div>
   {% endif %}
 </div>
 
 {% if stats and stats.total > 0 %}
-<div style="height:6px;background:#e9eef4;border-radius:99px;margin-bottom:1.1rem;overflow:hidden">
+<div style="height:6px;background:var(--border);border-radius:99px;margin-bottom:1.1rem;overflow:hidden">
   <div style="height:100%;width:{{ (stats.terkumpul / stats.total * 100)|int }}%;
               background:linear-gradient(90deg,#27ae60,#1e8449);border-radius:99px;
               transition:width .4s"></div>
@@ -30,15 +30,15 @@
   <input type="hidden" name="bulan" value="{{ bulan }}">
   {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
   <input type="text" name="q" value="{{ q }}" placeholder="Cari nama donatur..."
-         style="flex:1;border-radius:10px;border:1.5px solid #d0dde8;padding:.4rem .75rem;
+         style="flex:1;border-radius:10px;border:1.5px solid var(--border);padding:.4rem .75rem;
                 font-size:.85rem;outline:none">
-  <button style="border:none;background:#1a5276;color:#fff;border-radius:10px;
+  <button style="border:none;background:var(--primary-mid);color:#fff;border-radius:10px;
                  padding:.4rem .7rem;font-size:.85rem;cursor:pointer">
     <i class="bi bi-search"></i>
   </button>
   {% if q %}
   <a href="/marketing/koleksi?bulan={{ bulan }}{% if area %}&area={{ area }}{% endif %}"
-     style="border:1.5px solid #d0dde8;background:#fff;color:#64748b;border-radius:10px;
+     style="border:1.5px solid var(--border);background:#fff;color:#64748b;border-radius:10px;
             padding:.4rem .7rem;font-size:.85rem;text-decoration:none;display:flex;align-items:center">
     <i class="bi bi-x-lg"></i>
   </a>
@@ -50,16 +50,16 @@
   <a href="/marketing/koleksi?bulan={{ bulan }}{% if q %}&q={{ q }}{% endif %}"
      style="padding:.3rem .7rem;border-radius:99px;font-size:.75rem;font-weight:600;
        text-decoration:none;border:1.5px solid;
-       {% if not area %}background:#1a5276;color:#fff;border-color:#1a5276
-       {% else %}background:#fff;color:#64748b;border-color:#d0dde8{% endif %}">
+       {% if not area %}background:var(--primary-mid);color:#fff;border-color:var(--primary-mid)
+       {% else %}background:var(--surface);color:var(--text-muted);border-color:var(--border){% endif %}">
     Semua
   </a>
   {% for a in areas %}
   <a href="/marketing/koleksi?bulan={{ bulan }}&area={{ a.area }}{% if q %}&q={{ q }}{% endif %}"
      style="padding:.3rem .7rem;border-radius:99px;font-size:.75rem;font-weight:600;
        text-decoration:none;border:1.5px solid;
-       {% if area == a.area %}background:#1a5276;color:#fff;border-color:#1a5276
-       {% else %}background:#fff;color:#64748b;border-color:#d0dde8{% endif %}">
+       {% if area == a.area %}background:var(--primary-mid);color:#fff;border-color:var(--primary-mid)
+       {% else %}background:var(--surface);color:var(--text-muted);border-color:var(--border){% endif %}">
     {{ a.area }}
   </a>
   {% endfor %}
@@ -67,7 +67,7 @@
      style="padding:.3rem .7rem;border-radius:99px;font-size:.75rem;font-weight:600;
        text-decoration:none;border:1.5px solid;
        {% if area == '__none__' %}background:#e67e22;color:#fff;border-color:#e67e22
-       {% else %}background:#fff;color:#d35400;border-color:#fde8d0{% endif %}">
+       {% else %}background:var(--surface);color:#d35400;border-color:#fde8d0{% endif %}">
     Tanpa Area
   </a>
 </div>
@@ -111,7 +111,7 @@
               <span style="background:#e8f8f0;color:#1e8449;border-radius:6px;
                            padding:2px 7px;font-size:.67rem;font-weight:600">🏠 Kencleng</span>
               {% else %}
-              <span style="background:#eaf4fb;color:#1a5276;border-radius:6px;
+              <span style="background:#eaf4fb;color:var(--primary-mid);border-radius:6px;
                            padding:2px 7px;font-size:.67rem;font-weight:600">🕌 Kotak</span>
               {% endif %}
               {% if k.status == 'tidak_ada' %}
@@ -126,15 +126,15 @@
             {% if k.lat and k.lng %}
             <a href="https://www.google.com/maps?q={{ k.lat }},{{ k.lng }}"
                target="_blank"
-               style="width:36px;height:36px;border-radius:9px;background:#f0f4f8;
-                      color:#64748b;display:flex;align-items:center;justify-content:center;
+               style="width:36px;height:36px;border-radius:9px;background:var(--border);
+                      color:var(--text-muted);display:flex;align-items:center;justify-content:center;
                       text-decoration:none;font-size:1rem">
               <i class="bi bi-geo-alt"></i>
             </a>
             {% endif %}
             <a href="/marketing/koleksi/{{ k.id }}"
                style="height:36px;padding:0 .75rem;border-radius:9px;
-                      background:#1a5276;color:#fff;display:flex;align-items:center;
+                      background:var(--primary-mid);color:#fff;display:flex;align-items:center;
                       text-decoration:none;font-size:.82rem;font-weight:600;
                       white-space:nowrap">
               Catat

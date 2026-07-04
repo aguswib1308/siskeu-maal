@@ -17,9 +17,20 @@ def migrate(conn):
         ('penerima_id', 'INTEGER REFERENCES penerima_manfaat(id)'),
         ('jenis_dana',  'TEXT'),
         ('jurnal_id',   'INTEGER REFERENCES jurnal(id)'),
+        ('client_uuid', 'TEXT'),
     ]:
         if col not in trx:
             c.execute(f"ALTER TABLE transaksi ADD COLUMN {col} {defn}")
+
+    # Idempotensi anti double-submit: client_uuid unik (NULL boleh banyak)
+    jr = {r[1] for r in c.execute("PRAGMA table_info(jurnal)")}
+    if jr and 'client_uuid' not in jr:
+        c.execute("ALTER TABLE jurnal ADD COLUMN client_uuid TEXT")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transaksi_client_uuid "
+              "ON transaksi(client_uuid) WHERE client_uuid IS NOT NULL")
+    if jr:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jurnal_client_uuid "
+                  "ON jurnal(client_uuid) WHERE client_uuid IS NOT NULL")
 
     usr = {r[1] for r in c.execute("PRAGMA table_info(users)")}
     for col, defn in [

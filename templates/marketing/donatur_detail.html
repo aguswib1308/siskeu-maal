@@ -3,7 +3,12 @@
 
 {% block content %}
 <div class="card p-3 mb-3" style="border-left:4px solid
-  {% if donatur.sumber_infaq=='kencleng' %}#27ae60{% else %}#2980b9{% endif %}">
+  {% if donatur.sumber_infaq=='kencleng' %}#27ae60
+  {% elif donatur.sumber_infaq=='kotak_infaq' %}#2980b9
+  {% elif donatur.sumber_infaq=='zakat' %}#f39c12
+  {% elif donatur.sumber_infaq=='infaq_terikat' %}#8e44ad
+  {% elif donatur.sumber_infaq=='wakaf' %}#e67e22
+  {% else %}#94a3b8{% endif %}">
   <div class="d-flex justify-content-between align-items-start">
     <div>
       <div class="fw-bold fs-6">{{ donatur.nama }}</div>
@@ -16,8 +21,17 @@
           <span class="badge" style="background:#27ae60">🏠 Kencleng</span>
         {% elif donatur.sumber_infaq == 'kotak_infaq' %}
           <span class="badge" style="background:#2980b9">🕌 Kotak Infaq</span>
+        {% elif donatur.sumber_infaq == 'zakat' %}
+          <span class="badge" style="background:#f39c12">🌙 Zakat</span>
+        {% elif donatur.sumber_infaq == 'infaq_terikat' %}
+          <span class="badge" style="background:#8e44ad">🎯 Infaq Terikat</span>
+        {% elif donatur.sumber_infaq == 'wakaf' %}
+          <span class="badge" style="background:#e67e22">🏛️ Wakaf</span>
         {% else %}
           <span class="badge bg-secondary">💵 Tunai</span>
+        {% endif %}
+        {% if not donatur.aktif_infaq %}
+        <span class="badge bg-light text-muted border">Nonaktif koleksi</span>
         {% endif %}
       </div>
     </div>
@@ -36,6 +50,105 @@
   {% endif %}
 </div>
 
+{# ── Tombol edit ── #}
+<button class="btn btn-outline-primary w-100 mb-3" style="border-radius:10px;font-weight:600"
+        onclick="var f=document.getElementById('formEdit');
+                 f.style.display = f.style.display==='none' ? '' : 'none'">
+  <i class="bi bi-pencil-square"></i> Edit Data Donatur
+</button>
+
+{# ── Form edit ── #}
+<div id="formEdit" class="card p-3 mb-3" style="display:none">
+  <form method="POST" action="/marketing/donatur/edit/{{ donatur.id }}">
+    <div class="fw-bold mb-3" style="font-size:.95rem">Edit Donatur</div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Nama Lengkap / Lokasi</label>
+      <input type="text" name="nama" class="form-control" required value="{{ donatur.nama }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Kategori</label>
+      <select name="sumber_infaq" class="form-select"
+              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+        {% for val, label in [('tunai','💵 Tunai'),('kencleng','🏠 Kencleng'),
+                              ('kotak_infaq','🕌 Kotak Infaq'),('zakat','🌙 Zakat'),
+                              ('infaq_terikat','🎯 Infaq Terikat'),('wakaf','🏛️ Wakaf')] %}
+        <option value="{{ val }}" {% if donatur.sumber_infaq==val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Dusun</label>
+      <input type="text" name="area" class="form-control" list="areaList"
+             value="{{ donatur.area or '' }}" placeholder="Pilih dusun..."
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+      <datalist id="areaList">{% for a in areas %}<option value="{{ a.area }}">{% endfor %}</datalist>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">No HP
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="no_hp" class="form-control" placeholder="628xxx"
+             value="{{ donatur.no_hp or '' }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Alamat
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="alamat" class="form-control"
+             value="{{ donatur.alamat or '' }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Deskripsi Lokasi
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="lokasi_nama" class="form-control"
+             value="{{ donatur.lokasi_nama or '' }}"
+             placeholder="cth: Toko Budi - Jl. Mawar 5"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Koordinat
+        <span class="text-muted fw-normal">(paste link Google Maps — kosongkan jika tidak berubah)</span></label>
+      <input type="text" name="gmaps_url" class="form-control mb-2"
+             placeholder="https://maps.google.com/?q=..."
+             style="border-radius:10px;border-color:var(--border);font-size:.85rem">
+      <div class="d-flex gap-2">
+        <input type="number" name="lat" class="form-control form-control-sm"
+               placeholder="Latitude" step="any" value="{{ donatur.lat or '' }}"
+               style="border-radius:8px;font-size:.85rem">
+        <input type="number" name="lng" class="form-control form-control-sm"
+               placeholder="Longitude" step="any" value="{{ donatur.lng or '' }}"
+               style="border-radius:8px;font-size:.85rem">
+      </div>
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" name="aktif_infaq" value="1"
+               id="chkAktif" {% if donatur.aktif_infaq %}checked{% endif %}>
+        <label class="form-check-label small" for="chkAktif">Aktif dikoleksi</label>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="button" onclick="document.getElementById('formEdit').style.display='none'"
+              style="flex:1;padding:.65rem;border-radius:10px;border:1.5px solid var(--border);
+                     background:var(--surface);color:var(--text-muted);font-weight:600;font-size:.88rem;cursor:pointer">
+        Batal
+      </button>
+      <button type="submit"
+              style="flex:2;padding:.65rem;border-radius:10px;border:none;
+                     background:#1e8449;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer">
+        <i class="bi bi-check2"></i> Simpan Perubahan
+      </button>
+    </div>
+  </form>
+</div>
+
 <div class="fw-semibold mb-2 text-secondary small text-uppercase">Riwayat Fundraising</div>
 
 {% for r in riwayat %}
@@ -46,8 +159,14 @@
       <div class="small text-muted">{{ r.marketing_nama or '—' }} · {{ r.tanggal_koleksi or '—' }}</div>
     </div>
     <div class="text-end">
+      {% if r.status == 'terkumpul' %}
       <div class="fw-bold text-success">{{ r.jumlah | rupiah }}</div>
       <span class="badge bg-success" style="font-size:.65rem">Terkumpul</span>
+      {% elif r.status == 'tidak_ada' %}
+      <span class="badge bg-warning text-dark" style="font-size:.65rem">Tidak Ada</span>
+      {% else %}
+      <span class="badge bg-secondary" style="font-size:.65rem">Terjadwal</span>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -58,7 +177,7 @@
 </div>
 {% endfor %}
 
-<a href="/marketing/koleksi" class="btn btn-outline-secondary w-100 mt-3">
+<a href="/marketing/donatur" class="btn btn-outline-secondary w-100 mt-3">
   <i class="bi bi-arrow-left"></i> Kembali
 </a>
 {% endblock %}

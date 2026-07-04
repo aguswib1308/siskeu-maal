@@ -2,10 +2,10 @@
 {% block title %}Riwayat{% endblock %}
 
 {% set dana_warna = {
-  'zakat':        '#27ae60',
-  'infak_sedekah':'#2980b9',
-  'amil':         '#8e44ad',
-  'wakaf':        '#e67e22',
+  'zakat':        '#166534',
+  'infak_sedekah':'#1B3B5A',
+  'amil':         '#6b21a8',
+  'wakaf':        '#9a3412',
 } %}
 
 {% block content %}
@@ -13,24 +13,20 @@
 {# ── Filter bulan ──────────────────────────────────────── #}
 <form class="mb-3 d-flex gap-2 align-items-center">
   <input type="month" name="bulan" value="{{ bulan }}"
-         style="flex:1;border-radius:10px;border-color:#d0dde8;font-size:.9rem;
-                padding:.5rem .75rem"
+         style="flex:1;border-radius:10px;font-size:.9rem;padding:.5rem .75rem"
          class="form-control">
   <button style="padding:.5rem 1.1rem;border-radius:10px;border:none;
-                 background:#1a5276;color:#fff;font-weight:600;font-size:.88rem">
+                 background:var(--primary-mid);color:#fff;font-weight:600;font-size:.88rem">
     Cari
   </button>
 </form>
 
 {# ── Ringkasan ─────────────────────────────────────────── #}
 {% if transaksi %}
-<div class="card mb-3 p-3"
-     style="background:linear-gradient(135deg,#1a5276,#2e86c1);color:#fff">
-  <div style="font-size:.72rem;opacity:.8;margin-bottom:.3rem">
-    Ringkasan · {{ bulan }}
-  </div>
-  <div style="font-size:1.5rem;font-weight:800">{{ total|rupiah }}</div>
-  <div style="font-size:.75rem;opacity:.8">Total penerimaan bulan ini</div>
+<div class="hero-stat-card mb-3">
+  <div class="hero-stat-label">Ringkasan · {{ bulan }}</div>
+  <div class="hero-stat-amount" style="font-size:1.5rem">{{ total|rupiah }}</div>
+  <div class="hero-stat-sub">Total penerimaan bulan ini</div>
 </div>
 {% endif %}
 
@@ -47,13 +43,12 @@
 <div class="card mb-2" style="overflow:hidden">
   <div class="d-flex align-items-stretch">
     <div style="width:4px;flex-shrink:0;background:
-      {% if t.jenis=='masuk' %}#27ae60{% else %}#e74c3c{% endif %}"></div>
+      {% if t.jenis=='masuk' %}#22c55e{% else %}#ef4444{% endif %}"></div>
     <div class="px-3 py-2 flex-grow-1 d-flex justify-content-between align-items-center gap-2">
       <div style="min-width:0;flex:1">
         <div class="d-flex gap-1 mb-1 flex-wrap">
-          <span style="background:{% if t.jenis=='masuk' %}#d5f5e3;color:#1e8449
-                       {% else %}#fadbd8;color:#922b21{% endif %};
-                       border-radius:6px;padding:1px 7px;font-size:.66rem;font-weight:600">
+          <span class="badge-{{ t.jenis }}"
+                style="border-radius:6px;padding:1px 7px;font-size:.66rem;font-weight:600">
             {{ 'Masuk' if t.jenis=='masuk' else 'Keluar' }}
           </span>
           {% if t.jenis_dana %}
@@ -81,7 +76,7 @@
         </div>
         {% if t.jenis=='masuk' %}
         <a href="/slip/{{ t.id }}" class="d-inline-block mt-1"
-           style="font-size:.7rem;color:#1a5276;text-decoration:none">
+           style="font-size:.7rem;color:var(--primary-mid);text-decoration:none">
           <i class="bi bi-printer"></i> Cetak
         </a>
         {% endif %}

@@ -1,12 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
 import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod
+import uuid as uuid_mod
 from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'BmtMaal@2026!'
+app.secret_key = os.environ.get('SECRET_KEY') or 'BmtMaal@2026!'
 DB_PATH = os.path.join('data', 'keuangan.db')
 
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
@@ -16,10 +17,49 @@ VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'amalmuslim.bmt@gmail.co
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=15000")
     return conn
+
+def parse_jumlah(raw):
+    """Parse input jumlah ('1.500.000' / '1500000' / 1500000). None jika tidak valid atau <= 0."""
+    try:
+        val = float(str(raw).replace('.', '').replace(',', '').strip())
+    except (TypeError, ValueError):
+        return None
+    return val if val > 0 else None
+
+def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
+                     jumlah, keterangan, user_id, client_uuid=None):
+    """Insert transaksi dengan guard idempotensi client_uuid (anti double-submit).
+    Return (trx_id, duplikat)."""
+    if client_uuid:
+        existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
+                                (client_uuid,)).fetchone()
+        if existing:
+            return existing['id'], True
+    jenis_dana = None
+    if coa_id:
+        row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
+        if row: jenis_dana = row['jenis_dana']
+    try:
+        cur = conn.execute('''INSERT INTO transaksi
+            (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id,client_uuid)
+            VALUES (?,?,?,?,?,?,?,?,?,?)''',
+            (tanggal, jenis, jenis_dana, coa_id, donatur_id or None, penerima_id or None,
+             jumlah, keterangan, user_id, client_uuid or None))
+    except sqlite3.IntegrityError:
+        if client_uuid:
+            existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
+                                    (client_uuid,)).fetchone()
+            if existing:
+                return existing['id'], True
+        raise
+    return cur.lastrowid, False
+
+app.jinja_env.globals['new_form_uuid'] = lambda: uuid_mod.uuid4().hex
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -264,20 +304,23 @@ def admin_transaksi():
 @admin_required
 def tambah_transaksi():
     data = request.form
+    if data.get('jenis') not in ('masuk', 'keluar'):
+        flash('Pilih Sub Akun terlebih dahulu (jenis transaksi belum terisi).', 'danger')
+        return redirect(url_for('admin_transaksi'))
+    jumlah = parse_jumlah(data.get('jumlah'))
+    if jumlah is None:
+        flash('Jumlah tidak valid — harus angka lebih dari 0.', 'danger')
+        return redirect(url_for('admin_transaksi'))
     conn = get_db()
-    coa_id = data.get('coa_id') or None
-    jenis_dana = None
-    if coa_id:
-        row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
-        if row: jenis_dana = row['jenis_dana']
-    conn.execute('''INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
-        VALUES (?,?,?,?,?,?,?,?,?)''',
-        (data['tanggal'], data['jenis'], jenis_dana, coa_id,
-         data.get('donatur_id') or None, data.get('penerima_id') or None,
-         float(data['jumlah'].replace('.','').replace(',','')),
-         data.get('keterangan',''), session['user_id']))
+    trx_id, dup = insert_transaksi(conn, data['tanggal'], data['jenis'],
+        data.get('coa_id') or None, data.get('donatur_id') or None,
+        data.get('penerima_id') or None, jumlah,
+        data.get('keterangan',''), session['user_id'], data.get('client_uuid'))
     conn.commit(); conn.close()
-    flash('Transaksi berhasil dicatat.', 'success')
+    if dup:
+        flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
+    else:
+        flash('Transaksi berhasil dicatat.', 'success')
     return redirect(url_for('admin_transaksi'))
 
 @app.route('/admin/transaksi/hapus/<int:id>', methods=['POST'])
@@ -667,9 +710,9 @@ def master_donatur_tambah():
     gmaps = data.get('gmaps_url','').strip()
     if gmaps:
         lat, lng = parse_gmaps_url(gmaps)
-    if not lat and data.get('lat'):
+    if lat is None and data.get('lat'):
         try: lat = float(data['lat']); lng = float(data['lng'])
-        except: pass
+        except (TypeError, ValueError): lat = lng = None
     conn = get_db()
     program_id = int(data['program_id']) if data.get('program_id') else None
     sumber = data.get('sumber_infaq', 'tunai')
@@ -693,9 +736,9 @@ def master_donatur_edit(id):
     gmaps = data.get('gmaps_url','').strip()
     if gmaps:
         lat, lng = parse_gmaps_url(gmaps)
-    if not lat and data.get('lat'):
+    if lat is None and data.get('lat'):
         try: lat = float(data['lat']); lng = float(data['lng'])
-        except: pass
+        except (TypeError, ValueError): lat = lng = None
     conn = get_db()
     existing = conn.execute("SELECT lat,lng FROM donatur WHERE id=?", (id,)).fetchone()
     if lat is None and existing:
@@ -1102,18 +1145,37 @@ def admin_jurnal():
 @admin_required
 def admin_jurnal_tambah():
     data = request.form
-    conn = get_db()
-    debit_coa_id = int(data['debit_coa_id'])
-    kredit_coa_id = int(data['kredit_coa_id'])
-    jumlah = float(data['jumlah'].replace('.','').replace(',',''))
+    try:
+        debit_coa_id = int(data['debit_coa_id'])
+        kredit_coa_id = int(data['kredit_coa_id'])
+    except (KeyError, ValueError):
+        flash('Akun debit/kredit belum dipilih.', 'danger')
+        return redirect(url_for('admin_jurnal'))
+    if debit_coa_id == kredit_coa_id:
+        flash('Akun debit dan kredit tidak boleh sama.', 'danger')
+        return redirect(url_for('admin_jurnal'))
+    jumlah = parse_jumlah(data.get('jumlah'))
+    if jumlah is None:
+        flash('Jumlah tidak valid — harus angka lebih dari 0.', 'danger')
+        return redirect(url_for('admin_jurnal'))
     tanggal = data['tanggal']
     keterangan = data.get('keterangan', '')
     no_bukti = data.get('no_bukti', '').strip()
+    client_uuid = data.get('client_uuid') or None
+
+    conn = get_db()
+    if client_uuid:
+        existing = conn.execute("SELECT id FROM jurnal WHERE client_uuid=?", (client_uuid,)).fetchone()
+        if existing:
+            conn.close()
+            flash('Jurnal ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
+            return redirect(url_for('admin_jurnal'))
 
     cur = conn.execute("""INSERT INTO jurnal
-        (tanggal, no_bukti, keterangan, debit_coa_id, kredit_coa_id, jumlah, user_id)
-        VALUES (?,?,?,?,?,?,?)""",
-        (tanggal, no_bukti, keterangan, debit_coa_id, kredit_coa_id, jumlah, session['user_id']))
+        (tanggal, no_bukti, keterangan, debit_coa_id, kredit_coa_id, jumlah, user_id, client_uuid)
+        VALUES (?,?,?,?,?,?,?,?)""",
+        (tanggal, no_bukti, keterangan, debit_coa_id, kredit_coa_id, jumlah,
+         session['user_id'], client_uuid))
     jurnal_id = cur.lastrowid
 
     debit_coa = conn.execute("SELECT jenis_dana, jenis_transaksi FROM chart_of_accounts WHERE id=?",
@@ -1248,7 +1310,8 @@ def admin_backup_restore(filename):
 @app.route('/api/backup/auto', methods=['POST'])
 def api_backup_auto():
     key = request.headers.get('X-Backup-Key', '')
-    if key != app.secret_key:
+    expected = os.environ.get('BACKUP_KEY') or app.secret_key
+    if not key or key != expected:
         return jsonify(ok=False, msg='Unauthorized'), 401
     fname = create_backup('auto')
     cleanup = 0
@@ -1257,6 +1320,59 @@ def api_backup_auto():
         os.remove(backups.pop(0))
         cleanup += 1
     return jsonify(ok=True, filename=fname, cleaned=cleanup)
+
+# ── API read-only utk Agent Laporan Harian Pengelola ─────────────────────────
+@app.route('/api/laporan-harian')
+def api_laporan_harian():
+    """Dipakai agent laporan harian (server-to-server). READ-ONLY.
+    Auth: header X-Api-Key == env LAPORAN_API_KEY (fallback app.secret_key).
+    Param: tanggal=YYYY-MM-DD (default hari ini).
+    """
+    key = request.headers.get('X-Api-Key', '')
+    expected = os.environ.get('LAPORAN_API_KEY', '') or app.secret_key
+    if not key or key != expected:
+        return jsonify(error='unauthorized'), 401
+
+    tgl = request.args.get('tanggal') or date.today().isoformat()
+    conn = get_db()
+    try:
+        # Setoran ZIS/wakaf per marketing = koleksi yang terkumpul pada tanggal tsb
+        rows = conn.execute('''
+            SELECT u.nama,
+                   COALESCE(SUM(k.jumlah),0) AS setoran,
+                   COUNT(k.id) AS n_koleksi
+            FROM users u
+            LEFT JOIN koleksi_bulanan k
+              ON k.marketing_id = u.id
+             AND substr(COALESCE(k.tanggal_koleksi,''),1,10) = ?
+             AND k.status = 'terkumpul'
+            WHERE u.role='marketing' AND u.aktif=1
+            GROUP BY u.id, u.nama
+            ORDER BY setoran DESC
+        ''', (tgl,)).fetchall()
+
+        donatur_baru = conn.execute(
+            "SELECT COUNT(*) c FROM donatur WHERE substr(COALESCE(created_at,''),1,10)=?",
+            (tgl,)).fetchone()['c']
+
+        total_setoran = conn.execute('''
+            SELECT COALESCE(SUM(jumlah),0) s FROM koleksi_bulanan
+            WHERE substr(COALESCE(tanggal_koleksi,''),1,10)=? AND status='terkumpul'
+        ''', (tgl,)).fetchone()['s']
+    finally:
+        conn.close()
+
+    petugas = [{'nama': r['nama'], 'setoran': r['setoran'],
+                'n_koleksi': r['n_koleksi'], 'donatur_baru': None} for r in rows]
+    return jsonify({
+        'tanggal': tgl,
+        'petugas': petugas,
+        'total_setoran': total_setoran,
+        'donatur_baru_lembaga': donatur_baru,
+        # Belum terlacak di DB maal (perlu pencatatan terpisah / input manual):
+        'tidak_tersedia': ['layanan_ambulan', 'penawaran_donasi',
+                           'donatur_baru_per_petugas'],
+    })
 
 # ── Database Export / Import (Excel) ─────────────────────────────────────────
 
@@ -1678,7 +1794,11 @@ def marketing_koleksi_catat(id):
     today = date.today().isoformat()
 
     if aksi == 'terkumpul':
-        jumlah = float((request.form.get('jumlah', '0') or '0').replace('.','').replace(',',''))
+        try:
+            jumlah = float((request.form.get('jumlah', '0') or '0').replace('.','').replace(',',''))
+        except ValueError:
+            conn.close(); flash('Jumlah tidak valid.', 'danger')
+            return redirect(url_for('marketing_koleksi_form', id=id))
         kol = conn.execute("SELECT * FROM koleksi_bulanan WHERE id=?", (id,)).fetchone()
         if not kol:
             conn.close(); flash('Data tidak ditemukan.', 'danger')
@@ -1693,12 +1813,12 @@ def marketing_koleksi_catat(id):
         ).rowcount
 
         if rows == 0:
-            conn.close()
             # Cek siapa yang sudah koleksi duluan
             other = conn.execute(
                 "SELECT u.nama, kb.tanggal_koleksi FROM koleksi_bulanan kb "
                 "JOIN users u ON kb.marketing_id=u.id WHERE kb.id=?", (id,)
             ).fetchone()
+            conn.close()
             msg = f"Sudah dikoleksi oleh {other['nama']} pada {other['tanggal_koleksi']}." if other else "Sudah dikoleksi."
             flash(msg, 'warning')
             return redirect(url_for('marketing_koleksi'))
@@ -1739,8 +1859,10 @@ def marketing_donatur_detail(id):
         FROM koleksi_bulanan kb LEFT JOIN users u ON kb.marketing_id=u.id
         WHERE kb.donatur_id=? ORDER BY kb.bulan DESC
     ''', (id,)).fetchall()
+    areas = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
     conn.close()
-    return render_template('marketing/donatur_detail.html', donatur=donatur, riwayat=riwayat)
+    return render_template('marketing/donatur_detail.html', donatur=donatur,
+                           riwayat=riwayat, areas=areas)
 
 # ── Marketing Peta ────────────────────────────────────────────────────────────
 
@@ -1794,22 +1916,61 @@ def marketing_donatur_tambah():
     gmaps = data.get('gmaps_url', '').strip()
     if gmaps:
         lat, lng = parse_gmaps_url(gmaps)
-    if not lat and data.get('lat'):
+    if lat is None and data.get('lat'):
         try: lat = float(data['lat']); lng = float(data['lng'])
-        except: pass
+        except (TypeError, ValueError): lat = lng = None
     conn = get_db()
     sumber = data.get('sumber_infaq', 'tunai')
+    nama = (data.get('nama') or '').strip()
+    if not nama:
+        conn.close(); flash('Nama donatur wajib diisi.', 'danger')
+        return redirect(url_for('marketing_donatur_list'))
     cur = conn.execute("""INSERT INTO donatur
-        (nama,no_hp,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq)
-        VALUES (?,?,?,?,?,?,?,?)""",
-        (data['nama'], data.get('no_hp', ''),
+        (nama,no_hp,alamat,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq)
+        VALUES (?,?,?,?,?,?,?,?,?)""",
+        (nama, data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
          sumber,
-         data.get('area', ''), data.get('lokasi_nama', ''),
+         data.get('area', '').strip(), data.get('lokasi_nama', '').strip(),
          lat, lng, 1 if data.get('aktif_infaq') else 0))
     auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
-    flash(f'Donatur "{data["nama"]}" berhasil ditambahkan.', 'success')
+    flash(f'Donatur "{nama}" berhasil ditambahkan.', 'success')
     return redirect(url_for('marketing_donatur_list'))
+
+@app.route('/marketing/donatur/edit/<int:id>', methods=['POST'])
+@login_required
+def marketing_donatur_edit(id):
+    data = request.form
+    conn = get_db()
+    existing = conn.execute("SELECT * FROM donatur WHERE id=?", (id,)).fetchone()
+    if not existing:
+        conn.close(); flash('Donatur tidak ditemukan.', 'danger')
+        return redirect(url_for('marketing_donatur_list'))
+    nama = (data.get('nama') or '').strip()
+    if not nama:
+        conn.close(); flash('Nama donatur wajib diisi.', 'danger')
+        return redirect(url_for('marketing_donatur_detail', id=id))
+    lat = lng = None
+    gmaps = data.get('gmaps_url', '').strip()
+    if gmaps:
+        lat, lng = parse_gmaps_url(gmaps)
+    if lat is None and data.get('lat'):
+        try: lat = float(data['lat']); lng = float(data['lng'])
+        except (TypeError, ValueError): lat = lng = None
+    if lat is None:
+        lat, lng = existing['lat'], existing['lng']
+    sumber = data.get('sumber_infaq') or existing['sumber_infaq']
+    conn.execute("""UPDATE donatur SET
+        nama=?, no_hp=?, alamat=?, sumber_infaq=?, area=?, lokasi_nama=?,
+        lat=?, lng=?, aktif_infaq=?
+        WHERE id=?""",
+        (nama, data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
+         sumber, data.get('area', '').strip(), data.get('lokasi_nama', '').strip(),
+         lat, lng, 1 if data.get('aktif_infaq') else 0, id))
+    auto_koleksi_donatur_baru(conn, id, sumber)
+    conn.commit(); conn.close()
+    flash('Data donatur berhasil diperbarui.', 'success')
+    return redirect(url_for('marketing_donatur_detail', id=id))
 
 # ── Marketing Transaksi Tunai ─────────────────────────────────────────────────
 
@@ -1819,21 +1980,22 @@ def marketing_catat():
     conn = get_db()
     if request.method == 'POST':
         data = request.form
-        coa_id = data.get('coa_id') or None
-        jenis_dana = None
-        if coa_id:
-            row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
-            if row: jenis_dana = row['jenis_dana']
-        cur = conn.execute('''INSERT INTO transaksi
-            (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
-            VALUES (?,?,?,?,?,?,?,?,?)''',
-            (data['tanggal'], data['jenis'], jenis_dana, coa_id,
-             data.get('donatur_id') or None, data.get('penerima_id') or None,
-             float(data['jumlah'].replace('.','').replace(',','')),
-             data.get('keterangan',''), session['user_id']))
-        trx_id = cur.lastrowid
+        if data.get('jenis') not in ('masuk', 'keluar'):
+            conn.close(); flash('Jenis transaksi tidak valid.', 'danger')
+            return redirect(url_for('marketing_catat'))
+        jumlah = parse_jumlah(data.get('jumlah'))
+        if jumlah is None:
+            conn.close(); flash('Jumlah tidak valid — harus angka lebih dari 0.', 'danger')
+            return redirect(url_for('marketing_catat'))
+        trx_id, dup = insert_transaksi(conn, data['tanggal'], data['jenis'],
+            data.get('coa_id') or None, data.get('donatur_id') or None,
+            data.get('penerima_id') or None, jumlah,
+            data.get('keterangan',''), session['user_id'], data.get('client_uuid'))
         conn.commit(); conn.close()
-        flash('Transaksi berhasil dicatat!', 'success')
+        if dup:
+            flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
+        else:
+            flash('Transaksi berhasil dicatat!', 'success')
         if data['jenis'] == 'masuk':
             return redirect(url_for('slip', transaksi_id=trx_id))
         return redirect(url_for('marketing_dashboard'))
@@ -2038,31 +2200,30 @@ def api_marketing_koleksi_catat(id):
 @api_login_required
 def api_marketing_transaksi():
     data = request.get_json(silent=True) or {}
+    if data.get('jenis') not in ('masuk', 'keluar'):
+        return jsonify({'status': 'error', 'message': 'Jenis transaksi tidak valid.'}), 400
+    jumlah = parse_jumlah(data.get('jumlah'))
+    if jumlah is None:
+        return jsonify({'status': 'error', 'message': 'Jumlah tidak valid — harus angka lebih dari 0.'}), 400
     conn = get_db()
-    coa_id = data.get('coa_id') or None
-    jenis_dana = None
-    if coa_id:
-        row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
-        if row: jenis_dana = row['jenis_dana']
-    jumlah_raw = str(data.get('jumlah', '0'))
-    jumlah = float(jumlah_raw.replace('.','').replace(',',''))
-    cur = conn.execute('''INSERT INTO transaksi
-        (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
-        VALUES (?,?,?,?,?,?,?,?,?)''',
-        (data.get('tanggal', date.today().isoformat()),
-         data['jenis'], jenis_dana, coa_id,
-         data.get('donatur_id') or None, data.get('penerima_id') or None,
-         jumlah, data.get('keterangan',''), session['user_id']))
-    conn.commit()
-    trx_id = cur.lastrowid
-    conn.close()
-    return jsonify({'status': 'ok', 'message': 'Transaksi berhasil dicatat.', 'transaksi_id': trx_id})
+    trx_id, dup = insert_transaksi(conn,
+        data.get('tanggal') or date.today().isoformat(),
+        data['jenis'], data.get('coa_id') or None,
+        data.get('donatur_id') or None, data.get('penerima_id') or None,
+        jumlah, data.get('keterangan',''), session['user_id'],
+        data.get('client_uuid'))
+    conn.commit(); conn.close()
+    msg = ('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.'
+           if dup else 'Transaksi berhasil dicatat.')
+    return jsonify({'status': 'ok', 'message': msg, 'transaksi_id': trx_id, 'duplicate': dup})
 
 @app.route('/api/marketing/sync', methods=['POST'])
 @api_login_required
 def api_marketing_sync():
     items = (request.get_json(silent=True) or {}).get('items', [])
     results = []
+    # Simpan identitas user SEBELUM masuk test_request_context (context baru = session kosong)
+    cur_user = {'user_id': session.get('user_id'), 'role': session.get('role'), 'nama': session.get('nama')}
     for item in items:
         try:
             item_type = item.get('type')
@@ -2072,7 +2233,7 @@ def api_marketing_sync():
                     f"/api/marketing/koleksi/{item['koleksi_id']}/catat",
                     method='POST', json=body
                 ):
-                    session.update({'user_id': session.get('user_id'), 'role': session.get('role'), 'nama': session.get('nama')})
+                    session.update(cur_user)
                     resp = api_marketing_koleksi_catat(item['koleksi_id'])
                     if isinstance(resp, tuple):
                         results.append({'id': item.get('id'), 'status': 'ok' if resp[1] < 400 else 'error',
@@ -2080,23 +2241,21 @@ def api_marketing_sync():
                     else:
                         results.append({'id': item.get('id'), 'status': 'ok', 'response': resp.get_json()})
             elif item_type == 'transaksi':
+                jumlah = parse_jumlah(body.get('jumlah'))
+                if body.get('jenis') not in ('masuk', 'keluar') or jumlah is None:
+                    results.append({'id': item.get('id'), 'status': 'error',
+                                    'message': 'Data transaksi tidak valid.'})
+                    continue
                 conn = get_db()
-                coa_id = body.get('coa_id') or None
-                jenis_dana = None
-                if coa_id:
-                    row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
-                    if row: jenis_dana = row['jenis_dana']
-                jumlah_raw = str(body.get('jumlah', '0'))
-                jumlah = float(jumlah_raw.replace('.','').replace(',',''))
-                cur = conn.execute('''INSERT INTO transaksi
-                    (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id)
-                    VALUES (?,?,?,?,?,?,?,?,?)''',
-                    (body.get('tanggal', date.today().isoformat()),
-                     body['jenis'], jenis_dana, coa_id,
-                     body.get('donatur_id') or None, body.get('penerima_id') or None,
-                     jumlah, body.get('keterangan',''), session['user_id']))
+                trx_id, dup = insert_transaksi(conn,
+                    body.get('tanggal') or date.today().isoformat(),
+                    body['jenis'], body.get('coa_id') or None,
+                    body.get('donatur_id') or None, body.get('penerima_id') or None,
+                    jumlah, body.get('keterangan',''), session['user_id'],
+                    body.get('client_uuid'))
                 conn.commit(); conn.close()
-                results.append({'id': item.get('id'), 'status': 'ok', 'transaksi_id': cur.lastrowid})
+                results.append({'id': item.get('id'), 'status': 'ok',
+                                'transaksi_id': trx_id, 'duplicate': dup})
             else:
                 results.append({'id': item.get('id'), 'status': 'error', 'message': 'Unknown type'})
         except Exception as ex:
@@ -2276,9 +2435,65 @@ def admin_target():
     marketing_users = conn.execute(
         "SELECT id, nama FROM users WHERE role='marketing' AND aktif=1 ORDER BY nama"
     ).fetchall()
+
+    # ── Capaian real-time per marketing (rumus sama dgn /api/marketing/target) ──
+    # Target personal menang atas target global (user_id NULL) — sama seperti
+    # ORDER BY user_id DESC di api_marketing_target.
+    tmap = {(t['user_id'], t['jenis']): t for t in targets}
+    masuk_map = {r['user_id']: r for r in conn.execute("""
+        SELECT user_id, COALESCE(SUM(jumlah),0) AS nominal, COUNT(*) AS n
+        FROM transaksi WHERE jenis='masuk' AND strftime('%Y-%m',tanggal)=?
+        GROUP BY user_id""", (bulan,)).fetchall()}
+    keluar_map = {r['user_id']: r for r in conn.execute("""
+        SELECT user_id, COALESCE(SUM(jumlah),0) AS nominal,
+               COUNT(DISTINCT tanggal || coa_id) AS kegiatan
+        FROM transaksi WHERE jenis='keluar' AND strftime('%Y-%m',tanggal)=?
+        GROUP BY user_id""", (bulan,)).fetchall()}
+    koleksi_map = {r['marketing_id']: r for r in conn.execute("""
+        SELECT marketing_id, COUNT(*) AS n, COALESCE(SUM(jumlah),0) AS nominal
+        FROM koleksi_bulanan WHERE bulan=? AND status='terkumpul'
+        GROUP BY marketing_id""", (bulan,)).fetchall()}
     conn.close()
+
+    def _persen(real, tgt):
+        return round(real / tgt * 100, 1) if tgt else None
+
+    capaian = []
+    for u in marketing_users:
+        tf = tmap.get((u['id'], 'fundraising'))   or tmap.get((None, 'fundraising'))
+        tp = tmap.get((u['id'], 'pentasharufan')) or tmap.get((None, 'pentasharufan'))
+        m, k, kol = masuk_map.get(u['id']), keluar_map.get(u['id']), koleksi_map.get(u['id'])
+        row = {
+            'nama': u['nama'],
+            'fund_real':   m['nominal'] if m else 0,
+            'fund_n':      m['n'] if m else 0,
+            'fund_target': (tf['target_nominal'] if tf else 0) or 0,
+            'pent_real':     k['nominal'] if k else 0,
+            'pent_kegiatan': k['kegiatan'] if k else 0,
+            'pent_target':          (tp['target_nominal'] if tp else 0) or 0,
+            'pent_target_kegiatan': (tp['target_kegiatan'] if tp else 0) or 0,
+            'koleksi_n':       kol['n'] if kol else 0,
+            'koleksi_nominal': kol['nominal'] if kol else 0,
+        }
+        row['fund_persen']          = _persen(row['fund_real'], row['fund_target'])
+        row['pent_persen']          = _persen(row['pent_real'], row['pent_target'])
+        row['pent_persen_kegiatan'] = _persen(row['pent_kegiatan'], row['pent_target_kegiatan'])
+        capaian.append(row)
+    capaian.sort(key=lambda r: r['fund_real'], reverse=True)
+
+    total = {
+        'fund_real':     sum(r['fund_real'] for r in capaian),
+        'fund_n':        sum(r['fund_n'] for r in capaian),
+        'fund_target':   sum(r['fund_target'] for r in capaian),
+        'pent_real':     sum(r['pent_real'] for r in capaian),
+        'pent_kegiatan': sum(r['pent_kegiatan'] for r in capaian),
+        'koleksi_n':     sum(r['koleksi_n'] for r in capaian),
+    }
+    total['fund_persen'] = _persen(total['fund_real'], total['fund_target'])
+
     return render_template('admin/target.html',
-        targets=targets, marketing_users=marketing_users, bulan=bulan)
+        targets=targets, marketing_users=marketing_users, bulan=bulan,
+        capaian=capaian, total=total)
 
 @app.route('/admin/target/delete/<int:id>', methods=['POST'])
 @admin_required

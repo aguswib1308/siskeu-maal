@@ -185,7 +185,17 @@
   }
 
   // ── Flush sync queue (online-first) ───────────────────
+  var flushInFlight = null;
+
   function flushSyncQueue() {
+    // Cegah flush ganda paralel (event 'online' + 'load' + pesan SW bisa
+    // datang bersamaan → item yang sama terkirim dua kali)
+    if (flushInFlight) return flushInFlight;
+    flushInFlight = doFlushSyncQueue().finally(function() { flushInFlight = null; });
+    return flushInFlight;
+  }
+
+  function doFlushSyncQueue() {
     return getSyncQueue().then(function(items) {
       if (items.length === 0) return Promise.resolve({ synced: 0, errors: [] });
 

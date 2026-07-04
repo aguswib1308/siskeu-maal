@@ -1,22 +1,17 @@
 {% extends 'marketing/base.html' %}
 {% block title %}Beranda{% endblock %}
 
-{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2e86c1','amil':'#8e44ad','wakaf':'#e67e22'} %}
+{% set dana_warna = {'zakat':'#166534','infak_sedekah':'#1B3B5A','amil':'#6b21a8','wakaf':'#9a3412'} %}
 
 {% block content %}
 
 {# ── Hero card ─────────────────────────────────────────── #}
-<div class="mb-3" style="
-  background: linear-gradient(135deg,#1a5276,#2e86c1);
-  border-radius:18px; color:#fff; padding:1.25rem 1.25rem 1rem;
-  box-shadow:0 4px 16px rgba(26,82,118,.3)">
-  <div style="font-size:.75rem;opacity:.8;margin-bottom:.2rem">
+<div class="mb-3 hero-stat-card">
+  <div class="hero-stat-label">
     <i class="bi bi-calendar3"></i> {{ hari_ini }}
   </div>
-  <div style="font-size:.8rem;opacity:.75;margin-bottom:.15rem">Total Fundraising Bulan Ini</div>
-  <div style="font-size:1.9rem;font-weight:800;letter-spacing:-.02em">
-    {{ total_masuk_bulan|rupiah }}
-  </div>
+  <div class="hero-stat-sub">Total fundraising bulan ini</div>
+  <div class="hero-stat-amount">{{ total_masuk_bulan|rupiah }}</div>
 </div>
 
 {# ── Target Bulanan ────────────────────────────────────── #}
@@ -32,17 +27,17 @@
       if (t.fundraising) {
         var f = t.fundraising;
         var pct = Math.min(f.persen, 100);
-        var clr = pct >= 80 ? '#27ae60' : pct >= 50 ? '#f39c12' : '#e74c3c';
+        var clr = pct >= 80 ? '#166534' : pct >= 50 ? '#92400e' : '#991b1b';
         html += '<div class="card mb-2 p-3">' +
           '<div class="d-flex justify-content-between align-items-center mb-1">' +
-          '<div style="font-size:.78rem;font-weight:700;color:#1a5276">' +
+          '<div style="font-size:.78rem;font-weight:700;color:var(--primary-mid)">' +
           '<i class="bi bi-arrow-down-circle"></i> Fundraising</div>' +
-          (pct >= 100 ? '<span class="badge" style="background:#27ae60;color:#fff;font-size:.65rem">TARGET TERCAPAI</span>' : '') +
+          (pct >= 100 ? '<span class="badge" style="background:#166534;color:#fff;font-size:.65rem">Target tercapai</span>' : '') +
           '</div>' +
           '<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">' +
           'Rp ' + Number(f.realisasi_nominal).toLocaleString('id') + ' / Rp ' + Number(f.target_nominal).toLocaleString('id') +
           ' (' + f.persen + '%)</div>' +
-          '<div style="background:#e9eef4;border-radius:6px;height:8px;overflow:hidden">' +
+          '<div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden">' +
           '<div style="width:' + pct + '%;height:100%;background:' + clr + ';border-radius:6px;transition:width .5s"></div>' +
           '</div></div>';
       }
@@ -50,26 +45,26 @@
       if (t.pentasharufan) {
         var p = t.pentasharufan;
         var pctK = Math.min(p.persen_kegiatan, 100);
-        var clrK = pctK >= 80 ? '#27ae60' : pctK >= 50 ? '#f39c12' : '#e74c3c';
+        var clrK = pctK >= 80 ? '#166534' : pctK >= 50 ? '#92400e' : '#991b1b';
         html += '<div class="card mb-2 p-3">' +
           '<div class="d-flex justify-content-between align-items-center mb-1">' +
-          '<div style="font-size:.78rem;font-weight:700;color:#8e44ad">' +
+          '<div style="font-size:.78rem;font-weight:700;color:#6b21a8">' +
           '<i class="bi bi-arrow-up-circle"></i> Pentasharufan</div>' +
           (pctK >= 100 ? '<span class="badge" style="background:#27ae60;color:#fff;font-size:.65rem">TARGET TERCAPAI</span>' : '') +
           '</div>' +
           '<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">' +
           p.realisasi_kegiatan + ' / ' + p.target_kegiatan + ' kegiatan (' + p.persen_kegiatan + '%)' +
           '</div>' +
-          '<div style="background:#e9eef4;border-radius:6px;height:8px;overflow:hidden">' +
+          '<div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden">' +
           '<div style="width:' + pctK + '%;height:100%;background:' + clrK + ';border-radius:6px;transition:width .5s"></div>' +
           '</div>';
         if (p.target_nominal > 0) {
           var pctN = Math.min(p.persen_nominal, 100);
-          var clrN = pctN >= 80 ? '#27ae60' : pctN >= 50 ? '#f39c12' : '#e74c3c';
+          var clrN = pctN >= 80 ? '#166534' : pctN >= 50 ? '#92400e' : '#991b1b';
           html += '<div style="font-size:.72rem;color:#64748b;margin:6px 0 4px">' +
             'Rp ' + Number(p.realisasi_nominal).toLocaleString('id') + ' / Rp ' + Number(p.target_nominal).toLocaleString('id') +
             ' (' + p.persen_nominal + '%)</div>' +
-            '<div style="background:#e9eef4;border-radius:6px;height:8px;overflow:hidden">' +
+            '<div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden">' +
             '<div style="width:' + pctN + '%;height:100%;background:' + clrN + ';border-radius:6px;transition:width .5s"></div>' +
             '</div>';
         }
@@ -88,25 +83,17 @@
 
 {# ── Quick actions ─────────────────────────────────────── #}
 <div class="d-flex gap-2 mb-4">
-  <a href="/marketing/catat"
-     style="flex:1;background:#1e8449;color:#fff;border-radius:12px;
-            padding:.75rem;text-align:center;text-decoration:none;font-weight:600">
+  <a href="/marketing/catat" class="quick-action primary">
     <i class="bi bi-plus-circle d-block fs-4 mb-1"></i>
-    <span style="font-size:.8rem">Catat</span>
+    <span>Catat</span>
   </a>
-  <a href="/marketing/koleksi"
-     style="flex:1;background:#fff;color:#1a5276;border:1.5px solid #d0dde8;
-            border-radius:12px;padding:.75rem;text-align:center;
-            text-decoration:none;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+  <a href="/marketing/koleksi" class="quick-action secondary">
     <i class="bi bi-basket d-block fs-4 mb-1"></i>
-    <span style="font-size:.8rem">Fundraising</span>
+    <span>Fundraising</span>
   </a>
-  <a href="/marketing/peta"
-     style="flex:1;background:#fff;color:#1a5276;border:1.5px solid #d0dde8;
-            border-radius:12px;padding:.75rem;text-align:center;
-            text-decoration:none;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+  <a href="/marketing/peta" class="quick-action secondary">
     <i class="bi bi-map d-block fs-4 mb-1"></i>
-    <span style="font-size:.8rem">Peta</span>
+    <span>Peta</span>
   </a>
 </div>
 

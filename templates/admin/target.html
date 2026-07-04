@@ -1,8 +1,98 @@
 {% extends 'admin/base.html' %}
-{% block title %}Target Bulanan{% endblock %}
-{% block page_title %}Target Bulanan Marketing{% endblock %}
+{% block title %}Target & Capaian{% endblock %}
+{% block page_title %}Target & Capaian Marketing{% endblock %}
 
 {% block content %}
+
+{# ── Capaian real-time per marketing ─────────────────────── #}
+<div class="card p-4 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h6 class="fw-bold mb-0"><i class="bi bi-graph-up-arrow"></i> Capaian Marketing — {{ bulan|bulan_label }}</h6>
+    <form method="GET" class="d-flex gap-2">
+      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm"
+             onchange="this.form.submit()">
+    </form>
+  </div>
+
+  {% if capaian %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-2">
+      <thead class="table-light">
+        <tr>
+          <th>Marketing</th>
+          <th style="min-width:220px">Fundraising (Penerimaan)</th>
+          <th class="text-center">Trx</th>
+          <th class="text-center">Koleksi</th>
+          <th style="min-width:180px">Pentasharufan (Penyaluran)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in capaian %}
+        <tr>
+          <td class="fw-semibold">{{ r.nama }}</td>
+          <td>
+            <div class="d-flex justify-content-between small">
+              <span class="fw-semibold text-success">{{ r.fund_real|rupiah }}</span>
+              <span class="text-muted">
+                {% if r.fund_target %}/ {{ r.fund_target|rupiah }}
+                  <span class="fw-semibold {% if r.fund_persen >= 100 %}text-success{% elif r.fund_persen >= 60 %}text-primary{% else %}text-danger{% endif %}">
+                    ({{ r.fund_persen }}%)</span>
+                {% else %}<span class="fst-italic">tanpa target</span>{% endif %}
+              </span>
+            </div>
+            {% if r.fund_target %}
+            <div class="progress mt-1" style="height:7px">
+              <div class="progress-bar {% if r.fund_persen >= 100 %}bg-success{% elif r.fund_persen >= 60 %}bg-primary{% else %}bg-warning{% endif %}"
+                   style="width:{{ [r.fund_persen, 100]|min }}%"></div>
+            </div>
+            {% endif %}
+          </td>
+          <td class="text-center small">{{ r.fund_n }}</td>
+          <td class="text-center small">
+            {{ r.koleksi_n }}
+            {% if r.koleksi_nominal %}<div class="text-muted" style="font-size:.7rem">{{ r.koleksi_nominal|rupiah }}</div>{% endif %}
+          </td>
+          <td class="small">
+            <span class="fw-semibold">{{ r.pent_real|rupiah }}</span>
+            {% if r.pent_target %}
+              <span class="text-muted">/ {{ r.pent_target|rupiah }} ({{ r.pent_persen }}%)</span>
+            {% endif %}
+            <div class="text-muted" style="font-size:.72rem">
+              {{ r.pent_kegiatan }} kegiatan{% if r.pent_target_kegiatan %} / {{ r.pent_target_kegiatan }} ({{ r.pent_persen_kegiatan }}%){% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>Total</td>
+          <td class="small">
+            <span class="text-success">{{ total.fund_real|rupiah }}</span>
+            {% if total.fund_target %}
+            <span class="text-muted fw-normal">/ {{ total.fund_target|rupiah }} ({{ total.fund_persen }}%)</span>
+            {% endif %}
+          </td>
+          <td class="text-center small">{{ total.fund_n }}</td>
+          <td class="text-center small">{{ total.koleksi_n }}</td>
+          <td class="small">{{ total.pent_real|rupiah }}
+            <span class="text-muted fw-normal">· {{ total.pent_kegiatan }} kegiatan</span></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <div class="text-muted" style="font-size:.75rem">
+    <i class="bi bi-info-circle"></i>
+    Realisasi dihitung langsung dari transaksi yang <b>dicatat oleh petugas ybs</b> bulan ini
+    (termasuk hasil koleksi kencleng/kotak infaq) — angka yang sama dengan yang tampil di
+    dashboard HP marketing. Kolom <b>Koleksi</b> = jumlah kencleng/kotak terkumpul
+    (detail: <a href="/admin/koleksi/capaian?bulan={{ bulan }}">Capaian Koleksi</a>).
+    Transaksi yang diinput admin tidak masuk capaian marketing manapun.
+  </div>
+  {% else %}
+  <div class="text-muted text-center py-4">Belum ada user marketing aktif.</div>
+  {% endif %}
+</div>
 
 <div class="card p-4 mb-4">
   <h6 class="fw-bold mb-3"><i class="bi bi-bullseye"></i> Tambah / Edit Target</h6>
@@ -45,10 +135,7 @@
 
 <div class="card p-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h6 class="fw-bold mb-0"><i class="bi bi-list-check"></i> Daftar Target — {{ bulan }}</h6>
-    <form method="GET" class="d-flex gap-2">
-      <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" onchange="this.form.submit()">
-    </form>
+    <h6 class="fw-bold mb-0"><i class="bi bi-list-check"></i> Daftar Target — {{ bulan|bulan_label }}</h6>
   </div>
 
   {% if targets %}

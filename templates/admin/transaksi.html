@@ -2,7 +2,7 @@
 {% block title %}Transaksi{% endblock %}
 {% block page_title %}<i class="bi bi-arrow-left-right"></i> Transaksi{% endblock %}
 
-{% set dana_warna = {'zakat':'#27ae60','infak_sedekah':'#2980b9','amil':'#8e44ad','wakaf':'#e67e22'} %}
+{% set dana_warna = {'zakat':'#166534','infak_sedekah':'#1B3B5A','amil':'#6b21a8','wakaf':'#9a3412'} %}
 
 {% block content %}
 <div class="row mb-3 align-items-center">
@@ -83,6 +83,7 @@
       </div>
       <div class="modal-body row g-3">
         <input type="hidden" name="jenis" id="hiddenJenis" value="">
+        <input type="hidden" name="client_uuid" id="trxClientUuid" value="{{ new_form_uuid() }}">
         <div class="col-md-6">
           <label class="form-label fw-semibold">Tanggal</label>
           <input type="date" name="tanggal" class="form-control" required value="{{ bulan }}-01">
@@ -109,8 +110,8 @@
             <input type="text" id="donaturInput" class="form-control" placeholder="Ketik nama donatur..."
                    autocomplete="off">
             <div id="donaturDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1060;
-                 background:#fff;border:1px solid #dee2e6;border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;
-                 box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+                 background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;
+                 box-shadow:0 4px 12px rgba(15,37,55,.12)"></div>
           </div>
         </div>
         <div class="col-md-6">
@@ -240,6 +241,10 @@ document.querySelector('#modalTambah form').addEventListener('submit', function(
   this.querySelectorAll('input[name="jumlah"]').forEach(el => {
     el.value = el.value.replace(/\./g, '').replace(/,/g, '');
   });
+  // Anti double-click: kunci tombol simpan setelah submit pertama
+  const btn = this.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan…';
 });
 
 // Reset modal tiap dibuka
@@ -276,16 +281,16 @@ dInput.addEventListener('input', function() {
   if (!matches.length) { dDrop.style.display = 'none'; return; }
   if (dHidden.value) {
     const cl = document.createElement('div');
-    cl.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:.8rem;color:#e74c3c;text-align:center;border-bottom:1px solid #f0f4f8';
+    cl.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:.8rem;color:#ef4444;text-align:center;border-bottom:1px solid var(--border)';
     cl.textContent = '✕ Hapus pilihan';
     cl.onclick = () => { dHidden.value=''; dInput.value=''; dDrop.style.display='none'; };
     dDrop.appendChild(cl);
   }
   matches.forEach(d => {
     const div = document.createElement('div');
-    div.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:.88rem;border-bottom:1px solid #f0f4f8';
+    div.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:.88rem;border-bottom:1px solid var(--border)';
     div.innerHTML = escH(d.nama) + (d.area ? ' <span style="font-size:.7rem;color:#94a3b8">'+escH(d.area)+'</span>' : '');
-    div.onmouseover = () => div.style.background='#eaf4fb';
+    div.onmouseover = () => div.style.background='rgba(127,127,127,.12)';
     div.onmouseout = () => div.style.background='';
     div.onclick = () => {
       dHidden.value = d.id;

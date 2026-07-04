@@ -3,44 +3,113 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Login — Sistem Keuangan Baitul Maal</title>
+<title>Masuk — Sistem Keuangan Baitul Maal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-  body { background: linear-gradient(135deg, #1a5276, #2e86c1); min-height: 100vh; display: flex; align-items: center; }
-  .card { border: none; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
-  .logo-title { color: #1a5276; font-weight: 700; font-size: 1.1rem; }
-  .btn-login { background: #1a5276; border: none; }
-  .btn-login:hover { background: #154360; }
+  :root {
+    --primary: #0F2537;
+    --primary-mid: #1B3B5A;
+    --accent: #B8922A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    background: #0F2537;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  body::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 80%, rgba(184,146,42,.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 20%, rgba(27,59,90,.5) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  .login-wrap {
+    width: 100%; max-width: 380px;
+    padding: 1rem;
+    position: relative; z-index: 1;
+  }
+  .login-card {
+    background: rgba(255,255,255,.97);
+    border-radius: 18px;
+    padding: 2.25rem 2rem 2rem;
+    box-shadow: 0 8px 40px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.08) inset;
+  }
+  .brand-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; background: var(--accent);
+    border-radius: 11px; font-weight: 700; font-size: .95rem;
+    color: #fff; letter-spacing: .02em; margin-bottom: 1rem;
+  }
+  .brand-name {
+    font-size: 1.15rem; font-weight: 700; color: var(--primary); line-height: 1.3;
+  }
+  .brand-sub {
+    font-size: .8rem; color: #64748b; margin-top: .2rem; margin-bottom: 1.75rem;
+  }
+  .form-label { font-size: .83rem; font-weight: 600; color: #374151; margin-bottom: .35rem; }
+  .form-control {
+    border: 1.5px solid #e4e8ee; border-radius: 9px;
+    padding: .65rem .85rem; font-size: .9rem; font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .form-control:focus {
+    border-color: var(--primary-mid);
+    box-shadow: 0 0 0 3px rgba(27,59,90,.1);
+    outline: none;
+  }
+  .btn-masuk {
+    width: 100%; padding: .72rem;
+    background: var(--primary); border: none;
+    border-radius: 10px; color: #fff;
+    font-family: inherit; font-size: .95rem; font-weight: 600;
+    cursor: pointer; transition: background .15s, transform .1s;
+  }
+  .btn-masuk:hover { background: var(--primary-mid); }
+  .btn-masuk:active { transform: scale(.99); }
+  .alert-danger {
+    background: #fee2e2; color: #991b1b; border: none;
+    border-radius: 9px; font-size: .83rem; padding: .65rem .9rem;
+  }
+  .footer-note {
+    text-align: center; margin-top: 1.5rem;
+    font-size: .73rem; color: rgba(255,255,255,.35);
+  }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="row justify-content-center">
-    <div class="col-md-4 col-sm-8 col-11">
-      <div class="card p-4">
-        <div class="text-center mb-4">
-          <div style="font-size:3rem">🕌</div>
-          <div class="logo-title">SISTEM KEUANGAN</div>
-          <div class="logo-title">BAITUL MAAL</div>
-          <small class="text-muted">Manajemen ZIS & Keuangan</small>
-        </div>
-        {% if error %}
-        <div class="alert alert-danger py-2 small">{{ error }}</div>
-        {% endif %}
-        <form method="POST">
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Username</label>
-            <input type="text" name="username" class="form-control" placeholder="Masukkan username" required autofocus>
-          </div>
-          <div class="mb-4">
-            <label class="form-label fw-semibold">Password</label>
-            <input type="password" name="password" class="form-control" placeholder="Masukkan password" required>
-          </div>
-          <button type="submit" class="btn btn-login btn-primary w-100 fw-semibold">Masuk</button>
-        </form>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand-mark">BM</div>
+    <div class="brand-name">Baitul Maal<br>BMT Amal Muslim</div>
+    <div class="brand-sub">Sistem manajemen ZIS &amp; keuangan</div>
+
+    {% if error %}
+    <div class="alert-danger mb-3">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control" placeholder="Masukkan username" required autofocus>
       </div>
-    </div>
+      <div class="mb-4">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" placeholder="Masukkan password" required>
+      </div>
+      <button type="submit" class="btn-masuk">Masuk</button>
+    </form>
   </div>
+  <div class="footer-note">BMT Amal Muslim Wonogiri &copy; 2025</div>
 </div>
 </body>
 </html>
