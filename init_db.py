@@ -32,6 +32,17 @@ def migrate(conn):
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jurnal_client_uuid "
                   "ON jurnal(client_uuid) WHERE client_uuid IS NOT NULL")
 
+    # DB lama dibuat sebelum COA punya kolom hierarki/jenis → tambah bila belum ada
+    coa_cols = {r[1] for r in c.execute("PRAGMA table_info(chart_of_accounts)")}
+    for col, defn in [
+        ('jenis_dana',      'TEXT'),
+        ('parent_kode',     'TEXT'),
+        ('jenis_transaksi', 'TEXT'),
+        ('aktif',           'INTEGER DEFAULT 1'),
+    ]:
+        if col not in coa_cols:
+            c.execute(f"ALTER TABLE chart_of_accounts ADD COLUMN {col} {defn}")
+
     usr = {r[1] for r in c.execute("PRAGMA table_info(users)")}
     for col, defn in [
         ('no_hp', 'TEXT'),
@@ -318,6 +329,16 @@ def init():
     c.executemany(
         "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)",
         produk_entries
+    )
+
+    # Backfill utk DB lama: baris COA yang sudah ada sebelum kolom
+    # parent_kode/jenis_transaksi ditambah masih NULL → isi dari seed
+    # (COALESCE = tidak menimpa nilai yang sudah ada)
+    c.executemany(
+        "UPDATE chart_of_accounts SET parent_kode=COALESCE(parent_kode,?), "
+        "jenis_transaksi=COALESCE(jenis_transaksi,?), "
+        "jenis_dana=COALESCE(jenis_dana,?) WHERE kode=?",
+        [(pk, jt, jd, kode) for (kode, _, _, jd, pk, jt) in coa + list(produk_entries)]
     )
 
     conn.commit()
