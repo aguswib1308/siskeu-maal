@@ -7,6 +7,10 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/bmt-maal
 Environment="SECRET_KEY=MaalBmt@2026!"
+# LAPORAN_API_KEY: token autentikasi endpoint /api/laporan-harian (dibaca agen laporan harian).
+# Ganti nilainya dengan token acak yang sama di /etc/bmt-sync.env (MAAL_API_KEY) di VPS billing.
+# Contoh generate: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+Environment="LAPORAN_API_KEY=GANTI_DENGAN_TOKEN_ACAK"
 ExecStart=/var/www/bmt-maal/venv/bin/gunicorn \
     --workers 2 \
     --bind 127.0.0.1:5001 \

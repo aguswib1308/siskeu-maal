@@ -1336,34 +1336,44 @@ def api_laporan_harian():
     tgl = request.args.get('tanggal') or date.today().isoformat()
     conn = get_db()
     try:
-        # Setoran ZIS/wakaf per marketing = koleksi yang terkumpul pada tanggal tsb
-        rows = conn.execute('''
-            SELECT u.nama,
-                   COALESCE(SUM(k.jumlah),0) AS setoran,
-                   COUNT(k.id) AS n_koleksi
-            FROM users u
-            LEFT JOIN koleksi_bulanan k
-              ON k.marketing_id = u.id
-             AND substr(COALESCE(k.tanggal_koleksi,''),1,10) = ?
-             AND k.status = 'terkumpul'
-            WHERE u.role='marketing' AND u.aktif=1
-            GROUP BY u.id, u.nama
-            ORDER BY setoran DESC
-        ''', (tgl,)).fetchall()
+        # Ambil semua user marketing aktif
+        users = conn.execute(
+            "SELECT id, nama FROM users WHERE role='marketing' AND aktif=1 ORDER BY nama"
+        ).fetchall()
+
+        # Ambil sum setoran ZIS/wakaf per user untuk tanggal tsb
+        # Hanya dana ZIS/wakaf: zakat, infak_sedekah, wakaf
+        DANA_ZIS = ('zakat', 'infak_sedekah', 'wakaf')
+        placeholders = ','.join('?' * len(DANA_ZIS))
+        rows_setor = conn.execute(f'''
+            SELECT user_id, COALESCE(SUM(jumlah), 0) AS total_setoran
+            FROM transaksi
+            WHERE tanggal = ?
+              AND jenis = 'masuk'
+              AND jenis_dana IN ({placeholders})
+            GROUP BY user_id
+        ''', [tgl] + list(DANA_ZIS)).fetchall()
+
+        setoran_map = {r['user_id']: float(r['total_setoran'] or 0) for r in rows_setor}
+
+        petugas = []
+        total_setoran = 0.0
+        for u in users:
+            setor = setoran_map.get(u['id'], 0.0)
+            total_setoran += setor
+            petugas.append({
+                'nama': u['nama'],
+                'setoran': setor,
+                'donatur_baru': None
+            })
 
         donatur_baru = conn.execute(
             "SELECT COUNT(*) c FROM donatur WHERE substr(COALESCE(created_at,''),1,10)=?",
             (tgl,)).fetchone()['c']
 
-        total_setoran = conn.execute('''
-            SELECT COALESCE(SUM(jumlah),0) s FROM koleksi_bulanan
-            WHERE substr(COALESCE(tanggal_koleksi,''),1,10)=? AND status='terkumpul'
-        ''', (tgl,)).fetchone()['s']
     finally:
         conn.close()
 
-    petugas = [{'nama': r['nama'], 'setoran': r['setoran'],
-                'n_koleksi': r['n_koleksi'], 'donatur_baru': None} for r in rows]
     return jsonify({
         'tanggal': tgl,
         'petugas': petugas,
