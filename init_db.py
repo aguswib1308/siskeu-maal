@@ -417,6 +417,19 @@ def init():
         WHERE coa_id IN (SELECT id FROM chart_of_accounts WHERE kode IN ({placeholders}))
     """, kode_pasangan_terikat)
 
+    # Akun penyaluran baru "Santunan Dhuafa (Terikat) [IDHU]" — program dhuafa yg didanai
+    # dari Infaq Terikat Dhuafa, terpisah dari Sembako Dhuafa [SD] (dana tidak terikat)
+    c.execute(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) "
+        "VALUES ('5.2.4.05','Santunan Dhuafa (Terikat) [IDHU]','penyaluran_beban','infak_terikat','5.2.4','keluar')"
+    )
+    # Akun "Hibah ke Dana Lain" — transfer dari Infak Tidak Terikat ke Amil/program terikat
+    # yg penerimaannya sendiri belum cukup menutup penyalurannya bulan itu
+    c.execute(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) "
+        "VALUES ('5.2.8','Hibah ke Dana Lain (Amil/Terikat)','penyaluran_beban','infak_tidak_terikat','5.2','keluar')"
+    )
+
     conn.commit()
     conn.close()
     print("Database berhasil diinisialisasi.")
