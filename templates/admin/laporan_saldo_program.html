@@ -1,0 +1,74 @@
+{% extends 'admin/base.html' %}
+{% block title %}Saldo per Program{% endblock %}
+{% block page_title %}<i class="bi bi-pie-chart"></i> Saldo per Program{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <form class="d-flex gap-2">
+    <input type="month" name="bulan" value="{{ bulan }}"
+           class="form-control form-control-sm" style="width:180px">
+    <button class="btn btn-sm btn-primary">Tampilkan</button>
+  </form>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-printer"></i> Cetak
+  </button>
+</div>
+
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}
+    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+    {% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">SALDO PER PROGRAM</div>
+    <div class="report-period">Periode: {{ bulan | bulan_label }}</div>
+    <div class="text-muted small mt-1">
+      Saldo bersih tiap program (penerimaan terikat − penyaluran program itu), digabung dari akun
+      penerimaan &amp; penyaluran berkode sama (mis. akun "[CY]" di sisi penerimaan dan penyaluran).
+    </div>
+  </div>
+
+  <div class="p-4">
+    {% set current_dana = namespace(v=None) %}
+    <table class="table table-sm report-table">
+      <thead>
+        <tr style="background:#f8f9fa">
+          <th class="ps-3" style="font-size:.78rem;color:#64748b">Program</th>
+          <th class="text-end" style="font-size:.78rem;color:#64748b">Saldo Awal</th>
+          <th class="text-end" style="font-size:.78rem;color:#64748b">Penerimaan</th>
+          <th class="text-end" style="font-size:.78rem;color:#64748b">Penyaluran</th>
+          <th class="text-end pe-3" style="font-size:.78rem;color:#64748b">Saldo Akhir</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in data %}
+        {% if g.jenis_dana != current_dana.v %}
+        {% set current_dana.v = g.jenis_dana %}
+        <tr style="background:#eef2f7">
+          <td colspan="5" class="ps-3 fw-bold" style="font-size:.8rem">
+            {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya')|upper }}
+          </td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="ps-3 report-item">
+            {{ g.label }}{% if g.code %} <span class="text-muted small">[{{ g.code }}]</span>{% endif %}
+          </td>
+          <td class="text-end report-amount">{{ g.saldo_awal|rupiah }}</td>
+          <td class="text-end report-amount text-success">{{ g.masuk|rupiah }}</td>
+          <td class="text-end report-amount text-danger">{{ g.keluar|rupiah }}</td>
+          <td class="text-end pe-3 fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
+            {{ g.saldo_akhir|rupiah }}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted small fst-italic py-3">Tidak ada aktivitas</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include 'admin/_report_style.html' %}
+{% endblock %}

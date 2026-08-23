@@ -403,6 +403,20 @@ def init():
     # Tandai kode [SD] pada akun Sembako Dhuafa yg sudah ada (dipakai jg utk santunan dhuafa umum)
     c.execute("UPDATE chart_of_accounts SET nama='Sembako Dhuafa [SD]' WHERE kode='5.2.4.01'")
 
+    # Perbaiki jenis_dana akun penyaluran yg py pasangan penerimaan berkode sama (mis. [CY]) —
+    # saat pemisahan terikat/tidak-terikat awal, semua akun 5.2.x lama didefault ke tidak-terikat
+    # krn belum ada bukti pasangan. Sekarang akun2 ini terbukti terikat (penerimaannya di 4.2.1.x).
+    kode_pasangan_terikat = ['5.2.1.02', '5.2.1.03', '5.2.2.01', '5.2.3.01', '5.2.4.02',
+                              '5.2.4.03', '5.2.4.04', '5.2.5.01', '5.2.5.02', '5.2.6.01',
+                              '5.2.6.03', '5.2.6.06', '5.2.7.01']
+    for kode in kode_pasangan_terikat:
+        c.execute("UPDATE chart_of_accounts SET jenis_dana='infak_terikat' WHERE kode=?", (kode,))
+    placeholders = ','.join('?' * len(kode_pasangan_terikat))
+    c.execute(f"""
+        UPDATE transaksi SET jenis_dana='infak_terikat'
+        WHERE coa_id IN (SELECT id FROM chart_of_accounts WHERE kode IN ({placeholders}))
+    """, kode_pasangan_terikat)
+
     conn.commit()
     conn.close()
     print("Database berhasil diinisialisasi.")

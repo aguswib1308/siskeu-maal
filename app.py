@@ -439,6 +439,73 @@ def laporan_dana():
         data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
 
 
+def _program_code(nama):
+    """Ambil kode program dari akhiran '[KODE]' pada nama akun, mis. 'Cinta Yatim [CY]' -> 'CY'."""
+    m = re.search(r"\[([A-Za-z0-9']+)\]\s*$", nama or '')
+    return m.group(1).upper() if m else None
+
+
+@app.route('/admin/laporan/saldo-program')
+@admin_required
+def laporan_saldo_program():
+    """Saldo per program/produk (gabungan sisi penerimaan+penyaluran akun berkode sama, mis. [CY])."""
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    fd = f"{bulan}-01"
+    ld = _last_day(bulan)
+    conn = get_db()
+
+    saldo_awal_rows = conn.execute("""
+        SELECT c.id as coa_id, c.nama, c.jenis_dana, c.kelompok,
+               COALESCE(SUM(CASE WHEN t.jenis='masuk' THEN t.jumlah ELSE -t.jumlah END),0) as saldo
+        FROM chart_of_accounts c
+        LEFT JOIN transaksi t ON t.coa_id=c.id AND t.tanggal < ?
+        WHERE c.jenis_transaksi IS NOT NULL AND c.aktif=1
+        GROUP BY c.id
+    """, (fd,)).fetchall()
+
+    period_rows = conn.execute("""
+        SELECT c.id as coa_id,
+               COALESCE(SUM(CASE WHEN t.jenis='masuk' THEN t.jumlah ELSE 0 END),0) as masuk,
+               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END),0) as keluar
+        FROM chart_of_accounts c
+        LEFT JOIN transaksi t ON t.coa_id=c.id AND t.tanggal BETWEEN ? AND ?
+        WHERE c.jenis_transaksi IS NOT NULL AND c.aktif=1
+        GROUP BY c.id
+    """, (fd, ld)).fetchall()
+    period_map = {r['coa_id']: r for r in period_rows}
+
+    groups = {}
+    for r in saldo_awal_rows:
+        code = _program_code(r['nama'])
+        key = code or f"coa{r['coa_id']}"
+        if key not in groups:
+            label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
+            groups[key] = {'label': label, 'code': code, 'jenis_dana': r['jenis_dana'],
+                            'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+        g = groups[key]
+        g['saldo_awal'] += r['saldo']
+        p = period_map.get(r['coa_id'])
+        if p:
+            g['masuk']  += p['masuk']
+            g['keluar'] += p['keluar']
+        # program gabungan bisa punya jenis_dana beda di sisi penerimaan vs penyaluran
+        # (mis. akun penyaluran lama masih tertandai tidak-terikat) -> pakai jenis_dana sisi penerimaan
+        if r['kelompok'] == 'penerimaan':
+            g['jenis_dana'] = r['jenis_dana']
+
+    data = []
+    for g in groups.values():
+        g['saldo_akhir'] = g['saldo_awal'] + g['masuk'] - g['keluar']
+        if g['saldo_awal'] or g['masuk'] or g['keluar']:
+            data.append(g)
+    data.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_saldo_program.html',
+        data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+
+
 @app.route('/admin/laporan/arus-kas')
 @admin_required
 def laporan_arus_kas():
