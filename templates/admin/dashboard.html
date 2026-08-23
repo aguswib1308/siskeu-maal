@@ -2,7 +2,8 @@
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}<i class="bi bi-speedometer2"></i> Dashboard{% endblock %}
 
-{% set dana_warna = {'zakat':'#166534','infak_sedekah':'#1B3B5A','amil':'#6b21a8','wakaf':'#9a3412'} %}
+{% set dana_warna = {'zakat':'#166534','infak_tidak_terikat':'#1B3B5A','infak_terikat':'#0e7490','amil':'#6b21a8','wakaf':'#9a3412'} %}
+{% set dana_list = [('zakat','Zakat'),('infak_tidak_terikat','Infak/Sedekah Tidak Terikat'),('infak_terikat','Infak Terikat'),('amil','Amil'),('wakaf','Wakaf')] %}
 
 {% block content %}
 <div class="row mb-3 align-items-center">
@@ -36,7 +37,7 @@
 </div>
 
 <div class="row g-3 mb-3">
-  {% for dana, info in [('zakat','Zakat'),('infak_sedekah','Infak/Sedekah'),('amil','Amil'),('wakaf','Wakaf')] %}
+  {% for dana, info in dana_list %}
   {% set masuk = namespace(v=0) %}{% set keluar = namespace(v=0) %}
   {% for r in rekap_dana %}
     {% if r.jenis_dana == dana %}
@@ -103,7 +104,7 @@
   <div class="col-md-4">
     <div class="card p-3 h-100">
       <div class="fw-semibold mb-3">Rekap per Dana ({{ bulan }})</div>
-      {% for dana, info in [('zakat','Zakat'),('infak_sedekah','Infak/Sedekah'),('amil','Amil'),('wakaf','Wakaf')] %}
+      {% for dana, info in dana_list %}
       {% set masuk = namespace(v=0) %}{% set keluar = namespace(v=0) %}
       {% for r in rekap_dana %}
         {% if r.jenis_dana == dana %}

@@ -1,0 +1,59 @@
+{% extends 'admin/base.html' %}
+{% block title %}Saldo Awal{% endblock %}
+{% block page_title %}<i class="bi bi-wallet2"></i> Saldo Awal{% endblock %}
+
+{% block content %}
+<div class="card p-4" style="max-width:820px">
+  <p class="text-muted small mb-4">
+    Saldo awal per jenis dana <strong>sebelum</strong> transaksi pertama tercatat di sistem ini
+    (mis. saat migrasi dari pembukuan lama). Nilai ini otomatis ditambahkan sebagai dasar
+    perhitungan Saldo Awal di Neraca, Sumber &amp; Penggunaan Dana, dan Arus Kas — tidak
+    mempengaruhi transaksi yang sudah tercatat.
+  </p>
+  <form method="POST" action="/admin/master/saldo-awal/simpan">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width:220px">Jenis Dana</th>
+            <th style="width:220px">Saldo Awal (Rp)</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dana in dana_types %}
+          <tr>
+            <td class="fw-semibold">{{ LABEL_DANA.get(dana, dana) }}</td>
+            <td>
+              <input type="text" name="jumlah_{{ dana }}" class="form-control"
+                     inputmode="numeric" oninput="formatRibuan(this)"
+                     value="{{ '{:,.0f}'.format(saldo.get(dana, 0)).replace(',', '.') if saldo.get(dana, 0) else '' }}"
+                     placeholder="0">
+            </td>
+            <td>
+              <input type="text" name="keterangan_{{ dana }}" class="form-control form-control-sm"
+                     value="{{ keterangan.get(dana, '') or '' }}" placeholder="cth: saldo migrasi per Jan 2026">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="submit" class="btn btn-success mt-2">
+      <i class="bi bi-check-lg"></i> Simpan
+    </button>
+  </form>
+</div>
+
+<script>
+function formatRibuan(el) {
+  let raw = el.value.replace(/\D/g, '');
+  el.value = raw ? parseInt(raw).toLocaleString('id-ID') : '';
+}
+document.querySelector('form').addEventListener('submit', function() {
+  this.querySelectorAll('input[type="text"][name^="jumlah_"]').forEach(el => {
+    el.value = el.value.replace(/\./g, '').replace(/,/g, '');
+  });
+});
+</script>
+{% endblock %}

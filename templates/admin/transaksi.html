@@ -2,7 +2,7 @@
 {% block title %}Transaksi{% endblock %}
 {% block page_title %}<i class="bi bi-arrow-left-right"></i> Transaksi{% endblock %}
 
-{% set dana_warna = {'zakat':'#166534','infak_sedekah':'#1B3B5A','amil':'#6b21a8','wakaf':'#9a3412'} %}
+{% set dana_warna = {'zakat':'#166534','infak_tidak_terikat':'#1B3B5A','infak_terikat':'#0e7490','amil':'#6b21a8','wakaf':'#9a3412'} %}
 
 {% block content %}
 <div class="row mb-3 align-items-center">
@@ -16,7 +16,7 @@
       </select>
       <select name="jenis_dana" class="form-select form-select-sm" style="width:160px">
         <option value="">Semua Dana</option>
-        {% for kode, label in [('zakat','Zakat'),('infak_sedekah','Infak/Sedekah'),('amil','Amil'),('wakaf','Wakaf')] %}
+        {% for kode, label in [('zakat','Zakat'),('infak_tidak_terikat','Infak/Sedekah Tidak Terikat'),('infak_terikat','Infak Terikat'),('amil','Amil'),('wakaf','Wakaf')] %}
         <option value="{{ kode }}" {% if jenis_dana==kode %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>

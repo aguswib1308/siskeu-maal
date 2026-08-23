@@ -97,6 +97,14 @@ def migrate(conn):
         UNIQUE(bulan, user_id, jenis)
     )''')
 
+    # Saldo awal manual per jenis dana (saldo sebelum transaksi pertama di sistem)
+    c.execute('''CREATE TABLE IF NOT EXISTS saldo_awal (
+        jenis_dana TEXT PRIMARY KEY,
+        jumlah REAL NOT NULL DEFAULT 0,
+        keterangan TEXT,
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+
     conn.commit()
 
 def init():
@@ -340,6 +348,46 @@ def init():
         "jenis_dana=COALESCE(jenis_dana,?) WHERE kode=?",
         [(pk, jt, jd, kode) for (kode, _, _, jd, pk, jt) in coa + list(produk_entries)]
     )
+
+    # ── Migrasi: pisah Infak Terikat vs Tidak Terikat (dulu satu 'infak_sedekah') ──
+    # 4.2.1[.xx] = Infak Terikat; sisanya (4.2.2[.xx], 4.2.3 Sedekah, semua 5.2.x
+    # penyaluran) dianggap Tidak Terikat karena belum ada pembeda di data lama.
+    c.execute("""UPDATE chart_of_accounts SET jenis_dana='infak_terikat'
+                 WHERE jenis_dana='infak_sedekah' AND (kode='4.2.1' OR kode LIKE '4.2.1.%')""")
+    c.execute("""UPDATE chart_of_accounts SET jenis_dana='infak_tidak_terikat'
+                 WHERE jenis_dana='infak_sedekah' AND kode != '4.2'""")
+    c.execute("""UPDATE chart_of_accounts SET jenis_dana=NULL
+                 WHERE kode='4.2' AND jenis_dana='infak_sedekah'""")
+    c.execute("""UPDATE chart_of_accounts SET nama='Penyaluran Dana Infak/Sedekah Tidak Terikat'
+                 WHERE kode='5.2'""")
+
+    # Akun penyaluran baru utk Infak Terikat, paralel dgn 5.2 (Tidak Terikat)
+    infak_terikat_penyaluran = [
+        ('5.5',   'Penyaluran Dana Infak Terikat',
+            'penyaluran_beban', 'infak_terikat', '5',   None),
+        ('5.5.1', 'Program Pendidikan (Terikat)',
+            'penyaluran_beban', 'infak_terikat', '5.5', 'keluar'),
+        ('5.5.2', 'Program Kesehatan (Terikat)',
+            'penyaluran_beban', 'infak_terikat', '5.5', 'keluar'),
+        ('5.5.3', 'Program Ekonomi/Pemberdayaan (Terikat)',
+            'penyaluran_beban', 'infak_terikat', '5.5', 'keluar'),
+        ('5.5.4', 'Program Sosial/Kemanusiaan (Terikat)',
+            'penyaluran_beban', 'infak_terikat', '5.5', 'keluar'),
+        ('5.5.5', 'Bantuan Bencana (Terikat)',
+            'penyaluran_beban', 'infak_terikat', '5.5', 'keluar'),
+    ]
+    c.executemany(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)",
+        infak_terikat_penyaluran
+    )
+
+    # transaksi.jenis_dana adalah salinan (snapshot) dari coa.jenis_dana saat dicatat —
+    # sinkronkan ulang transaksi lama yang masih berlabel 'infak_sedekah' dari akun COA-nya
+    c.execute("""
+        UPDATE transaksi
+        SET jenis_dana = (SELECT jenis_dana FROM chart_of_accounts WHERE id = transaksi.coa_id)
+        WHERE jenis_dana = 'infak_sedekah' AND coa_id IS NOT NULL
+    """)
 
     conn.commit()
     conn.close()

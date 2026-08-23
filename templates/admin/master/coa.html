@@ -21,7 +21,7 @@
   ('penerimaan','Penerimaan','bg-success'),
   ('penyaluran_beban','Penyaluran & Beban','bg-danger')
 ] %}
-{% set dana_warna = {'zakat':'#2ecc71','infak_sedekah':'#3498db','amil':'#9b59b6','wakaf':'#e67e22','umum':'#95a5a6'} %}
+{% set dana_warna = {'zakat':'#2ecc71','infak_tidak_terikat':'#3498db','infak_terikat':'#16a085','amil':'#9b59b6','wakaf':'#e67e22','umum':'#95a5a6'} %}
 
 {% for kode_kelompok, label_kelompok, badge_class in kelompok_list %}
 {% set akun_kelompok = coa | selectattr('kelompok','equalto',kode_kelompok) | list %}
@@ -118,7 +118,8 @@
           <select name="jenis_dana" class="form-select">
             <option value="">— Pilih —</option>
             <option value="zakat">Zakat</option>
-            <option value="infak_sedekah">Infak/Sedekah</option>
+            <option value="infak_tidak_terikat">Infak/Sedekah Tidak Terikat</option>
+            <option value="infak_terikat">Infak Terikat</option>
             <option value="amil">Amil</option>
             <option value="wakaf">Wakaf</option>
             <option value="umum">Umum</option>

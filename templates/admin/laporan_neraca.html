@@ -40,12 +40,9 @@
           </thead>
           <tbody>
             <tr class="report-group"><td colspan="2">Aset Lancar</td></tr>
-            {% for dana, label in [('zakat','Kas & Setara Kas Dana Zakat'),
-                                    ('infak_sedekah','Kas & Setara Kas Dana Infak/Sedekah'),
-                                    ('amil','Kas & Setara Kas Dana Amil'),
-                                    ('wakaf','Kas & Setara Kas Dana Wakaf')] %}
+            {% for dana in dana_types %}
             <tr>
-              <td class="ps-4 report-item">{{ label }}</td>
+              <td class="ps-4 report-item">Kas & Setara Kas Dana {{ LABEL_DANA.get(dana, dana) }}</td>
               <td class="text-end report-amount">{{ kas.get(dana, 0)|rupiah }}</td>
             </tr>
             {% endfor %}

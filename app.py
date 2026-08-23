@@ -123,7 +123,9 @@ def terbilang(n):
 
 app.jinja_env.filters['rupiah'] = format_rupiah
 
-LABEL_DANA  = {'zakat':'Zakat','infak_sedekah':'Infak/Sedekah','amil':'Amil','wakaf':'Wakaf','umum':'Umum'}
+DANA_TYPES  = ['zakat', 'infak_tidak_terikat', 'infak_terikat', 'amil', 'wakaf']
+LABEL_DANA  = {'zakat':'Zakat','infak_tidak_terikat':'Infak/Sedekah Tidak Terikat',
+               'infak_terikat':'Infak Terikat','amil':'Amil','wakaf':'Wakaf','umum':'Umum'}
 LABEL_ASNAF = {'fakir':'Fakir','miskin':'Miskin','amil':'Amil','muallaf':'Muallaf',
                'riqab':'Riqab','gharim':'Gharim','fisabilillah':'Fisabilillah','ibnu_sabil':'Ibnu Sabil'}
 LABEL_SUMBER = {'tunai':'Tunai','kencleng':'Kencleng','kotak_infaq':'Kotak Infaq'}
@@ -139,7 +141,7 @@ def format_bulan(b):
 
 app.jinja_env.filters['bulan_label'] = format_bulan
 app.jinja_env.globals.update(LABEL_DANA=LABEL_DANA, LABEL_ASNAF=LABEL_ASNAF,
-                              LABEL_SUMBER=LABEL_SUMBER)
+                              LABEL_SUMBER=LABEL_SUMBER, DANA_TYPES=DANA_TYPES)
 
 def parse_gmaps_url(url):
     """Ekstrak (lat, lng) dari berbagai format URL Google Maps."""
@@ -195,14 +197,19 @@ def get_instansi(conn=None):
             'email': '', 'website': '', 'ketua': '', 'bendahara': '', 'sekretaris': '',
             'no_izin': ''}
 
+def get_saldo_awal(conn):
+    """Saldo awal manual per jenis dana (sebelum transaksi pertama tercatat di sistem)."""
+    rows = conn.execute("SELECT jenis_dana, jumlah FROM saldo_awal").fetchall()
+    return {r['jenis_dana']: r['jumlah'] for r in rows}
+
 def auto_transaksi_koleksi(conn, koleksi_id, donatur_id, bulan, sumber, jumlah, tanggal, user_id):
     """Buat transaksi otomatis saat koleksi terkumpul."""
-    coa = conn.execute("SELECT id FROM chart_of_accounts WHERE kode='4.2.2'").fetchone()
+    coa = conn.execute("SELECT id, jenis_dana FROM chart_of_accounts WHERE kode='4.2.2'").fetchone()
     keterangan = f"Koleksi {LABEL_SUMBER.get(sumber, sumber)} – {bulan}"
     cur = conn.execute("""
         INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,donatur_id,jumlah,keterangan,user_id)
         VALUES (?,?,?,?,?,?,?,?)
-    """, (tanggal, 'masuk', 'infak_sedekah', coa['id'] if coa else None,
+    """, (tanggal, 'masuk', coa['jenis_dana'] if coa else None, coa['id'] if coa else None,
           donatur_id, jumlah, keterangan, user_id))
     trx_id = cur.lastrowid
     conn.execute("UPDATE koleksi_bulanan SET transaksi_id=? WHERE id=?", (trx_id, koleksi_id))
@@ -352,7 +359,8 @@ def _prev_last_day(bulan):
 
 def _dana_summary(conn, bulan):
     """Hitung saldo awal, penerimaan, penyaluran, saldo akhir per jenis dana."""
-    dana_types = ['zakat', 'infak_sedekah', 'amil', 'wakaf']
+    dana_types = DANA_TYPES
+    saldo_manual = get_saldo_awal(conn)
 
     rows_awal = conn.execute("""
         SELECT jenis_dana,
@@ -360,7 +368,9 @@ def _dana_summary(conn, bulan):
         FROM transaksi WHERE strftime('%Y-%m',tanggal) < ? AND jenis_dana IS NOT NULL
         GROUP BY jenis_dana
     """, (bulan,)).fetchall()
-    saldo_awal = {r['jenis_dana']: r['saldo'] for r in rows_awal}
+    saldo_awal = {r['jenis_dana']: saldo_manual.get(r['jenis_dana'], 0) + r['saldo'] for r in rows_awal}
+    for dana in dana_types:
+        saldo_awal.setdefault(dana, saldo_manual.get(dana, 0))
 
     masuk_rows = conn.execute("""
         SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
@@ -404,9 +414,11 @@ def laporan_neraca():
         FROM transaksi WHERE tanggal <= ? AND jenis_dana IS NOT NULL
         GROUP BY jenis_dana
     """, (ld,)).fetchall()
-    kas = {r['jenis_dana']: r['saldo'] for r in rows}
+    kas_trans = {r['jenis_dana']: r['saldo'] for r in rows}
+    saldo_manual = get_saldo_awal(conn)
 
-    dana_types = ['zakat', 'infak_sedekah', 'amil', 'wakaf']
+    dana_types = DANA_TYPES
+    kas = {d: kas_trans.get(d, 0) + saldo_manual.get(d, 0) for d in dana_types}
     total_aset = sum(kas.get(d, 0) for d in dana_types)
     inst = get_instansi(conn)
     conn.close()
@@ -424,8 +436,7 @@ def laporan_dana():
     inst  = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_dana.html',
-        data=data, bulan=bulan, inst=inst,
-        dana_types=['zakat', 'infak_sedekah', 'amil', 'wakaf'])
+        data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
 
 
 @app.route('/admin/laporan/arus-kas')
@@ -435,10 +446,11 @@ def laporan_arus_kas():
     prev_ld  = _prev_last_day(bulan)
     conn     = get_db()
 
-    saldo_awal = conn.execute("""
+    saldo_awal_trans = conn.execute("""
         SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0)
         FROM transaksi WHERE tanggal <= ?
     """, (prev_ld,)).fetchone()[0]
+    saldo_awal = saldo_awal_trans + sum(get_saldo_awal(conn).values())
 
     masuk = conn.execute("""
         SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
@@ -1118,6 +1130,38 @@ def master_instansi_simpan():
     flash('Data instansi berhasil diperbarui.', 'success')
     return redirect(url_for('master_instansi'))
 
+# ── Master: Saldo Awal ───────────────────────────────────────────────────────
+
+@app.route('/admin/master/saldo-awal')
+@admin_required
+def master_saldo_awal():
+    conn = get_db()
+    saldo = get_saldo_awal(conn)
+    ket_rows = conn.execute("SELECT jenis_dana, keterangan FROM saldo_awal").fetchall()
+    keterangan = {r['jenis_dana']: r['keterangan'] for r in ket_rows}
+    conn.close()
+    return render_template('admin/master/saldo_awal.html',
+        saldo=saldo, keterangan=keterangan, dana_types=DANA_TYPES)
+
+@app.route('/admin/master/saldo-awal/simpan', methods=['POST'])
+@admin_required
+def master_saldo_awal_simpan():
+    data = request.form
+    conn = get_db()
+    for dana in DANA_TYPES:
+        jumlah = parse_jumlah(data.get(f'jumlah_{dana}')) or 0
+        ket = data.get(f'keterangan_{dana}', '').strip()
+        conn.execute("""
+            INSERT INTO saldo_awal (jenis_dana, jumlah, keterangan, updated_at)
+            VALUES (?,?,?,datetime('now','localtime'))
+            ON CONFLICT(jenis_dana) DO UPDATE SET
+                jumlah=excluded.jumlah, keterangan=excluded.keterangan,
+                updated_at=excluded.updated_at
+        """, (dana, jumlah, ket))
+    conn.commit(); conn.close()
+    flash('Saldo awal berhasil disimpan.', 'success')
+    return redirect(url_for('master_saldo_awal'))
+
 # ── Admin Jurnal (Non-Tunai) ─────────────────────────────────────────────────
 
 @app.route('/admin/jurnal')
@@ -1342,8 +1386,8 @@ def api_laporan_harian():
         ).fetchall()
 
         # Ambil sum setoran ZIS/wakaf per user untuk tanggal tsb
-        # Hanya dana ZIS/wakaf: zakat, infak_sedekah, wakaf
-        DANA_ZIS = ('zakat', 'infak_sedekah', 'wakaf')
+        # Hanya dana ZIS/wakaf: zakat, infak (tidak terikat & terikat), wakaf
+        DANA_ZIS = ('zakat', 'infak_tidak_terikat', 'infak_terikat', 'wakaf')
         placeholders = ','.join('?' * len(DANA_ZIS))
         rows_setor = conn.execute(f'''
             SELECT user_id, COALESCE(SUM(jumlah), 0) AS total_setoran
