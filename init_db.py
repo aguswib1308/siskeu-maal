@@ -395,6 +395,11 @@ def init():
         "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) "
         "VALUES ('5.2.6.06','Program Dakwah [ID]','penyaluran_beban','infak_tidak_terikat','5.2.6','keluar')"
     )
+    # Akun penerimaan baru "Infaq Program Tahfidz [ITAH]", paralel dgn produk 4.2.1.xx lain
+    c.execute(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) "
+        "VALUES ('4.2.1.19','Infaq Program Tahfidz [ITAH]','penerimaan','infak_terikat','4.2.1','masuk')"
+    )
     # Tandai kode [SD] pada akun Sembako Dhuafa yg sudah ada (dipakai jg utk santunan dhuafa umum)
     c.execute("UPDATE chart_of_accounts SET nama='Sembako Dhuafa [SD]' WHERE kode='5.2.4.01'")
 
