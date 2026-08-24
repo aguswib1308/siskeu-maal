@@ -102,6 +102,7 @@
           <select name="coa_id" class="form-select" required id="selCoa">
             <option value="">— Pilih Sub Akun —</option>
           </select>
+          <div id="saldoInfo" class="small mt-2" style="display:none"></div>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Donatur <span class="text-muted fw-normal">(untuk penerimaan)</span></label>
@@ -224,7 +225,39 @@ document.getElementById('selCoa').addEventListener('change', function() {
   const jenis = this.selectedOptions[0]?.dataset.jenis || '';
   document.getElementById('hiddenJenis').value = jenis;
   updateJenisLabel(jenis);
+  updateSaldoInfo(this.value);
 });
+
+/* ── Popup sisa saldo akun terpilih ── */
+const TANGGAL_KERJA_BULAN = {{ tanggal_kerja[:7]|tojson }};
+let saldoReqId = 0;
+
+function rupiahFmt(n) {
+  return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+}
+
+function updateSaldoInfo(coaId) {
+  const info = document.getElementById('saldoInfo');
+  const reqId = ++saldoReqId;
+  if (!coaId) { info.style.display = 'none'; info.innerHTML = ''; return; }
+  info.style.display = '';
+  info.className = 'small mt-2 text-muted';
+  info.innerHTML = '<i class="bi bi-hourglass-split"></i> Memuat saldo…';
+  fetch('/api/coa/' + coaId + '/saldo?bulan=' + TANGGAL_KERJA_BULAN)
+    .then(r => r.json())
+    .then(d => {
+      if (reqId !== saldoReqId) return;  // respons basi (sub akun sudah berganti lagi)
+      if (!d.ok) { info.style.display = 'none'; return; }
+      const negatif = d.saldo < 0;
+      info.className = 'small mt-2 p-2 rounded ' +
+        (negatif ? 'text-danger fw-semibold' : 'text-success');
+      info.style.background = negatif ? 'rgba(220,53,69,.08)' : 'rgba(25,135,84,.08)';
+      info.innerHTML = '<i class="bi bi-info-circle"></i> Sisa saldo <strong>' + escH(d.label) +
+        '</strong>: ' + rupiahFmt(d.saldo) +
+        (d.catatan ? '<div class="text-muted fst-italic" style="font-size:.72rem">' + escH(d.catatan) + '</div>' : '');
+    })
+    .catch(() => { if (reqId === saldoReqId) info.style.display = 'none'; });
+}
 
 function updateJenisLabel(jenis) {
   const el = document.getElementById('jenisLabel');
@@ -253,6 +286,7 @@ document.getElementById('modalTambah').addEventListener('show.bs.modal', () => {
   document.getElementById('selCoa').innerHTML = '<option value="">— Pilih Sub Akun —</option>';
   document.getElementById('hiddenJenis').value = '';
   updateJenisLabel('');
+  document.getElementById('saldoInfo').style.display = 'none';
   document.getElementById('donaturId').value = '';
   document.getElementById('donaturInput').value = '';
   document.getElementById('donaturDropdown').style.display = 'none';

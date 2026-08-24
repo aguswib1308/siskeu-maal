@@ -481,14 +481,18 @@ def _program_code(nama):
     return m.group(1).upper() if m else None
 
 
-@app.route('/admin/laporan/saldo-program')
-@admin_required
-def laporan_saldo_program():
-    """Saldo per program/produk (gabungan sisi penerimaan+penyaluran akun berkode sama, mis. [CY])."""
-    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+def _hitung_saldo_program(conn, bulan):
+    """Hitung saldo per program (gabungan sisi penerimaan+penyaluran akun berkode sama,
+    mis. [CY]) s/d akhir `bulan`. Dipakai bareng oleh laporan Saldo per Program & API
+    saldo akun (popup di menu Tambah Transaksi) spy logikanya selalu konsisten.
+    Return (groups, tidak_terikat, coa_key):
+      - groups: {key: {..., saldo_akhir}} per program/akun individual (SEBELUM akun
+        tidak-terikat digabung & SEBELUM key 'Miskin' dibuang oleh alokasi zakat)
+      - tidak_terikat: dict agregat 1 baris utk semua akun berjenis infak_tidak_terikat
+      - coa_key: {coa_id: key} utk lookup akun -> key aslinya di `groups`
+    """
     fd = f"{bulan}-01"
     ld = _last_day(bulan)
-    conn = get_db()
 
     saldo_awal_rows = conn.execute("""
         SELECT c.id as coa_id, c.nama, c.jenis_dana, c.kelompok,
@@ -511,9 +515,11 @@ def laporan_saldo_program():
     period_map = {r['coa_id']: r for r in period_rows}
 
     groups = {}
+    coa_key = {}
     for r in saldo_awal_rows:
         code = _program_code(r['nama'])
         key = code or f"coa{r['coa_id']}"
+        coa_key[r['coa_id']] = key
         if key not in groups:
             label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
             groups[key] = {'label': label, 'code': code, 'jenis_dana': r['jenis_dana'],
@@ -553,7 +559,9 @@ def laporan_saldo_program():
         if sisa > 0 and zm_key in groups:
             groups[zm_key]['keluar'] += sisa  # kekurangan (jika ada) tetap nempel Zakat Maal
 
-    data = []
+    for g in groups.values():
+        g['saldo_akhir'] = g['saldo_awal'] + g['masuk'] - g['keluar']
+
     # Infak Tidak Terikat dikelola sbg satu saldo gabungan (Kotak Infaq+Kencleng+Tunai
     # di penerimaan; Kafalah Guru TPQ, Safari Masjid, Sembako Dhuafa, Hibah ke Dana
     # Lain, dll di penyaluran) — bukan program per-akun, jadi digabung jadi 1 baris.
@@ -564,11 +572,25 @@ def laporan_saldo_program():
             tidak_terikat['saldo_awal'] += g['saldo_awal']
             tidak_terikat['masuk']      += g['masuk']
             tidak_terikat['keluar']     += g['keluar']
+    tidak_terikat['saldo_akhir'] = tidak_terikat['saldo_awal'] + tidak_terikat['masuk'] - tidak_terikat['keluar']
+
+    return groups, tidak_terikat, coa_key
+
+
+@app.route('/admin/laporan/saldo-program')
+@admin_required
+def laporan_saldo_program():
+    """Saldo per program/produk (gabungan sisi penerimaan+penyaluran akun berkode sama, mis. [CY])."""
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+    conn = get_db()
+    groups, tidak_terikat, _ = _hitung_saldo_program(conn, bulan)
+
+    data = []
+    for g in groups.values():
+        if g['jenis_dana'] == 'infak_tidak_terikat':
             continue
-        g['saldo_akhir'] = g['saldo_awal'] + g['masuk'] - g['keluar']
         if g['saldo_awal'] or g['masuk'] or g['keluar']:
             data.append(g)
-    tidak_terikat['saldo_akhir'] = tidak_terikat['saldo_awal'] + tidak_terikat['masuk'] - tidak_terikat['keluar']
     if tidak_terikat['saldo_awal'] or tidak_terikat['masuk'] or tidak_terikat['keluar']:
         data.append(tidak_terikat)
     data.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
@@ -577,6 +599,41 @@ def laporan_saldo_program():
     conn.close()
     return render_template('admin/laporan_saldo_program.html',
         data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+
+
+@app.route('/api/coa/<int:coa_id>/saldo')
+@admin_required
+def api_coa_saldo(coa_id):
+    """Sisa saldo program dari akun terpilih, utk popup info di menu Tambah Transaksi."""
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+    conn = get_db()
+    akun = conn.execute(
+        "SELECT id, kode, nama, jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)
+    ).fetchone()
+    if not akun:
+        conn.close()
+        return jsonify(ok=False), 404
+
+    groups, tidak_terikat, coa_key = _hitung_saldo_program(conn, bulan)
+    conn.close()
+
+    if akun['jenis_dana'] == 'infak_tidak_terikat':
+        return jsonify(ok=True, label='Infaq Tidak Terikat (gabungan)',
+                        saldo=tidak_terikat['saldo_akhir'],
+                        catatan='dikelola sbg satu saldo gabungan (Kotak Infaq+Kencleng+Tunai)')
+
+    if akun['kode'] == '5.1.2':  # Miskin: dialokasikan otomatis dr Fidyah/ZF/ZM, tdk py saldo sendiri
+        total_zakat = sum(g['saldo_akhir'] for g in groups.values() if g['jenis_dana'] == 'zakat')
+        return jsonify(ok=True, label='Total Dana Zakat (Fidyah + Zakat Fitrah + Zakat Maal)',
+                        saldo=total_zakat,
+                        catatan='Miskin dialokasikan otomatis dr saldo zakat, tdk py saldo terpisah')
+
+    key = coa_key.get(coa_id)
+    g = groups.get(key)
+    if not g:
+        return jsonify(ok=False)
+    label = g['label'] + (f" [{g['code']}]" if g['code'] else '')
+    return jsonify(ok=True, label=label, saldo=g['saldo_akhir'])
 
 
 @app.route('/admin/laporan/rekap-sumber-infaq')
