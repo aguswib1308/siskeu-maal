@@ -435,6 +435,44 @@ def init():
     # memang lawan penerimaan/pengeluaran dana Amil yg sama.
     c.execute("UPDATE chart_of_accounts SET nama='Penerimaan Lain Dana Amil [OP]' WHERE kode='4.3.3'")
 
+    # ── Pindahkan akun penyaluran yg jenis_dana-nya sudah infak_terikat (krn py
+    # pasangan penerimaan terikat) supaya juga SECARA STRUKTUR (kode & parent_kode)
+    # berada di bawah grup [5.5] Penyaluran Dana Infak Terikat — sebelumnya kode-nya
+    # masih menempel di [5.2] Tidak Terikat shg tdk ketemu saat cari menu transaksi
+    # utk program spt Tebar Qurban, OTA, dst di grup Terikat.
+    # 5.5.1-5.5.5 semula akun langsung (leaf) kosong tak pernah dipakai -> jadikan
+    # grup induk (spt 5.2.1-5.2.5), tambah grup baru 5.5.6 Dakwah & 5.5.7 Qurban.
+    c.executemany(
+        "UPDATE chart_of_accounts SET jenis_transaksi=NULL WHERE kode=? AND jenis_transaksi='keluar'",
+        [('5.5.1',), ('5.5.2',), ('5.5.3',), ('5.5.4',), ('5.5.5',)]
+    )
+    c.executemany(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)",
+        [
+            ('5.5.6', 'Program Dakwah/Advokasi (Terikat)', 'penyaluran_beban', 'infak_terikat', '5.5', None),
+            ('5.5.7', 'Program Qurban (Terikat)',            'penyaluran_beban', 'infak_terikat', '5.5', None),
+        ]
+    )
+    # (kode_lama, kode_baru, parent_baru)
+    pindah_ke_terikat = [
+        ('5.2.1.02', '5.5.1.01', '5.5.1'),  # Orang Tua Asuh [OTA]
+        ('5.2.1.03', '5.5.1.02', '5.5.1'),  # Beasiswa PTQ Al Mu'jiz [PTQ]
+        ('5.2.2.01', '5.5.2.01', '5.5.2'),  # Sunat Sehat Gratis [SSG]
+        ('5.2.3.01', '5.5.3.01', '5.5.3'),  # Pemberdayaan [DAYA]
+        ('5.2.4.02', '5.5.4.01', '5.5.4'),  # Cinta Yatim [CY]
+        ('5.2.4.03', '5.5.4.02', '5.5.4'),  # Operasional Ambulance [AM]
+        ('5.2.4.04', '5.5.4.03', '5.5.4'),  # Bantuan Air Bersih [AB]
+        ('5.2.5.01', '5.5.5.01', '5.5.5'),  # Bencana Wonogiri [BW]
+        ('5.2.5.02', '5.5.5.02', '5.5.5'),  # Palestina [DI]
+        ('5.2.6.01', '5.5.6.01', '5.5.6'),  # Listrik Masjid Gratis [IL]
+        ('5.2.6.03', '5.5.6.02', '5.5.6'),  # Honorarium Mubaligh [HM]
+        ('5.2.6.06', '5.5.6.03', '5.5.6'),  # Program Dakwah [ID]
+        ('5.2.7.01', '5.5.7.01', '5.5.7'),  # Tebar Qurban [TQUR]
+    ]
+    for kode_lama, kode_baru, parent_baru in pindah_ke_terikat:
+        c.execute("UPDATE chart_of_accounts SET kode=?, parent_kode=? WHERE kode=?",
+                   (kode_baru, parent_baru, kode_lama))
+
     conn.commit()
     conn.close()
     print("Database berhasil diinisialisasi.")
