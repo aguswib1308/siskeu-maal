@@ -1,0 +1,54 @@
+{% extends 'marketing/base.html' %}
+{% block title %}Saldo Program{% endblock %}
+
+{% set dana_warna = {
+  'zakat':               '#166534',
+  'infak_tidak_terikat': '#1B3B5A',
+  'infak_terikat':       '#0e7490',
+  'amil':                '#6b21a8',
+  'wakaf':               '#9a3412',
+} %}
+
+{% block content %}
+
+<div class="hero-stat-card mb-3">
+  <div class="hero-stat-label"><i class="bi bi-pie-chart"></i> Saldo per Program</div>
+  <div class="hero-stat-sub">Posisi s/d {{ bulan | bulan_label }}</div>
+</div>
+
+{% if not data %}
+<div class="card p-4 text-center text-muted mt-2">
+  <i class="bi bi-inbox fs-1 d-block mb-2" style="opacity:.25"></i>
+  <div style="font-size:.9rem">Belum ada data saldo program</div>
+</div>
+{% else %}
+{% set current_dana = namespace(v=None) %}
+{% for g in data %}
+{% if g.jenis_dana != current_dana.v %}
+{% set current_dana.v = g.jenis_dana %}
+<div class="section-label mt-3">{{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</div>
+{% endif %}
+<div class="card mb-2" style="overflow:hidden">
+  <div class="d-flex align-items-stretch">
+    <div style="width:4px;flex-shrink:0;background:{{ dana_warna.get(g.jenis_dana,'#aaa') }}"></div>
+    <div class="px-3 py-2 flex-grow-1">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div class="fw-semibold" style="font-size:.88rem">
+          {{ g.label }}{% if g.code %} <span class="text-muted" style="font-size:.72rem">[{{ g.code }}]</span>{% endif %}
+        </div>
+        <div class="fw-bold text-end flex-shrink-0 {% if g.saldo_akhir < 0 %}text-danger{% else %}text-success{% endif %}"
+             style="font-size:.95rem;white-space:nowrap">
+          {{ g.saldo_akhir|rupiah }}
+        </div>
+      </div>
+      <div class="text-muted d-flex gap-3" style="font-size:.7rem">
+        <span><i class="bi bi-arrow-down-circle"></i> {{ g.masuk|rupiah }}</span>
+        <span><i class="bi bi-arrow-up-circle"></i> {{ g.keluar|rupiah }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

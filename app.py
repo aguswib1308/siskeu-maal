@@ -577,14 +577,9 @@ def _hitung_saldo_program(conn, bulan):
     return groups, tidak_terikat, coa_key
 
 
-@app.route('/admin/laporan/saldo-program')
-@admin_required
-def laporan_saldo_program():
-    """Saldo per program/produk (gabungan sisi penerimaan+penyaluran akun berkode sama, mis. [CY])."""
-    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
-    conn = get_db()
-    groups, tidak_terikat, _ = _hitung_saldo_program(conn, bulan)
-
+def _saldo_program_list(groups, tidak_terikat):
+    """Ratakan output _hitung_saldo_program() jadi list siap-tampil: akun2 tidak
+    terikat digabung jadi 1 baris, urut per jenis dana lalu saldo akhir terbesar."""
     data = []
     for g in groups.values():
         if g['jenis_dana'] == 'infak_tidak_terikat':
@@ -594,6 +589,17 @@ def laporan_saldo_program():
     if tidak_terikat['saldo_awal'] or tidak_terikat['masuk'] or tidak_terikat['keluar']:
         data.append(tidak_terikat)
     data.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
+    return data
+
+
+@app.route('/admin/laporan/saldo-program')
+@admin_required
+def laporan_saldo_program():
+    """Saldo per program/produk (gabungan sisi penerimaan+penyaluran akun berkode sama, mis. [CY])."""
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+    conn = get_db()
+    groups, tidak_terikat, _ = _hitung_saldo_program(conn, bulan)
+    data = _saldo_program_list(groups, tidak_terikat)
 
     inst = get_instansi(conn)
     conn.close()
@@ -2018,6 +2024,18 @@ def marketing_dashboard():
     return render_template('marketing/dashboard.html',
         total_masuk_bulan=total_masuk_bulan, koleksi_bulan=koleksi_bulan,
         transaksi_hari=transaksi_hari, hari_ini=date.today().strftime('%d %B %Y'))
+
+@app.route('/marketing/saldo-program')
+@login_required
+def marketing_saldo_program():
+    """Saldo akhir tiap program fundraising -- versi ringkas (kartu, read-only) dr
+    laporan Saldo per Program admin, spy fundraiser bisa cek sisa saldo programnya."""
+    bulan = get_tanggal_kerja()[:7]
+    conn = get_db()
+    groups, tidak_terikat, _ = _hitung_saldo_program(conn, bulan)
+    data = _saldo_program_list(groups, tidak_terikat)
+    conn.close()
+    return render_template('marketing/saldo_program.html', data=data, bulan=bulan)
 
 # ── Marketing Koleksi ─────────────────────────────────────────────────────────
 
