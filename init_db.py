@@ -430,6 +430,11 @@ def init():
         "VALUES ('5.2.8','Hibah ke Dana Lain (Amil/Terikat)','penyaluran_beban','infak_tidak_terikat','5.2','keluar')"
     )
 
+    # Tandai kode [OP] pada akun penerimaan Amil (4.3.3) supaya otomatis berpasangan
+    # dgn "Operasional Amil [OP]" (5.2.6.05) di laporan Saldo per Program — keduanya
+    # memang lawan penerimaan/pengeluaran dana Amil yg sama.
+    c.execute("UPDATE chart_of_accounts SET nama='Penerimaan Lain Dana Amil [OP]' WHERE kode='4.3.3'")
+
     conn.commit()
     conn.close()
     print("Database berhasil diinisialisasi.")

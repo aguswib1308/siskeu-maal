@@ -529,6 +529,30 @@ def laporan_saldo_program():
         if r['kelompok'] == 'penerimaan':
             g['jenis_dana'] = r['jenis_dana']
 
+    # Alokasi penyaluran "Miskin" (dr Zakat): habiskan dulu saldo Fidyah, lalu Zakat
+    # Fitrah, sisanya dr Zakat Maal — bukan transaksi baru, murni cara tampil krn
+    # ketiganya sama2 dana zakat & Miskin tdk py sumber spesifik per transaksi.
+    zakat_kode = {r['kode']: r['id'] for r in conn.execute(
+        "SELECT kode, id FROM chart_of_accounts WHERE kode IN ('4.1.1','4.1.2','4.1.6','5.1.2')"
+    ).fetchall()}
+    fid_key = 'F'
+    zf_key  = f"coa{zakat_kode.get('4.1.2')}"
+    zm_key  = f"coa{zakat_kode.get('4.1.1')}"
+    miskin_key = f"coa{zakat_kode.get('5.1.2')}"
+    if miskin_key in groups:
+        miskin_g = groups.pop(miskin_key)
+        sisa = -(miskin_g['saldo_awal'] + miskin_g['masuk'] - miskin_g['keluar'])
+        for k in (fid_key, zf_key, zm_key):
+            if sisa <= 0 or k not in groups:
+                continue
+            g = groups[k]
+            saldo_sblm_alokasi = g['saldo_awal'] + g['masuk'] - g['keluar']
+            potong = min(sisa, saldo_sblm_alokasi) if saldo_sblm_alokasi > 0 else 0
+            g['keluar'] += potong
+            sisa -= potong
+        if sisa > 0 and zm_key in groups:
+            groups[zm_key]['keluar'] += sisa  # kekurangan (jika ada) tetap nempel Zakat Maal
+
     data = []
     # Infak Tidak Terikat dikelola sbg satu saldo gabungan (Kotak Infaq+Kencleng+Tunai
     # di penerimaan; Kafalah Guru TPQ, Safari Masjid, Sembako Dhuafa, Hibah ke Dana
