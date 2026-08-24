@@ -470,8 +470,28 @@ def init():
         ('5.2.7.01', '5.5.7.01', '5.5.7'),  # Tebar Qurban [TQUR]
     ]
     for kode_lama, kode_baru, parent_baru in pindah_ke_terikat:
+        sudah_ada = c.execute("SELECT 1 FROM chart_of_accounts WHERE kode=?", (kode_baru,)).fetchone()
+        if sudah_ada:
+            # Migrasi kode ini sudah pernah jalan. Seed INSERT OR IGNORE di atas (keyed
+            # by kode lama yg kini bebas) bisa membangkitkan lagi baris kode_lama sbg
+            # duplikat kosong -- buang drpd nabrak UNIQUE constraint saat rename ulang.
+            c.execute(
+                "DELETE FROM chart_of_accounts WHERE kode=? "
+                "AND id NOT IN (SELECT DISTINCT coa_id FROM transaksi WHERE coa_id IS NOT NULL)",
+                (kode_lama,)
+            )
+            continue
         c.execute("UPDATE chart_of_accounts SET kode=?, parent_kode=? WHERE kode=?",
                    (kode_baru, parent_baru, kode_lama))
+
+    # Grup induk lama yg semua anaknya sudah pindah ke [5.5] jadi kosong (yatim) —
+    # nonaktifkan spy tdk muncul lagi di Master Data > Chart of Accounts (bkn dihapus,
+    # kode-nya dipertahankan sbg jejak histori).
+    c.executemany(
+        "UPDATE chart_of_accounts SET aktif=0 WHERE kode=? AND NOT EXISTS "
+        "(SELECT 1 FROM chart_of_accounts x WHERE x.parent_kode=chart_of_accounts.kode AND x.aktif=1)",
+        [('5.2.2',), ('5.2.3',), ('5.2.5',), ('5.2.7',)]
+    )
 
     conn.commit()
     conn.close()
