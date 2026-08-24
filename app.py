@@ -642,6 +642,108 @@ def api_coa_saldo(coa_id):
     return jsonify(ok=True, label=label, saldo=g['saldo_akhir'])
 
 
+def _program_registry(conn):
+    """Daftar semua program (gabungan akun berkode sama, mis. [CY]) + daftar coa_id
+    anggotanya -- dipakai Buku Besar Program utk narik transaksi lintas-akun 1 program.
+    Semua akun infak_tidak_terikat digabung jadi satu key 'TIDAK_TERIKAT' (dikelola
+    1 saldo, sama seperti di Saldo per Program)."""
+    rows = conn.execute("""
+        SELECT id, kode, nama, jenis_dana, kelompok FROM chart_of_accounts
+        WHERE jenis_transaksi IS NOT NULL AND aktif=1
+    """).fetchall()
+    programs = {}
+    for r in rows:
+        code = _program_code(r['nama'])
+        key = code or f"coa{r['id']}"
+        if key not in programs:
+            label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
+            programs[key] = {'label': label, 'code': code, 'jenis_dana': r['jenis_dana'], 'coa_ids': []}
+        p = programs[key]
+        p['coa_ids'].append(r['id'])
+        if r['kelompok'] == 'penerimaan':
+            p['jenis_dana'] = r['jenis_dana']
+
+    tt_ids = []
+    for key in [k for k, p in programs.items() if p['jenis_dana'] == 'infak_tidak_terikat']:
+        tt_ids += programs.pop(key)['coa_ids']
+    if tt_ids:
+        programs['TIDAK_TERIKAT'] = {'label': 'Infaq Tidak Terikat (gabungan)', 'code': None,
+                                      'jenis_dana': 'infak_tidak_terikat', 'coa_ids': tt_ids}
+    return programs
+
+
+@app.route('/admin/laporan/buku-besar')
+@admin_required
+def laporan_buku_besar():
+    """Buku besar per program: rincian mutasi + saldo berjalan, utk semua program
+    (Zakat, Infaq Tidak Terikat gabungan, maupun tiap program Infaq Terikat)."""
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+    program_key = request.args.get('program', '')
+    fd = f"{bulan}-01"
+    ld = _last_day(bulan)
+    conn = get_db()
+    programs = _program_registry(conn)
+
+    ringkasan = []
+    for key, p in programs.items():
+        ph = ','.join('?' * len(p['coa_ids']))
+        saldo_awal = conn.execute(
+            f"SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) "
+            f"FROM transaksi WHERE coa_id IN ({ph}) AND tanggal < ?",
+            (*p['coa_ids'], fd)
+        ).fetchone()[0]
+        agg = conn.execute(
+            f"SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE 0 END),0) as masuk, "
+            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END),0) as keluar "
+            f"FROM transaksi WHERE coa_id IN ({ph}) AND tanggal BETWEEN ? AND ?",
+            (*p['coa_ids'], fd, ld)
+        ).fetchone()
+        saldo_akhir = saldo_awal + agg['masuk'] - agg['keluar']
+        if saldo_awal or agg['masuk'] or agg['keluar']:
+            ringkasan.append({'key': key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
+                               'saldo_awal': saldo_awal, 'masuk': agg['masuk'], 'keluar': agg['keluar'],
+                               'saldo_akhir': saldo_akhir})
+    ringkasan.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
+
+    detail = None
+    if program_key and program_key in programs:
+        p = programs[program_key]
+        ph = ','.join('?' * len(p['coa_ids']))
+        saldo_awal = conn.execute(
+            f"SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) "
+            f"FROM transaksi WHERE coa_id IN ({ph}) AND tanggal < ?",
+            (*p['coa_ids'], fd)
+        ).fetchone()[0]
+        rows = conn.execute(
+            f"SELECT t.id, t.tanggal, t.jenis, t.jumlah, t.keterangan, c.kode as coa_kode, c.nama as coa_nama, "
+            f"d.nama as donatur_nama, pm.nama as penerima_nama "
+            f"FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id "
+            f"LEFT JOIN donatur d ON t.donatur_id=d.id "
+            f"LEFT JOIN penerima_manfaat pm ON t.penerima_id=pm.id "
+            f"WHERE t.coa_id IN ({ph}) AND t.tanggal BETWEEN ? AND ? "
+            f"ORDER BY t.tanggal, t.id",
+            (*p['coa_ids'], fd, ld)
+        ).fetchall()
+        baris = []
+        running = saldo_awal
+        total_masuk = total_keluar = 0
+        for r in rows:
+            if r['jenis'] == 'masuk':
+                running += r['jumlah']; total_masuk += r['jumlah']
+            else:
+                running -= r['jumlah']; total_keluar += r['jumlah']
+            baris.append({**dict(r), 'saldo': running})
+        detail = {'key': program_key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
+                   'saldo_awal': saldo_awal, 'baris': baris, 'total_masuk': total_masuk,
+                   'total_keluar': total_keluar, 'saldo_akhir': running}
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_buku_besar.html',
+        ringkasan=ringkasan, detail=detail, program_key=program_key,
+        bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+
+
 @app.route('/admin/laporan/rekap-sumber-infaq')
 @admin_required
 def laporan_rekap_sumber_infaq():
