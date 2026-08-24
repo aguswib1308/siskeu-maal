@@ -44,24 +44,25 @@
   {% set d = data[dana] %}
   {% if d.masuk or d.keluar or d.saldo_awal %}
 
-  <div class="mb-4" style="border:1px solid #e9eef4;border-radius:10px;overflow:hidden">
-    <div class="d-flex justify-content-between align-items-center px-3 py-2"
-         style="background:{{ dana_color.get(dana,'#aaa') }};color:#fff">
-      <span class="fw-bold" style="font-size:.88rem">DANA {{ LABEL_DANA.get(dana, dana)|upper }}</span>
-      <div style="font-size:.78rem">
-        Saldo Awal: <strong>{{ d.saldo_awal|rupiah }}</strong>
-        &nbsp;·&nbsp;
-        Saldo Akhir: <strong>{{ d.saldo_akhir|rupiah }}</strong>
-      </div>
+  <div class="report-panel" style="--panel-accent: {{ dana_color.get(dana,'#94a3b8') }}">
+    <div class="report-panel-head">
+      <span class="report-panel-title">DANA {{ LABEL_DANA.get(dana, dana)|upper }}</span>
+      <span class="report-panel-meta">
+        Saldo Awal <strong>{{ d.saldo_awal|rupiah }}</strong>
+        &nbsp;→&nbsp;
+        Saldo Akhir <strong>{{ d.saldo_akhir|rupiah }}</strong>
+      </span>
     </div>
 
     <table class="table table-sm report-table mb-0">
       <thead>
-        <tr style="background:#f8f9fa">
-          <th class="ps-3" style="width:50%;font-size:.78rem;color:#64748b">Penerimaan</th>
-          <th class="text-end pe-3" style="width:15%;font-size:.78rem;color:#64748b">Jumlah</th>
-          <th class="ps-3" style="width:20%;font-size:.78rem;color:#64748b;border-left:2px solid #e9eef4">Penyaluran / Penggunaan</th>
-          <th class="text-end pe-3" style="width:15%;font-size:.78rem;color:#64748b">Jumlah</th>
+        <tr style="background:var(--bg)">
+          <th class="ps-3" style="width:12%;font-size:.72rem;color:var(--text-muted)">Kode</th>
+          <th style="width:38%;font-size:.72rem;color:var(--text-muted)">Penerimaan</th>
+          <th class="text-end" style="width:15%;font-size:.72rem;color:var(--text-muted)">Jumlah</th>
+          <th class="ps-3" style="width:12%;font-size:.72rem;color:var(--text-muted);border-left:1px solid var(--border)">Kode</th>
+          <th style="width:23%;font-size:.72rem;color:var(--text-muted)">Penyaluran / Penggunaan</th>
+          <th class="text-end pe-3" style="width:15%;font-size:.72rem;color:var(--text-muted)">Jumlah</th>
         </tr>
       </thead>
       <tbody>
@@ -69,41 +70,43 @@
         {% for i in range(max_rows if max_rows > 0 else 1) %}
         <tr>
           {% if i < d.masuk|length %}
-          <td class="ps-3 report-item">{{ d.masuk[i].nama }}</td>
-          <td class="text-end pe-3 text-success fw-semibold report-amount">{{ d.masuk[i].total|rupiah }}</td>
+          <td class="ps-3 report-kode">{{ d.masuk[i].kode }}</td>
+          <td class="report-item">{{ d.masuk[i].nama }}</td>
+          <td class="text-end text-success fw-semibold report-amount">{{ d.masuk[i].total|rupiah }}</td>
           {% else %}
-          <td></td><td></td>
+          <td></td><td></td><td></td>
           {% endif %}
           {% if i < d.keluar|length %}
-          <td class="ps-3 report-item" style="border-left:2px solid #e9eef4">{{ d.keluar[i].nama }}</td>
+          <td class="ps-3 report-kode" style="border-left:1px solid var(--border)">{{ d.keluar[i].kode }}</td>
+          <td class="report-item">{{ d.keluar[i].nama }}</td>
           <td class="text-end pe-3 text-danger fw-semibold report-amount">{{ d.keluar[i].total|rupiah }}</td>
           {% else %}
-          <td style="border-left:2px solid #e9eef4"></td><td></td>
+          <td style="border-left:1px solid var(--border)"></td><td></td><td></td>
           {% endif %}
         </tr>
         {% endfor %}
         {% if not d.masuk and not d.keluar %}
         <tr>
-          <td class="ps-3 text-muted small fst-italic" colspan="2">Tidak ada penerimaan</td>
-          <td class="ps-3 text-muted small fst-italic" colspan="2" style="border-left:2px solid #e9eef4">Tidak ada penyaluran</td>
+          <td class="ps-3 text-muted small fst-italic" colspan="3">Tidak ada penerimaan</td>
+          <td class="ps-3 text-muted small fst-italic" colspan="3" style="border-left:1px solid var(--border)">Tidak ada penyaluran</td>
         </tr>
         {% endif %}
       </tbody>
       <tfoot>
-        <tr style="border-top:2px solid #dee2e6;background:#f8fafb">
-          <td class="ps-3 fw-bold" style="font-size:.82rem">Total Penerimaan</td>
-          <td class="text-end pe-3 fw-bold text-success" style="font-size:.82rem">{{ d.total_masuk|rupiah }}</td>
-          <td class="ps-3 fw-bold" style="font-size:.82rem;border-left:2px solid #e9eef4">Total Penyaluran</td>
-          <td class="text-end pe-3 fw-bold text-danger" style="font-size:.82rem">{{ d.total_keluar|rupiah }}</td>
+        <tr class="report-subtotal">
+          <td colspan="2" class="ps-3">Total Penerimaan</td>
+          <td class="text-end text-success">{{ d.total_masuk|rupiah }}</td>
+          <td colspan="2" class="ps-3" style="border-left:1px solid var(--border)">Total Penyaluran</td>
+          <td class="text-end pe-3 text-danger">{{ d.total_keluar|rupiah }}</td>
         </tr>
       </tfoot>
     </table>
 
-    <div class="d-flex justify-content-end gap-4 px-3 py-2" style="background:#f8fafb;border-top:1px solid #e9eef4;font-size:.82rem">
-      <span class="text-muted">Saldo Awal: <strong>{{ d.saldo_awal|rupiah }}</strong></span>
-      <span class="text-muted">+ Penerimaan: <strong class="text-success">{{ d.total_masuk|rupiah }}</strong></span>
-      <span class="text-muted">− Penyaluran: <strong class="text-danger">{{ d.total_keluar|rupiah }}</strong></span>
-      <span>= Saldo Akhir: <strong class="{{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.92rem">{{ d.saldo_akhir|rupiah }}</strong></span>
+    <div class="report-panel-foot">
+      <span class="text-muted">Saldo Awal: <strong class="val">{{ d.saldo_awal|rupiah }}</strong></span>
+      <span class="text-muted">+ Penerimaan: <strong class="val text-success">{{ d.total_masuk|rupiah }}</strong></span>
+      <span class="text-muted">− Penyaluran: <strong class="val text-danger">{{ d.total_keluar|rupiah }}</strong></span>
+      <span>= Saldo Akhir: <strong class="val {{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.92rem">{{ d.saldo_akhir|rupiah }}</strong></span>
     </div>
   </div>
 

@@ -1,32 +1,108 @@
 <style>
-.report-card { border: none; border-radius: 8px; overflow: hidden; }
-.report-header { text-align: center; padding: 1.5rem 1.5rem .5rem; }
-.report-inst { font-weight: 800; font-size: 1.15rem; letter-spacing: .04em; text-transform: uppercase; }
-.report-sub-inst { font-size: .85rem; color: #555; margin-top: 2px; }
-.report-addr { font-size: .78rem; color: #777; margin-top: 4px; }
-.report-line { border-bottom: 3px double #1a5276; margin: .75rem auto; max-width: 90%; }
-.report-title { font-weight: 700; font-size: 1.05rem; margin-top: .5rem; }
-.report-period { font-size: .85rem; color: #555; margin-bottom: .5rem; }
-.report-table { font-size: .85rem; margin-bottom: 0; }
-.report-table th, .report-table td { padding: .45rem .75rem; }
-.report-thead th { background: #1a5276; color: #fff; font-weight: 600; font-size: .82rem; letter-spacing: .03em; }
-.report-group td { font-weight: 600; background: #f8f9fa; font-size: .82rem; }
-.report-item { color: #444; font-size: .82rem; }
-.report-amount { white-space: nowrap; font-size: .82rem; }
-.report-subtotal td { font-weight: 600; border-top: 1px solid #ccc; font-size: .82rem; }
-.report-total td { font-weight: 700; background: #eaf4fb; font-size: .85rem; border-top: 2px solid #1a5276; }
-.report-sign { padding: 2rem 2rem 1.5rem; }
-.sign-role { font-size: .8rem; color: #777; }
-.sign-name { font-weight: 700; margin-top: 3.5rem; border-bottom: 1px solid #333; display: inline-block; padding: 0 1rem; }
-.sign-label { font-size: .78rem; color: #777; margin-top: 4px; }
-.report-summary { background: #f8fafb; border-top: 2px solid #e9eef4; padding: 1.25rem 1.5rem; }
-.report-summary .sum-label { font-size: .75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; }
-.report-summary .sum-value { font-weight: 700; font-size: 1.05rem; margin-top: 2px; }
+.report-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.report-header {
+  text-align: center;
+  padding: 1.75rem 1.5rem .6rem;
+  background: linear-gradient(180deg, rgba(184,146,42,.06), transparent);
+}
+.report-inst {
+  font-weight: 800; font-size: 1.2rem; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--text-main);
+}
+.report-sub-inst { font-size: .85rem; color: var(--text-muted); margin-top: 2px; }
+.report-addr { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
+.report-line {
+  border: none; border-top: 1px solid var(--border);
+  position: relative; margin: 1rem auto .85rem; max-width: 92%;
+}
+.report-line::after {
+  content: ''; position: absolute; left: 50%; top: -1.5px; transform: translateX(-50%);
+  width: 56px; height: 3px; background: var(--accent); border-radius: 2px;
+}
+.report-title { font-weight: 700; font-size: 1.08rem; margin-top: .6rem; letter-spacing: .01em; color: var(--text-main); }
+.report-period { font-size: .84rem; color: var(--text-muted); margin-bottom: .25rem; }
+.report-table {
+  --bs-table-bg: transparent; --bs-table-color: var(--text-main);
+  --bs-table-striped-bg: transparent; --bs-table-hover-bg: transparent;
+  font-size: .85rem; margin-bottom: 0; color: var(--text-main);
+}
+.report-table th, .report-table td { padding: .5rem .75rem; border-color: var(--border) !important; background-color: transparent; }
+.report-thead th {
+  background: var(--primary); color: #fff; font-weight: 600; font-size: .78rem;
+  letter-spacing: .05em; text-transform: uppercase; border: none !important;
+}
+.report-group td { font-weight: 600; background: var(--bg) !important; font-size: .78rem; letter-spacing: .03em; color: var(--text-muted) !important; }
+.report-kode {
+  font-family: 'SFMono-Regular', ui-monospace, Consolas, monospace;
+  font-size: .74rem; color: var(--text-muted) !important; white-space: nowrap; letter-spacing: 0;
+}
+.report-item { color: var(--text-main) !important; font-size: .82rem; }
+.report-amount { white-space: nowrap; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.report-subtotal td { font-weight: 600; border-top: 1px solid var(--border); font-size: .82rem; }
+.report-total td {
+  font-weight: 700; background: rgba(184,146,42,.09); font-size: .85rem;
+  border-top: 2px solid var(--accent) !important;
+}
+.report-table tbody tr:hover td { background: rgba(15,37,55,.025); }
+[data-bs-theme="dark"] .report-table tbody tr:hover td { background: rgba(255,255,255,.035); }
+.report-sign { padding: 2.25rem 2rem 1.75rem; }
+.sign-role { font-size: .8rem; color: var(--text-muted); }
+.sign-name {
+  font-weight: 700; margin-top: 3.5rem; border-bottom: 1px solid var(--text-main);
+  display: inline-block; padding: 0 1.25rem; color: var(--text-main);
+}
+.sign-label { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
+.report-summary { background: var(--bg); border-top: 1px solid var(--border); padding: 1.35rem 1.5rem; }
+.report-summary .sum-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.report-summary .sum-value { font-weight: 700; font-size: 1.05rem; margin-top: 2px; font-variant-numeric: tabular-nums; color: var(--text-main); }
+
+/* Panel per-jenis-dana (dipakai LSPD & Arus Kas) — aksen warna di tepi kiri, bukan blok penuh */
+.report-panel {
+  border: 1px solid var(--border); border-left: 3px solid var(--panel-accent, var(--accent));
+  border-radius: 10px; overflow: hidden; background: var(--surface); margin-bottom: 1rem;
+}
+.report-panel-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .65rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.report-panel-title {
+  font-weight: 700; font-size: .84rem; color: var(--panel-accent, var(--text-main));
+  letter-spacing: .02em;
+}
+.report-panel-meta { font-size: .76rem; color: var(--text-muted); }
+.report-panel-meta strong { color: var(--text-main); font-variant-numeric: tabular-nums; }
+.report-panel-foot {
+  display: flex; justify-content: flex-end; gap: 1.5rem; flex-wrap: wrap;
+  padding: .6rem 1rem; background: var(--bg); border-top: 1px solid var(--border); font-size: .8rem;
+}
+.report-panel-foot .val { font-variant-numeric: tabular-nums; }
+@media print {
+  .report-panel { border-color: #ddd !important; }
+  .report-panel-head, .report-panel-foot { background: #f8f8f8 !important; }
+  .report-panel-title { color: #111 !important; }
+}
+
 @media print {
   .no-print { display: none !important; }
   .sidebar, .topbar { display: none !important; }
   .main { margin-left: 0 !important; padding: .5rem !important; }
-  .report-card { box-shadow: none !important; border: none !important; }
+  body { background: #fff !important; }
+  .report-card {
+    box-shadow: none !important; border: 1px solid #ddd !important; border-radius: 0 !important;
+    background: #fff !important;
+  }
+  .report-header { background: none !important; }
+  .report-inst, .report-title, .report-item, .report-amount, .sign-name, .report-table { color: #111 !important; }
+  .report-sub-inst, .report-addr, .report-period, .sum-label, .sign-role, .sign-label, .report-kode { color: #555 !important; }
+  .report-thead th { background: #1a2635 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-group td { background: #f4f4f4 !important; color: #333 !important; }
+  .report-total td { background: #f1e7cf !important; border-top-color: #B8922A !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-summary { background: #f8f8f8 !important; }
   .report-sign { page-break-inside: avoid; }
   .card { box-shadow: none !important; page-break-inside: avoid; }
 }

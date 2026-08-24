@@ -36,14 +36,15 @@
       <div class="flex-grow-1">
         <table class="table table-sm report-table">
           <thead>
-            <tr class="report-thead"><th colspan="2">ASET</th></tr>
+            <tr class="report-thead"><th colspan="3">ASET</th></tr>
           </thead>
           <tbody>
-            <tr class="report-group"><td colspan="2">Aset Lancar</td></tr>
+            <tr class="report-group"><td colspan="3">Aset Lancar</td></tr>
             {% for dana in dana_types %}
             <tr>
-              <td class="ps-4 report-item">Kas & Setara Kas Dana {{ LABEL_DANA.get(dana, dana) }}</td>
-              <td class="text-end report-amount">{{ kas.get(dana, 0)|rupiah }}</td>
+              <td class="ps-3 report-kode" style="width:58px">{{ KODE_KAS_DANA.get(dana, '') }}</td>
+              <td class="report-item">Kas &amp; Setara Kas Dana {{ LABEL_DANA.get(dana, dana) }}</td>
+              <td class="text-end pe-3 report-amount">{{ kas.get(dana, 0)|rupiah }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -52,8 +53,8 @@
       <table class="table table-sm report-table mb-0">
         <tfoot>
           <tr class="report-total">
-            <td>TOTAL ASET</td>
-            <td class="text-end">{{ total_aset|rupiah }}</td>
+            <td colspan="2">TOTAL ASET</td>
+            <td class="text-end pe-3">{{ total_aset|rupiah }}</td>
           </tr>
         </tfoot>
       </table>
@@ -63,28 +64,31 @@
       <div class="flex-grow-1">
         <table class="table table-sm report-table">
           <thead>
-            <tr class="report-thead"><th colspan="2">LIABILITAS & SALDO DANA</th></tr>
+            <tr class="report-thead"><th colspan="3">LIABILITAS &amp; SALDO DANA</th></tr>
           </thead>
           <tbody>
-            <tr class="report-group"><td colspan="2">Liabilitas</td></tr>
+            <tr class="report-group"><td colspan="3">Liabilitas</td></tr>
             <tr>
-              <td class="ps-4 report-item">Titipan / Hutang Dana Zakat</td>
-              <td class="text-end report-amount">Rp 0</td>
+              <td class="ps-3 report-kode" style="width:58px">2.1.1</td>
+              <td class="report-item">Titipan / Hutang Dana Zakat</td>
+              <td class="text-end pe-3 report-amount">Rp 0</td>
             </tr>
             <tr>
-              <td class="ps-4 report-item">Titipan / Hutang Dana Infak</td>
-              <td class="text-end report-amount">Rp 0</td>
+              <td class="ps-3 report-kode">2.1.2</td>
+              <td class="report-item">Titipan / Hutang Dana Infak</td>
+              <td class="text-end pe-3 report-amount">Rp 0</td>
             </tr>
             <tr class="report-subtotal">
-              <td>Total Liabilitas</td>
-              <td class="text-end">Rp 0</td>
+              <td colspan="2">Total Liabilitas</td>
+              <td class="text-end pe-3">Rp 0</td>
             </tr>
-            <tr class="report-group" style="border-top:2px solid #dee2e6"><td colspan="2">Saldo Dana</td></tr>
+            <tr class="report-group"><td colspan="3">Saldo Dana</td></tr>
             {% for dana in dana_types %}
             {% set sal = kas.get(dana, 0) %}
             <tr>
-              <td class="ps-4 report-item">Saldo Dana {{ LABEL_DANA.get(dana, dana) }}</td>
-              <td class="text-end report-amount {% if sal < 0 %}text-danger{% endif %}">{{ sal|rupiah }}</td>
+              <td class="ps-3 report-kode">{{ KODE_SALDO_DANA.get(dana, '') }}</td>
+              <td class="report-item">Saldo Dana {{ LABEL_DANA.get(dana, dana) }}</td>
+              <td class="text-end pe-3 report-amount {% if sal < 0 %}text-danger{% endif %}">{{ sal|rupiah }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -93,8 +97,8 @@
       <table class="table table-sm report-table mb-0">
         <tfoot>
           <tr class="report-total">
-            <td>TOTAL LIABILITAS & SALDO DANA</td>
-            <td class="text-end">{{ total_aset|rupiah }}</td>
+            <td colspan="2">TOTAL LIABILITAS &amp; SALDO DANA</td>
+            <td class="text-end pe-3">{{ total_aset|rupiah }}</td>
           </tr>
         </tfoot>
       </table>

@@ -42,19 +42,19 @@
   <div class="p-4">
     {# ── Saldo Kas Awal ─────────────────────────────────── #}
     <div class="d-flex justify-content-between align-items-center p-3 mb-3"
-         style="background:#f8fafb;border:1px solid #e9eef4;border-radius:8px">
-      <span class="fw-semibold" style="color:#64748b;font-size:.88rem">
+         style="background:var(--bg);border:1px solid var(--border);border-radius:10px">
+      <span class="fw-semibold" style="color:var(--text-muted);font-size:.88rem">
         <i class="bi bi-wallet2"></i> Saldo Kas Awal Periode
       </span>
-      <span class="fw-bold" style="font-size:1.1rem">{{ saldo_awal|rupiah }}</span>
+      <span class="fw-bold report-amount" style="font-size:1.1rem">{{ saldo_awal|rupiah }}</span>
     </div>
 
     <div class="row g-3 mb-3">
       {# ── Arus Kas Masuk ───────────────────────────────── #}
       <div class="col-md-6">
-        <div style="border:1px solid #e9eef4;border-radius:10px;overflow:hidden">
-          <div class="px-3 py-2 fw-bold" style="background:#e8f8f0;color:#1e8449;font-size:.88rem">
-            <i class="bi bi-arrow-down-circle-fill"></i> Arus Kas Masuk
+        <div class="report-panel mb-0" style="--panel-accent:#1e8449">
+          <div class="report-panel-head">
+            <span class="report-panel-title"><i class="bi bi-arrow-down-circle-fill me-1"></i> Arus Kas Masuk</span>
           </div>
           <table class="table table-sm report-table mb-0">
             <tbody>
@@ -64,24 +64,25 @@
                 {% if d != ns_dana.cur %}
                   {% set ns_dana.cur = d %}
                   <tr class="report-group">
-                    <td colspan="2" class="ps-3" style="color:{{ dana_color.get(d,'#aaa') }}">
+                    <td colspan="3" class="ps-3" style="color:{{ dana_color.get(d,'#94a3b8') }}">
                       Dana {{ LABEL_DANA.get(d, d) }}
                     </td>
                   </tr>
                 {% endif %}
                 <tr>
-                  <td class="ps-4 report-item">{{ r.nama }}</td>
+                  <td class="ps-3 report-kode" style="width:56px">{{ r.kode }}</td>
+                  <td class="report-item">{{ r.nama }}</td>
                   <td class="text-end pe-3 text-success fw-semibold report-amount">{{ r.total|rupiah }}</td>
                 </tr>
               {% else %}
-              <tr><td colspan="2" class="text-muted text-center py-3 small fst-italic">
+              <tr><td colspan="3" class="text-muted text-center py-3 small fst-italic">
                 Tidak ada arus kas masuk
               </td></tr>
               {% endfor %}
             </tbody>
             <tfoot>
-              <tr class="report-total">
-                <td class="ps-3">Total Arus Masuk</td>
+              <tr class="report-subtotal">
+                <td colspan="2" class="ps-3">Total Arus Masuk</td>
                 <td class="text-end pe-3 text-success">{{ total_masuk|rupiah }}</td>
               </tr>
             </tfoot>
@@ -91,9 +92,9 @@
 
       {# ── Arus Kas Keluar ──────────────────────────────── #}
       <div class="col-md-6">
-        <div style="border:1px solid #e9eef4;border-radius:10px;overflow:hidden">
-          <div class="px-3 py-2 fw-bold" style="background:#fde8e6;color:#922b21;font-size:.88rem">
-            <i class="bi bi-arrow-up-circle-fill"></i> Arus Kas Keluar
+        <div class="report-panel mb-0" style="--panel-accent:#922b21">
+          <div class="report-panel-head">
+            <span class="report-panel-title"><i class="bi bi-arrow-up-circle-fill me-1"></i> Arus Kas Keluar</span>
           </div>
           <table class="table table-sm report-table mb-0">
             <tbody>
@@ -103,24 +104,25 @@
                 {% if d != ns_dana2.cur %}
                   {% set ns_dana2.cur = d %}
                   <tr class="report-group">
-                    <td colspan="2" class="ps-3" style="color:{{ dana_color.get(d,'#aaa') }}">
+                    <td colspan="3" class="ps-3" style="color:{{ dana_color.get(d,'#94a3b8') }}">
                       Dana {{ LABEL_DANA.get(d, d) }}
                     </td>
                   </tr>
                 {% endif %}
                 <tr>
-                  <td class="ps-4 report-item">{{ r.nama }}</td>
+                  <td class="ps-3 report-kode" style="width:56px">{{ r.kode }}</td>
+                  <td class="report-item">{{ r.nama }}</td>
                   <td class="text-end pe-3 text-danger fw-semibold report-amount">{{ r.total|rupiah }}</td>
                 </tr>
               {% else %}
-              <tr><td colspan="2" class="text-muted text-center py-3 small fst-italic">
+              <tr><td colspan="3" class="text-muted text-center py-3 small fst-italic">
                 Tidak ada arus kas keluar
               </td></tr>
               {% endfor %}
             </tbody>
             <tfoot>
-              <tr class="report-total">
-                <td class="ps-3">Total Arus Keluar</td>
+              <tr class="report-subtotal">
+                <td colspan="2" class="ps-3">Total Arus Keluar</td>
                 <td class="text-end pe-3 text-danger">{{ total_keluar|rupiah }}</td>
               </tr>
             </tfoot>
@@ -130,7 +132,7 @@
     </div>
 
     {# ── Ringkasan ────────────────────────────────────────── #}
-    <div class="report-summary" style="border-radius:10px">
+    <div class="report-summary" style="border-radius:10px;border:1px solid var(--border)">
       <div class="row text-center g-2">
         <div class="col">
           <div class="sum-label">Saldo Kas Awal</div>

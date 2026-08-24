@@ -154,6 +154,11 @@ def terbilang(n):
 app.jinja_env.filters['rupiah'] = format_rupiah
 
 DANA_TYPES  = ['zakat', 'infak_tidak_terikat', 'infak_terikat', 'amil', 'wakaf']
+# Kode akun GL (Kas & Saldo Dana) per jenis dana, utk ditampilkan di Neraca.
+# infak_tidak_terikat & infak_terikat berbagi kode Kas/Saldo Infak yg sama krn
+# keduanya blm punya akun Kas terpisah di COA (pemisahan hanya di sisi mutasi).
+KODE_KAS_DANA   = {'zakat': '1.1.1', 'infak_tidak_terikat': '1.1.2', 'infak_terikat': '1.1.2', 'amil': '1.1.3', 'wakaf': '1.1.4'}
+KODE_SALDO_DANA = {'zakat': '3.1',   'infak_tidak_terikat': '3.2',   'infak_terikat': '3.2',   'amil': '3.3',   'wakaf': '3.4'}
 LABEL_DANA  = {'zakat':'Zakat','infak_tidak_terikat':'Infak/Sedekah Tidak Terikat',
                'infak_terikat':'Infak Terikat','amil':'Amil','wakaf':'Wakaf','umum':'Umum'}
 LABEL_ASNAF = {'fakir':'Fakir','miskin':'Miskin','amil':'Amil','muallaf':'Muallaf',
@@ -171,7 +176,8 @@ def format_bulan(b):
 
 app.jinja_env.filters['bulan_label'] = format_bulan
 app.jinja_env.globals.update(LABEL_DANA=LABEL_DANA, LABEL_ASNAF=LABEL_ASNAF,
-                              LABEL_SUMBER=LABEL_SUMBER, DANA_TYPES=DANA_TYPES)
+                              LABEL_SUMBER=LABEL_SUMBER, DANA_TYPES=DANA_TYPES,
+                              KODE_KAS_DANA=KODE_KAS_DANA, KODE_SALDO_DANA=KODE_SALDO_DANA)
 
 def parse_gmaps_url(url):
     """Ekstrak (lat, lng) dari berbagai format URL Google Maps."""
