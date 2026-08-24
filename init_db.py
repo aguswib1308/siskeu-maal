@@ -493,6 +493,19 @@ def init():
         [('5.2.2',), ('5.2.3',), ('5.2.5',), ('5.2.7',)]
     )
 
+    # Akun penerimaan terikat lain yg juga blm py pasangan penyaluran (pola bug sama dgn
+    # Tebar Qurban [TQUR] sebelumnya) -- tambahkan skrg spy semua program terikat py menu.
+    c.executemany(
+        "INSERT OR IGNORE INTO chart_of_accounts (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)",
+        [
+            ('5.5.1.03', "Program Tahfidz [ITAH]",    'penyaluran_beban', 'infak_terikat', '5.5.1', 'keluar'),
+            ('5.5.4.04', 'Mobil Operasional [MOP]',    'penyaluran_beban', 'infak_terikat', '5.5.4', 'keluar'),
+            ('5.5.4.05', 'Sembako Awal Tahun [SAT]',   'penyaluran_beban', 'infak_terikat', '5.5.4', 'keluar'),
+            ('5.5.5.03', 'Bencana [IKEM]',             'penyaluran_beban', 'infak_terikat', '5.5.5', 'keluar'),
+            ("5.5.6.04", "Tebar Qur'an [IQRA]",        'penyaluran_beban', 'infak_terikat', '5.5.6', 'keluar'),
+        ]
+    )
+
     conn.commit()
     conn.close()
     print("Database berhasil diinisialisasi.")
