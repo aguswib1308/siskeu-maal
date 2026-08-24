@@ -1,0 +1,92 @@
+{% extends 'admin/base.html' %}
+{% block title %}Rekap Sumber Infaq{% endblock %}
+{% block page_title %}<i class="bi bi-pie-chart-fill"></i> Rekap Tahunan Sumber Infaq{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <form class="d-flex gap-2 align-items-center">
+    <label class="form-label mb-0 small text-muted">Tahun</label>
+    <input type="number" name="tahun" value="{{ tahun }}" min="2020" max="2100"
+           class="form-control form-control-sm" style="width:100px">
+    <button class="btn btn-sm btn-primary">Tampilkan</button>
+  </form>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-printer"></i> Cetak
+  </button>
+</div>
+
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}
+    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+    {% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">REKAP PENERIMAAN INFAK TIDAK TERIKAT PER SUMBER</div>
+    <div class="report-period">Tahun {{ tahun }}</div>
+    <div class="text-muted small mt-1">
+      Rincian sumber penerimaan (Kotak Infaq, Kencleng, Tunai) untuk bahan rapat — dalam
+      pengelolaan sehari-hari ketiganya tetap satu saldo Infak Tidak Terikat.
+    </div>
+  </div>
+
+  <div class="p-4">
+    <table class="table table-sm report-table">
+      <thead>
+        <tr class="report-thead">
+          <th class="ps-3">Bulan</th>
+          {% for c in sumber_coa %}
+          <th class="text-end">{{ c.nama }}</th>
+          {% endfor %}
+          <th class="text-end pe-3">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for baris in tabel %}
+        <tr>
+          <td class="ps-3 report-item">{{ baris.label }}</td>
+          {% for c in sumber_coa %}
+          <td class="text-end report-amount">{{ baris.per_sumber.get(c.id, 0)|rupiah }}</td>
+          {% endfor %}
+          <td class="text-end pe-3 fw-semibold report-amount">{{ baris.total|rupiah }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ sumber_coa|length + 2 }}" class="text-center text-muted py-4 fst-italic">
+          Belum ada data penerimaan utk tahun {{ tahun }}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if tabel %}
+      <tfoot>
+        <tr class="report-total">
+          <td class="ps-3">TOTAL {{ tahun }}</td>
+          {% for c in sumber_coa %}
+          <td class="text-end">{{ total_per_sumber.get(c.id, 0)|rupiah }}</td>
+          {% endfor %}
+          <td class="text-end pe-3">{{ grand_total|rupiah }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  {% if inst.ketua or inst.bendahara %}
+  <div class="report-sign">
+    <div class="row">
+      <div class="col-6 text-center">
+        <div class="sign-role">Mengetahui,</div>
+        <div class="sign-name">{{ inst.ketua or '_______________' }}</div>
+        <div class="sign-label">Ketua</div>
+      </div>
+      <div class="col-6 text-center">
+        <div class="sign-role">Dibuat oleh,</div>
+        <div class="sign-name">{{ inst.bendahara or '_______________' }}</div>
+        <div class="sign-label">Bendahara</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% include 'admin/_report_style.html' %}
+{% endblock %}

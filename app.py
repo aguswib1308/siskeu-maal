@@ -531,6 +531,12 @@ def laporan_saldo_program():
 
     data = []
     for g in groups.values():
+        # Infak Tidak Terikat dikelola sbg satu saldo gabungan (bukan per-program) —
+        # program yg tdk punya pasangan penerimaan terikat (mis. Kafalah Guru TPQ,
+        # Safari Masjid, Sembako Dhuafa) tidak relevan ditampilkan di sini krn
+        # "saldo per program"-nya memang tidak dipisah, semua dari kas umum.
+        if g['jenis_dana'] == 'infak_tidak_terikat':
+            continue
         g['saldo_akhir'] = g['saldo_awal'] + g['masuk'] - g['keluar']
         if g['saldo_awal'] or g['masuk'] or g['keluar']:
             data.append(g)
@@ -540,6 +546,53 @@ def laporan_saldo_program():
     conn.close()
     return render_template('admin/laporan_saldo_program.html',
         data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+
+
+@app.route('/admin/laporan/rekap-sumber-infaq')
+@admin_required
+def laporan_rekap_sumber_infaq():
+    """Rekap tahunan penerimaan Infak Tidak Terikat per sumber (Kotak Infaq/Kencleng/Tunai) —
+    bahan rapat. Sesuai pengelolaan riil: ketiganya jadi satu saldo, ini murni rekap sumber dana."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+
+    sumber_coa = conn.execute("""
+        SELECT id, kode, nama FROM chart_of_accounts
+        WHERE parent_kode='4.2.2' AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode
+    """).fetchall()
+
+    rows = conn.execute("""
+        SELECT strftime('%m', t.tanggal) as bln, t.coa_id, SUM(t.jumlah) as total
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE c.parent_kode='4.2.2' AND t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        GROUP BY bln, t.coa_id
+    """, (tahun,)).fetchall()
+    per_bulan = {}
+    for r in rows:
+        per_bulan.setdefault(r['bln'], {})[r['coa_id']] = r['total']
+
+    bulan_urut = [f"{i:02d}" for i in range(1, 13)]
+    tabel = []
+    total_per_sumber = {c['id']: 0 for c in sumber_coa}
+    grand_total = 0
+    for bm in bulan_urut:
+        vals = per_bulan.get(bm, {})
+        if not vals:
+            continue
+        baris = {'bulan': bm, 'label': BULAN_IND[int(bm)], 'per_sumber': {}, 'total': 0}
+        for c in sumber_coa:
+            v = vals.get(c['id'], 0)
+            baris['per_sumber'][c['id']] = v
+            baris['total'] += v
+            total_per_sumber[c['id']] += v
+        grand_total += baris['total']
+        tabel.append(baris)
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_rekap_sumber.html',
+        sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
+        grand_total=grand_total, tahun=tahun, inst=inst)
 
 
 @app.route('/admin/laporan/arus-kas')
