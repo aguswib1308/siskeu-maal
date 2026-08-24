@@ -440,7 +440,7 @@ def _dana_summary(conn, bulan):
 @app.route('/admin/laporan/neraca')
 @admin_required
 def laporan_neraca():
-    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
     ld    = _last_day(bulan)
     conn  = get_db()
 
@@ -466,7 +466,7 @@ def laporan_neraca():
 @app.route('/admin/laporan/dana')
 @admin_required
 def laporan_dana():
-    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
     conn  = get_db()
     data  = _dana_summary(conn, bulan)
     inst  = get_instansi(conn)
@@ -485,7 +485,7 @@ def _program_code(nama):
 @admin_required
 def laporan_saldo_program():
     """Saldo per program/produk (gabungan sisi penerimaan+penyaluran akun berkode sama, mis. [CY])."""
-    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
     fd = f"{bulan}-01"
     ld = _last_day(bulan)
     conn = get_db()
@@ -545,7 +545,7 @@ def laporan_saldo_program():
 @app.route('/admin/laporan/arus-kas')
 @admin_required
 def laporan_arus_kas():
-    bulan    = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    bulan    = request.args.get('bulan', get_tanggal_kerja()[:7])
     prev_ld  = _prev_last_day(bulan)
     conn     = get_db()
 
