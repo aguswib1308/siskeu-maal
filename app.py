@@ -530,16 +530,23 @@ def laporan_saldo_program():
             g['jenis_dana'] = r['jenis_dana']
 
     data = []
+    # Infak Tidak Terikat dikelola sbg satu saldo gabungan (Kotak Infaq+Kencleng+Tunai
+    # di penerimaan; Kafalah Guru TPQ, Safari Masjid, Sembako Dhuafa, Hibah ke Dana
+    # Lain, dll di penyaluran) — bukan program per-akun, jadi digabung jadi 1 baris.
+    tidak_terikat = {'label': 'Infaq Tidak Terikat (gabungan)', 'code': None,
+                      'jenis_dana': 'infak_tidak_terikat', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
     for g in groups.values():
-        # Infak Tidak Terikat dikelola sbg satu saldo gabungan (bukan per-program) —
-        # program yg tdk punya pasangan penerimaan terikat (mis. Kafalah Guru TPQ,
-        # Safari Masjid, Sembako Dhuafa) tidak relevan ditampilkan di sini krn
-        # "saldo per program"-nya memang tidak dipisah, semua dari kas umum.
         if g['jenis_dana'] == 'infak_tidak_terikat':
+            tidak_terikat['saldo_awal'] += g['saldo_awal']
+            tidak_terikat['masuk']      += g['masuk']
+            tidak_terikat['keluar']     += g['keluar']
             continue
         g['saldo_akhir'] = g['saldo_awal'] + g['masuk'] - g['keluar']
         if g['saldo_awal'] or g['masuk'] or g['keluar']:
             data.append(g)
+    tidak_terikat['saldo_akhir'] = tidak_terikat['saldo_awal'] + tidak_terikat['masuk'] - tidak_terikat['keluar']
+    if tidak_terikat['saldo_awal'] or tidak_terikat['masuk'] or tidak_terikat['keluar']:
+        data.append(tidak_terikat)
     data.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
 
     inst = get_instansi(conn)
