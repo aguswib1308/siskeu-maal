@@ -82,6 +82,36 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def get_tanggal_kerja():
+    """Tanggal kerja admin (default hari ini) — dipakai sbg default tanggal saat
+    input transaksi, supaya mudah memasukkan transaksi masa lalu berturut-turut
+    tanpa ganti tanggal manual tiap kali."""
+    return session.get('tanggal_kerja') or date.today().isoformat()
+
+@app.context_processor
+def inject_tanggal_kerja():
+    tk = get_tanggal_kerja()
+    return {'tanggal_kerja': tk, 'tanggal_kerja_is_today': tk == date.today().isoformat()}
+
+@app.route('/admin/tanggal-kerja', methods=['POST'])
+@admin_required
+def set_tanggal_kerja():
+    tgl = request.form.get('tanggal', '').strip()
+    try:
+        datetime.strptime(tgl, '%Y-%m-%d')
+        session['tanggal_kerja'] = tgl
+        flash(f'Tanggal kerja diatur ke {tgl}. Transaksi baru akan default ke tanggal ini.', 'success')
+    except ValueError:
+        flash('Tanggal tidak valid.', 'danger')
+    return redirect(request.referrer or url_for('admin_dashboard'))
+
+@app.route('/admin/tanggal-kerja/reset', methods=['POST'])
+@admin_required
+def reset_tanggal_kerja():
+    session.pop('tanggal_kerja', None)
+    flash('Tanggal kerja dikembalikan ke hari ini.', 'success')
+    return redirect(request.referrer or url_for('admin_dashboard'))
+
 def format_rupiah(angka):
     try:
         return f"Rp {int(angka):,}".replace(',', '.')
@@ -277,7 +307,7 @@ def admin_dashboard():
 @admin_required
 def admin_transaksi():
     conn = get_db()
-    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
     jenis = request.args.get('jenis', '')
     jenis_dana = request.args.get('jenis_dana', '')
     query = '''
@@ -1235,7 +1265,7 @@ def master_saldo_awal_simpan():
 @admin_required
 def admin_jurnal():
     conn = get_db()
-    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
     jurnal = conn.execute('''
         SELECT j.*, cd.kode as debit_kode, cd.nama as debit_nama,
                ck.kode as kredit_kode, ck.nama as kredit_nama, u.nama as petugas
