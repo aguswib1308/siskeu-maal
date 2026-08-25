@@ -1,0 +1,169 @@
+{% extends 'admin/base.html' %}
+{% block title %}Donatur & Mustahik{% endblock %}
+{% block page_title %}<i class="bi bi-people"></i> Statistik Donatur & Mustahik{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <div></div>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-printer"></i> Cetak
+  </button>
+</div>
+
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}
+    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+    {% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">STATISTIK DONATUR &amp; MUSTAHIK</div>
+    <div class="report-period">Posisi per {{ hari_ini }} — bahan evaluasi pengurus</div>
+  </div>
+
+  <div class="report-summary">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="sum-label">Total Donatur</div>
+        <div class="sum-value" style="font-size:1.4rem">{{ d_total }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-label">Donatur Aktif</div>
+        <div class="sum-value text-success" style="font-size:1.4rem">{{ d_aktif }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-label">Total Mustahik Terdaftar</div>
+        <div class="sum-value" style="font-size:1.4rem">{{ m_total }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-label">Mustahik Aktif</div>
+        <div class="sum-value text-success" style="font-size:1.4rem">{{ m_aktif }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="p-4 pt-3">
+
+    {# ── DONATUR ───────────────────────────────────────────── #}
+    <div class="report-panel" style="--panel-accent:#1B3B5A">
+      <div class="report-panel-head">
+        <div class="report-panel-title"><i class="bi bi-person-heart"></i> DONATUR</div>
+        <div class="report-panel-meta">Aktif <strong>{{ d_aktif }}</strong> · Nonaktif <strong>{{ d_nonaktif }}</strong></div>
+      </div>
+      <div class="p-3">
+        <div class="row g-3 mb-3 text-center">
+          <div class="col-6 col-md-3">
+            <div class="p-2 rounded" style="background:var(--bg)">
+              <div class="fw-bold" style="font-size:1.1rem">{{ d_rutin }}</div>
+              <div class="text-muted" style="font-size:.72rem">Rutin Infaq Bulanan</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-2 rounded" style="background:var(--bg)">
+              <div class="fw-bold" style="font-size:1.1rem">{{ d_tidak_rutin }}</div>
+              <div class="text-muted" style="font-size:.72rem">Tidak Rutin</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-2 rounded" style="background:var(--bg)">
+              <div class="fw-bold" style="font-size:1.1rem">{{ d_area_distinct }}</div>
+              <div class="text-muted" style="font-size:.72rem">Desa/Area Tercatat</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-2 rounded" style="background:var(--bg)">
+              <div class="fw-bold" style="font-size:1.1rem">{{ d_area_pct }}%</div>
+              <div class="text-muted" style="font-size:.72rem">Kelengkapan Data Desa</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-md-5">
+            <div class="fw-semibold small text-muted mb-2">SUMBER INFAQ</div>
+            {% for r in d_sumber %}
+            <div class="d-flex justify-content-between small mb-1">
+              <span>{{ r.label }}</span>
+              <span class="fw-semibold">{{ r.n }} <span class="text-muted fw-normal">({{ r.pct }}%)</span></span>
+            </div>
+            <div style="background:var(--border);border-radius:6px;height:6px;overflow:hidden" class="mb-2">
+              <div style="width:{{ r.pct }}%;height:100%;background:#1B3B5A;border-radius:6px"></div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="col-md-7">
+            <div class="fw-semibold small text-muted mb-2">
+              TOP {{ d_top_area|length }} DESA/AREA (dari {{ d_area_distinct }} tercatat)
+            </div>
+            {% for r in d_top_area %}
+            <div class="d-flex justify-content-between small mb-1">
+              <span>{{ r.label }}</span>
+              <span class="fw-semibold">{{ r.n }}</span>
+            </div>
+            <div style="background:var(--border);border-radius:6px;height:5px;overflow:hidden" class="mb-2">
+              <div style="width:{{ r.pct }}%;height:100%;background:#B8922A;border-radius:6px"></div>
+            </div>
+            {% else %}
+            <div class="text-muted small fst-italic">Belum ada data desa/area</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if d_area_kosong %}
+        <div class="small text-muted mt-2" style="font-size:.74rem">
+          <i class="bi bi-exclamation-circle"></i> {{ d_area_kosong }} donatur aktif belum punya data desa/area —
+          lengkapi di Master Data &gt; Donatur agar peta sebaran lebih akurat.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── MUSTAHIK ──────────────────────────────────────────── #}
+    <div class="report-panel" style="--panel-accent:#166534">
+      <div class="report-panel-head">
+        <div class="report-panel-title"><i class="bi bi-hand-thumbs-up"></i> MUSTAHIK (PENERIMA MANFAAT)</div>
+        <div class="report-panel-meta">Aktif <strong>{{ m_aktif }}</strong> · Nonaktif <strong>{{ m_nonaktif }}</strong></div>
+      </div>
+      <div class="p-3">
+        <div class="fw-semibold small text-muted mb-2">PER ASNAF</div>
+        <div class="row g-3 mb-3">
+          {% for r in m_asnaf %}
+          <div class="col-6 col-md-3">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>{{ r.label }}</span>
+              <span class="fw-semibold">{{ r.n }}</span>
+            </div>
+            <div style="background:var(--border);border-radius:6px;height:5px;overflow:hidden">
+              <div style="width:{{ r.pct }}%;height:100%;background:#166534;border-radius:6px"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="p-3 rounded" style="background:var(--bg)">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="fw-semibold small">
+              <i class="bi bi-clipboard-check"></i> Kelengkapan pencatatan penyaluran per-nama mustahik
+            </div>
+            <div class="fw-bold {% if trx_bernama_pct < 50 %}text-danger{% else %}text-success{% endif %}">
+              {{ trx_keluar_bernama }} / {{ trx_keluar_total }} transaksi ({{ trx_bernama_pct }}%)
+            </div>
+          </div>
+          <div style="background:var(--border);border-radius:6px;height:6px;overflow:hidden" class="mt-2">
+            <div style="width:{{ trx_bernama_pct }}%;height:100%;background:#166534;border-radius:6px"></div>
+          </div>
+          <div class="text-muted mt-2" style="font-size:.74rem">
+            Master data Mustahik baru berisi <strong>{{ m_total }}</strong> nama terdaftar, sementara sebagian
+            besar penyaluran selama ini dicatat sbg keterangan agregat (mis. "Santunan Dhuafa (151 mustahik)")
+            tanpa terhubung ke data mustahik individual. Utk evaluasi yg lebih akurat ke depan, isi field
+            "Penerima Manfaat" saat mencatat transaksi penyaluran per-nama.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% include 'admin/_report_style.html' %}
+{% endblock %}

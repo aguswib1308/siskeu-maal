@@ -791,6 +791,76 @@ def laporan_rekap_sumber_infaq():
         grand_total=grand_total, tahun=tahun, inst=inst)
 
 
+@app.route('/admin/laporan/donatur-mustahik')
+@admin_required
+def laporan_donatur_mustahik():
+    """Statistik jumlah & komposisi Donatur dan Mustahik (penerima manfaat) -- bahan
+    evaluasi pengurus. Sebelumnya tdk ada laporan khusus utk 2 angka ini."""
+    conn = get_db()
+
+    d_total = conn.execute("SELECT COUNT(*) FROM donatur").fetchone()[0]
+    d_aktif = conn.execute("SELECT COUNT(*) FROM donatur WHERE aktif=1").fetchone()[0]
+    d_rutin = conn.execute("SELECT COUNT(*) FROM donatur WHERE aktif=1 AND aktif_infaq=1").fetchone()[0]
+
+    sumber_rows = conn.execute("""
+        SELECT COALESCE(sumber_infaq,'-') as k, COUNT(*) as n FROM donatur
+        WHERE aktif=1 GROUP BY k ORDER BY n DESC
+    """).fetchall()
+    d_sumber = [{'label': LABEL_SUMBER.get(r['k'], r['k']), 'n': r['n'],
+                 'pct': round(r['n'] * 100 / d_aktif, 1) if d_aktif else 0} for r in sumber_rows]
+
+    jenis_rows = conn.execute("""
+        SELECT COALESCE(jenis,'-') as k, COUNT(*) as n FROM donatur
+        WHERE aktif=1 GROUP BY k ORDER BY n DESC
+    """).fetchall()
+    d_jenis = [{'label': r['k'].replace('_',' ').title(), 'n': r['n'],
+                'pct': round(r['n'] * 100 / d_aktif, 1) if d_aktif else 0} for r in jenis_rows]
+
+    d_area_terisi = conn.execute(
+        "SELECT COUNT(*) FROM donatur WHERE aktif=1 AND area IS NOT NULL AND area<>''"
+    ).fetchone()[0]
+    d_area_distinct = conn.execute(
+        "SELECT COUNT(DISTINCT area) FROM donatur WHERE aktif=1 AND area IS NOT NULL AND area<>''"
+    ).fetchone()[0]
+    top_area_rows = conn.execute("""
+        SELECT area, COUNT(*) as n FROM donatur
+        WHERE aktif=1 AND area IS NOT NULL AND area<>'' GROUP BY area ORDER BY n DESC LIMIT 15
+    """).fetchall()
+    max_area_n = top_area_rows[0]['n'] if top_area_rows else 1
+    d_top_area = [{'label': r['area'], 'n': r['n'],
+                   'pct': round(r['n'] * 100 / max_area_n, 1)} for r in top_area_rows]
+
+    m_total = conn.execute("SELECT COUNT(*) FROM penerima_manfaat").fetchone()[0]
+    m_aktif = conn.execute("SELECT COUNT(*) FROM penerima_manfaat WHERE aktif=1").fetchone()[0]
+    asnaf_rows = conn.execute("""
+        SELECT asnaf, COUNT(*) as n FROM penerima_manfaat WHERE aktif=1 GROUP BY asnaf
+    """).fetchall()
+    asnaf_map = {r['asnaf']: r['n'] for r in asnaf_rows}
+    max_asnaf_n = max(asnaf_map.values()) if asnaf_map else 1
+    m_asnaf = [{'label': LABEL_ASNAF.get(k, k), 'n': asnaf_map.get(k, 0),
+                'pct': round(asnaf_map.get(k, 0) * 100 / max_asnaf_n, 1) if max_asnaf_n else 0}
+               for k in LABEL_ASNAF]
+
+    trx_keluar_total = conn.execute("SELECT COUNT(*) FROM transaksi WHERE jenis='keluar'").fetchone()[0]
+    trx_keluar_bernama = conn.execute(
+        "SELECT COUNT(*) FROM transaksi WHERE jenis='keluar' AND penerima_id IS NOT NULL"
+    ).fetchone()[0]
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_donatur_mustahik.html',
+        d_total=d_total, d_aktif=d_aktif, d_nonaktif=d_total - d_aktif,
+        d_rutin=d_rutin, d_tidak_rutin=d_aktif - d_rutin,
+        d_sumber=d_sumber, d_jenis=d_jenis,
+        d_area_terisi=d_area_terisi, d_area_kosong=d_aktif - d_area_terisi,
+        d_area_pct=round(d_area_terisi * 100 / d_aktif, 1) if d_aktif else 0,
+        d_area_distinct=d_area_distinct, d_top_area=d_top_area,
+        m_total=m_total, m_aktif=m_aktif, m_nonaktif=m_total - m_aktif, m_asnaf=m_asnaf,
+        trx_keluar_total=trx_keluar_total, trx_keluar_bernama=trx_keluar_bernama,
+        trx_bernama_pct=round(trx_keluar_bernama * 100 / trx_keluar_total, 1) if trx_keluar_total else 0,
+        inst=inst, hari_ini=date.today().strftime('%d %B %Y'))
+
+
 @app.route('/admin/laporan/arus-kas')
 @admin_required
 def laporan_arus_kas():
