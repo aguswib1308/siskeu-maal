@@ -189,13 +189,26 @@
           <datalist id="areaList">{% for a in areas %}<option value="{{ a.area }}">{% endfor %}</datalist>
         </div>
         <div class="col-12" id="addKoord">
-          <label class="form-label fw-semibold">Koordinat <span class="text-muted fw-normal">(paste link Google Maps)</span></label>
-          <input type="text" name="gmaps_url" class="form-control mb-2"
-                 placeholder="https://maps.google.com/?q=-7.812,110.923 atau @lat,lng">
-          <div class="d-flex gap-2">
-            <input type="number" name="lat" class="form-control form-control-sm" placeholder="Latitude" step="any">
-            <input type="number" name="lng" class="form-control form-control-sm" placeholder="Longitude" step="any">
+          <label class="form-label fw-semibold">Koordinat Lokasi</label>
+          <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-2"
+                  onclick="useMyLocation(this, 'addMap')">
+            <i class="bi bi-crosshair"></i> Gunakan Lokasi Saya Sekarang
+          </button>
+          <div id="addMap" style="height:220px;border-radius:10px;overflow:hidden;border:1px solid var(--border)" class="mb-1"></div>
+          <div class="text-muted mb-2" style="font-size:.72rem">
+            <i class="bi bi-hand-index"></i> Atau klik / geser penanda di peta utk menentukan lokasi manual.
           </div>
+          <details class="mb-2">
+            <summary class="small text-muted" style="cursor:pointer">Opsi lain: isi manual / paste link Google Maps</summary>
+            <div class="mt-2">
+              <input type="text" name="gmaps_url" class="form-control mb-2"
+                     placeholder="https://maps.google.com/?q=-7.812,110.923 atau @lat,lng">
+              <div class="d-flex gap-2">
+                <input type="number" id="addLat" name="lat" class="form-control form-control-sm" placeholder="Latitude" step="any">
+                <input type="number" id="addLng" name="lng" class="form-control form-control-sm" placeholder="Longitude" step="any">
+              </div>
+            </div>
+          </details>
           <div class="form-check mt-2">
             <input class="form-check-input" type="checkbox" name="aktif_infaq" value="1" id="addAktif" checked>
             <label class="form-check-label small" for="addAktif">Aktif dikoleksi</label>
@@ -278,11 +291,21 @@
           <input type="text" name="area" class="form-control" list="areaList" value="{{ d.area or '' }}">
         </div>
         <div class="col-12">
-          <label class="form-label fw-semibold">Update Koordinat <span class="text-muted fw-normal">(kosongkan untuk pertahankan)</span></label>
-          <input type="text" name="gmaps_url" class="form-control mb-2" placeholder="Paste link Google Maps baru...">
-          <div class="d-flex gap-2 align-items-center">
-            <input type="number" name="lat" class="form-control form-control-sm" placeholder="Latitude" step="any" value="{{ d.lat or '' }}">
-            <input type="number" name="lng" class="form-control form-control-sm" placeholder="Longitude" step="any" value="{{ d.lng or '' }}">
+          <label class="form-label fw-semibold">Update Koordinat Lokasi</label>
+          <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-2"
+                  onclick="useMyLocation(this, 'edit{{ d.id }}Map')">
+            <i class="bi bi-crosshair"></i> Gunakan Lokasi Saya Sekarang
+          </button>
+          <div id="edit{{ d.id }}Map" style="height:220px;border-radius:10px;overflow:hidden;border:1px solid var(--border)" class="mb-1"></div>
+          <div class="text-muted mb-2" style="font-size:.72rem">
+            <i class="bi bi-hand-index"></i> Atau klik / geser penanda di peta utk memperbarui lokasi.
+          </div>
+          <details class="mb-2">
+            <summary class="small text-muted" style="cursor:pointer">Opsi lain: isi manual / paste link Google Maps</summary>
+          <div class="d-flex gap-2 align-items-center mt-2">
+            <input type="text" name="gmaps_url" class="form-control form-control-sm" placeholder="Paste link Google Maps baru...">
+            <input type="number" id="edit{{ d.id }}Lat" name="lat" class="form-control form-control-sm" placeholder="Latitude" step="any" value="{{ d.lat or '' }}">
+            <input type="number" id="edit{{ d.id }}Lng" name="lng" class="form-control form-control-sm" placeholder="Longitude" step="any" value="{{ d.lng or '' }}">
             {% if d.lat and d.lng %}
             <a href="https://www.google.com/maps?q={{ d.lat }},{{ d.lng }}" target="_blank"
                class="btn btn-sm btn-outline-success text-nowrap">
@@ -290,6 +313,7 @@
             </a>
             {% endif %}
           </div>
+          </details>
           <div class="form-check mt-2">
             <input class="form-check-input" type="checkbox" name="aktif_infaq" value="1"
                    id="editAktif{{ d.id }}" {% if d.aktif_infaq %}checked{% endif %}>
@@ -352,13 +376,33 @@
 {% endblock %}
 
 {% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/coord-picker.js"></script>
 <script>
+document.getElementById('modalTambah').addEventListener('shown.bs.modal', () => initCoordPicker('addMap', 'addLat', 'addLng'));
+document.getElementById('modalTambah').addEventListener('hidden.bs.modal', () => destroyCoordPicker('addMap'));
+document.addEventListener('shown.bs.modal', (e) => {
+  const m = e.target.id.match(/^modalEdit(\d+)$/);
+  if (m) initCoordPicker('edit' + m[1] + 'Map', 'edit' + m[1] + 'Lat', 'edit' + m[1] + 'Lng');
+});
+document.addEventListener('hidden.bs.modal', (e) => {
+  const m = e.target.id.match(/^modalEdit(\d+)$/);
+  if (m) destroyCoordPicker('edit' + m[1] + 'Map');
+});
+
 function toggleFields(prefix) {
   const sel = document.getElementById(prefix + 'Sumber');
   if (!sel) return;
   const sumber = sel.value;
   const koord = document.getElementById(prefix + 'Koord');
-  if (koord) koord.style.display = (sumber === 'tunai') ? 'none' : '';
+  if (koord) {
+    const show = sumber !== 'tunai';
+    koord.style.display = show ? '' : 'none';
+    if (show && coordPickers[prefix + 'Map']) {
+      setTimeout(() => coordPickers[prefix + 'Map'].map.invalidateSize(), 50);
+    }
+  }
   const prog = document.getElementById(prefix + 'ProgramWrap');
   const showProg = ['zakat','infaq_terikat','wakaf'].includes(sumber);
   if (prog) {

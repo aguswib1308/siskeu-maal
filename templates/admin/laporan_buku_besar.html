@@ -155,6 +155,27 @@
               {{ g.saldo_akhir|rupiah }}
             </td>
           </tr>
+          {% if loop.nextitem is not defined or loop.nextitem.jenis_dana != g.jenis_dana %}
+          {% set st = subtotal_per_dana[g.jenis_dana] %}
+          <tr class="report-subtotal">
+            <td class="ps-3">Subtotal {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
+            <td class="text-end report-amount">{{ st.saldo_awal|rupiah }}</td>
+            <td class="text-end report-amount">{{ st.masuk|rupiah }}</td>
+            <td class="text-end report-amount">{{ st.keluar|rupiah }}</td>
+            <td class="text-end pe-3 report-amount">{{ st.saldo_akhir|rupiah }}</td>
+          </tr>
+          {% if g.jenis_dana == 'zakat' %}
+          <tr>
+            <td colspan="5" class="ps-3 pb-2 text-muted fst-italic" style="font-size:.72rem">
+              <i class="bi bi-info-circle"></i> Total di atas SAMA dengan laporan
+              <a href="/admin/laporan/saldo-program?bulan={{ bulan }}">Saldo per Program</a> — baris per-akun
+              terlihat beda krn di sana penyaluran "Miskin" (di buku besar ini akun tersendiri, sering minus
+              krn tdk py sumber sendiri) dialokasikan tampilannya ke Fidyah → Zakat Fitrah → Zakat Maal.
+              Buku besar ini sengaja menampilkan tiap akun apa adanya (transaksi asli, tanpa alokasi).
+            </td>
+          </tr>
+          {% endif %}
+          {% endif %}
           {% else %}
           <tr><td colspan="5" class="text-center text-muted small fst-italic py-4">Belum ada data pada periode ini</td></tr>
           {% endfor %}

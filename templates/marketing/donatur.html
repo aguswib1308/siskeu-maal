@@ -17,8 +17,13 @@
 
 {# ── Tombol tambah ── #}
 <button class="btn btn-success w-100 mb-3" style="border-radius:10px;font-weight:600"
-        onclick="document.getElementById('formTambah').style.display=
-                 document.getElementById('formTambah').style.display==='none'?'':'none'">
+        onclick="var f=document.getElementById('formTambah');
+                 var show=f.style.display==='none';
+                 f.style.display= show?'':'none';
+                 if(show) setTimeout(function(){
+                   var p=initCoordPicker('addMap','addLat','addLng');
+                   if(p) p.map.invalidateSize();
+                 },50);">
   <i class="bi bi-plus-lg"></i> Tambah Donatur Baru
 </button>
 
@@ -70,15 +75,25 @@
     </div>
 
     <div class="mb-3">
-      <label class="form-label fw-semibold" style="font-size:.85rem">Koordinat
-        <span class="text-muted fw-normal">(paste link Google Maps)</span></label>
-      <input type="text" name="gmaps_url" class="form-control mb-2"
-             placeholder="https://maps.google.com/?q=..."
-             style="border-radius:10px;border-color:var(--border);font-size:.85rem">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Koordinat Lokasi</label>
+      <button type="button" class="btn btn-success w-100 mb-2" style="border-radius:10px;font-weight:600"
+              onclick="useMyLocation(this, 'addMap')">
+        <i class="bi bi-crosshair"></i> Gunakan Lokasi Saya Sekarang
+      </button>
+      <div id="addMap" style="height:200px;border-radius:10px;overflow:hidden;border:1px solid var(--border)" class="mb-1"></div>
+      <div class="text-muted mb-2" style="font-size:.72rem">
+        <i class="bi bi-hand-index"></i> Atau ketuk / geser penanda di peta.
+      </div>
+      <details class="mb-2">
+        <summary class="small text-muted" style="cursor:pointer">Opsi lain: paste link Google Maps</summary>
+        <input type="text" name="gmaps_url" class="form-control mt-2"
+               placeholder="https://maps.google.com/?q=..."
+               style="border-radius:10px;border-color:var(--border);font-size:.85rem">
+      </details>
       <div class="d-flex gap-2">
-        <input type="number" name="lat" class="form-control form-control-sm"
+        <input type="number" id="addLat" name="lat" class="form-control form-control-sm"
                placeholder="Latitude" step="any" style="border-radius:8px;font-size:.85rem">
-        <input type="number" name="lng" class="form-control form-control-sm"
+        <input type="number" id="addLng" name="lng" class="form-control form-control-sm"
                placeholder="Longitude" step="any" style="border-radius:8px;font-size:.85rem">
       </div>
       <div class="form-check mt-2">
@@ -186,4 +201,10 @@
 </div>
 {% endfor %}
 
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/coord-picker.js"></script>
 {% endblock %}

@@ -705,6 +705,14 @@ def laporan_buku_besar():
                                'saldo_akhir': saldo_akhir})
     ringkasan.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
 
+    subtotal_per_dana = {}
+    for g in ringkasan:
+        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'saldo_akhir': 0})
+        s['saldo_awal']  += g['saldo_awal']
+        s['masuk']       += g['masuk']
+        s['keluar']      += g['keluar']
+        s['saldo_akhir'] += g['saldo_akhir']
+
     detail = None
     if program_key and program_key in programs:
         p = programs[program_key]
@@ -740,7 +748,7 @@ def laporan_buku_besar():
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_buku_besar.html',
-        ringkasan=ringkasan, detail=detail, program_key=program_key,
+        ringkasan=ringkasan, detail=detail, program_key=program_key, subtotal_per_dana=subtotal_per_dana,
         bulan=bulan, inst=inst, dana_types=DANA_TYPES)
 
 
