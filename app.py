@@ -676,11 +676,12 @@ def _program_registry(conn):
 @admin_required
 def laporan_buku_besar():
     """Buku besar per program: rincian mutasi + saldo berjalan, utk semua program
-    (Zakat, Infaq Tidak Terikat gabungan, maupun tiap program Infaq Terikat)."""
-    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+    (Zakat, Infaq Tidak Terikat gabungan, maupun tiap program Infaq Terikat).
+    Rentang tanggal bebas (bkn cuma 1 bulan) spy bisa akses dr awal tahun."""
+    tk = get_tanggal_kerja()
+    fd = request.args.get('dari', f"{tk[:4]}-01-01")
+    ld = request.args.get('sampai', tk)
     program_key = request.args.get('program', '')
-    fd = f"{bulan}-01"
-    ld = _last_day(bulan)
     conn = get_db()
     programs = _program_registry(conn)
 
@@ -749,7 +750,8 @@ def laporan_buku_besar():
     conn.close()
     return render_template('admin/laporan_buku_besar.html',
         ringkasan=ringkasan, detail=detail, program_key=program_key, subtotal_per_dana=subtotal_per_dana,
-        bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+        dari=fd, sampai=ld, awal_tahun=f"{tk[:4]}-01-01", awal_bulan=f"{tk[:7]}-01", hari_ini=tk,
+        inst=inst, dana_types=DANA_TYPES)
 
 
 @app.route('/admin/laporan/rekap-sumber-infaq')
@@ -814,7 +816,7 @@ def laporan_donatur_mustahik():
         SELECT COALESCE(sumber_infaq,'-') as k, COUNT(*) as n FROM donatur
         WHERE aktif=1 GROUP BY k ORDER BY n DESC
     """).fetchall()
-    d_sumber = [{'label': LABEL_SUMBER.get(r['k'], r['k']), 'n': r['n'],
+    d_sumber = [{'key': r['k'], 'label': LABEL_SUMBER.get(r['k'], r['k']), 'n': r['n'],
                  'pct': round(r['n'] * 100 / d_aktif, 1) if d_aktif else 0} for r in sumber_rows]
 
     jenis_rows = conn.execute("""
@@ -854,6 +856,21 @@ def laporan_donatur_mustahik():
         "SELECT COUNT(*) FROM transaksi WHERE jenis='keluar' AND penerima_id IS NOT NULL"
     ).fetchone()[0]
 
+    programs = _program_registry(conn)
+    m_per_program = []
+    for key, p in programs.items():
+        ph = ','.join('?' * len(p['coa_ids']))
+        row = conn.execute(
+            f"SELECT COUNT(*) as n_trx, COUNT(DISTINCT penerima_id) as n_mustahik, "
+            f"COALESCE(SUM(jumlah),0) as total "
+            f"FROM transaksi WHERE coa_id IN ({ph}) AND jenis='keluar'",
+            p['coa_ids']
+        ).fetchone()
+        if row['n_trx']:
+            m_per_program.append({'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
+                                   'n_trx': row['n_trx'], 'n_mustahik': row['n_mustahik'], 'total': row['total']})
+    m_per_program.sort(key=lambda g: -g['total'])
+
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_donatur_mustahik.html',
@@ -864,6 +881,7 @@ def laporan_donatur_mustahik():
         d_area_pct=round(d_area_terisi * 100 / d_aktif, 1) if d_aktif else 0,
         d_area_distinct=d_area_distinct, d_top_area=d_top_area,
         m_total=m_total, m_aktif=m_aktif, m_nonaktif=m_total - m_aktif, m_asnaf=m_asnaf,
+        m_per_program=m_per_program,
         trx_keluar_total=trx_keluar_total, trx_keluar_bernama=trx_keluar_bernama,
         trx_bernama_pct=round(trx_keluar_bernama * 100 / trx_keluar_total, 1) if trx_keluar_total else 0,
         inst=inst, hari_ini=date.today().strftime('%d %B %Y'))
@@ -1125,6 +1143,7 @@ def master_donatur():
     q       = request.args.get('q','')
     sumber  = request.args.get('sumber','')
     area    = request.args.get('area','')
+    aktif_f = request.args.get('aktif','')
     query   = "SELECT d.*, c.nama AS program_nama FROM donatur d LEFT JOIN chart_of_accounts c ON d.program_id=c.id WHERE 1=1"
     params  = []
     if q:
@@ -1134,6 +1153,8 @@ def master_donatur():
         query += " AND d.sumber_infaq=?"; params.append(sumber)
     if area:
         query += " AND d.area=?"; params.append(area)
+    if aktif_f in ('0','1'):
+        query += " AND d.aktif=?"; params.append(int(aktif_f))
     query += " ORDER BY d.sumber_infaq, d.area, d.nama"
     donatur = conn.execute(query, params).fetchall()
     areas   = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
@@ -1142,7 +1163,7 @@ def master_donatur():
     ).fetchall()
     conn.close()
     return render_template('admin/master/donatur.html',
-        donatur=donatur, areas=areas, produk_list=produk_list, q=q, sumber=sumber, area=area)
+        donatur=donatur, areas=areas, produk_list=produk_list, q=q, sumber=sumber, area=area, aktif_f=aktif_f)
 
 @app.route('/admin/master/donatur/tambah', methods=['POST'])
 @admin_required

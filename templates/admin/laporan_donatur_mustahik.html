@@ -80,29 +80,34 @@
 
         <div class="row g-4">
           <div class="col-md-5">
-            <div class="fw-semibold small text-muted mb-2">SUMBER INFAQ</div>
+            <div class="fw-semibold small text-muted mb-2">SUMBER INFAQ <span class="fw-normal fst-italic">(klik utk lihat daftar)</span></div>
             {% for r in d_sumber %}
-            <div class="d-flex justify-content-between small mb-1">
-              <span>{{ r.label }}</span>
-              <span class="fw-semibold">{{ r.n }} <span class="text-muted fw-normal">({{ r.pct }}%)</span></span>
-            </div>
-            <div style="background:var(--border);border-radius:6px;height:6px;overflow:hidden" class="mb-2">
-              <div style="width:{{ r.pct }}%;height:100%;background:#1B3B5A;border-radius:6px"></div>
-            </div>
+            <a href="/admin/master/donatur?sumber={{ r.key }}&aktif=1" class="text-decoration-none d-block chart-link">
+              <div class="d-flex justify-content-between small mb-1">
+                <span>{{ r.label }}</span>
+                <span class="fw-semibold">{{ r.n }} <span class="text-muted fw-normal">({{ r.pct }}%)</span></span>
+              </div>
+              <div style="background:var(--border);border-radius:6px;height:6px;overflow:hidden" class="mb-2">
+                <div style="width:{{ r.pct }}%;height:100%;background:#1B3B5A;border-radius:6px"></div>
+              </div>
+            </a>
             {% endfor %}
           </div>
           <div class="col-md-7">
             <div class="fw-semibold small text-muted mb-2">
               TOP {{ d_top_area|length }} DESA/AREA (dari {{ d_area_distinct }} tercatat)
+              <span class="fw-normal fst-italic">(klik utk lihat daftar)</span>
             </div>
             {% for r in d_top_area %}
-            <div class="d-flex justify-content-between small mb-1">
-              <span>{{ r.label }}</span>
-              <span class="fw-semibold">{{ r.n }}</span>
-            </div>
-            <div style="background:var(--border);border-radius:6px;height:5px;overflow:hidden" class="mb-2">
-              <div style="width:{{ r.pct }}%;height:100%;background:#B8922A;border-radius:6px"></div>
-            </div>
+            <a href="/admin/master/donatur?area={{ r.label | urlencode }}&aktif=1" class="text-decoration-none d-block chart-link">
+              <div class="d-flex justify-content-between small mb-1">
+                <span>{{ r.label }}</span>
+                <span class="fw-semibold">{{ r.n }}</span>
+              </div>
+              <div style="background:var(--border);border-radius:6px;height:5px;overflow:hidden" class="mb-2">
+                <div style="width:{{ r.pct }}%;height:100%;background:#B8922A;border-radius:6px"></div>
+              </div>
+            </a>
             {% else %}
             <div class="text-muted small fst-italic">Belum ada data desa/area</div>
             {% endfor %}
@@ -140,6 +145,34 @@
           {% endfor %}
         </div>
 
+        <div class="fw-semibold small text-muted mb-2">PENYALURAN PER PROGRAM</div>
+        <div class="table-responsive mb-3">
+          <table class="table table-sm report-table">
+            <thead>
+              <tr style="background:var(--bg)">
+                <th class="ps-3" style="font-size:.72rem;color:var(--text-muted)">Program</th>
+                <th class="text-end" style="font-size:.72rem;color:var(--text-muted)">Transaksi Penyaluran</th>
+                <th class="text-end" style="font-size:.72rem;color:var(--text-muted)">Mustahik Bernama</th>
+                <th class="text-end pe-3" style="font-size:.72rem;color:var(--text-muted)">Total Disalurkan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in m_per_program %}
+              <tr>
+                <td class="ps-3 report-item">
+                  {{ r.label }}{% if r.code %} <span class="text-muted small">[{{ r.code }}]</span>{% endif %}
+                </td>
+                <td class="text-end report-amount">{{ r.n_trx }}</td>
+                <td class="text-end report-amount {% if r.n_mustahik == 0 %}text-danger{% endif %}">{{ r.n_mustahik }}</td>
+                <td class="text-end pe-3 report-amount">{{ r.total|rupiah }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-center text-muted small fst-italic py-3">Belum ada penyaluran tercatat</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
         <div class="p-3 rounded" style="background:var(--bg)">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="fw-semibold small">
@@ -164,6 +197,11 @@
 
   </div>
 </div>
+
+<style>
+.chart-link { color: inherit; border-radius: 8px; padding: 4px 6px; margin: 0 -6px; transition: background .15s; }
+.chart-link:hover { background: rgba(184,146,42,.09); }
+</style>
 
 {% include 'admin/_report_style.html' %}
 {% endblock %}
