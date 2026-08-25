@@ -135,6 +135,27 @@
           <label class="form-label fw-semibold">Keterangan</label>
           <input type="text" name="keterangan" class="form-control" placeholder="Opsional">
         </div>
+        <div class="col-12" id="kegiatanFields" style="display:none">
+          <div class="p-3 rounded" style="background:var(--bg);border:1px solid var(--border)">
+            <div class="fw-semibold small text-muted mb-2">
+              <i class="bi bi-calendar-event"></i> Info Kegiatan Penyaluran <span class="fw-normal fst-italic">(opsional, utk Laporan Kegiatan)</span>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-4">
+                <input type="text" name="nama_kegiatan" class="form-control form-control-sm"
+                       placeholder="Nama kegiatan, cth: Santunan Dhuafa Ramadhan">
+              </div>
+              <div class="col-md-4">
+                <input type="text" name="lokasi" class="form-control form-control-sm"
+                       placeholder="Tempat kegiatan, cth: Masjid Al-Ikhlas">
+              </div>
+              <div class="col-md-4">
+                <input type="number" name="jumlah_mustahik" class="form-control form-control-sm"
+                       placeholder="Jumlah mustahik" min="0">
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
@@ -264,6 +285,7 @@ function updateJenisLabel(jenis) {
   if (jenis === 'masuk')   { el.className='badge bg-success fs-6 py-2 px-3'; el.textContent='Penerimaan'; }
   else if (jenis==='keluar'){ el.className='badge bg-danger fs-6 py-2 px-3';  el.textContent='Penyaluran / Beban'; }
   else                      { el.className='badge bg-secondary fs-6 py-2 px-3'; el.textContent='— Pilih akun —'; }
+  document.getElementById('kegiatanFields').style.display = (jenis === 'keluar') ? '' : 'none';
 }
 
 function formatRibuan(el) {
@@ -290,6 +312,9 @@ document.getElementById('modalTambah').addEventListener('show.bs.modal', () => {
   document.getElementById('donaturId').value = '';
   document.getElementById('donaturInput').value = '';
   document.getElementById('donaturDropdown').style.display = 'none';
+  document.querySelector('[name="nama_kegiatan"]').value = '';
+  document.querySelector('[name="lokasi"]').value = '';
+  document.querySelector('[name="jumlah_mustahik"]').value = '';
 });
 
 /* ── Donatur search ── */

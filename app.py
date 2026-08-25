@@ -32,9 +32,11 @@ def parse_jumlah(raw):
     return val if val > 0 else None
 
 def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
-                     jumlah, keterangan, user_id, client_uuid=None):
+                     jumlah, keterangan, user_id, client_uuid=None,
+                     nama_kegiatan=None, lokasi=None, jumlah_mustahik=None):
     """Insert transaksi dengan guard idempotensi client_uuid (anti double-submit).
-    Return (trx_id, duplikat)."""
+    nama_kegiatan/lokasi/jumlah_mustahik opsional, dipakai utk penyaluran (keluar)
+    spy bisa direkap di Laporan Kegiatan Penyaluran. Return (trx_id, duplikat)."""
     if client_uuid:
         existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
                                 (client_uuid,)).fetchone()
@@ -46,10 +48,12 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
         if row: jenis_dana = row['jenis_dana']
     try:
         cur = conn.execute('''INSERT INTO transaksi
-            (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id,client_uuid)
-            VALUES (?,?,?,?,?,?,?,?,?,?)''',
+            (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id,client_uuid,
+             nama_kegiatan,lokasi,jumlah_mustahik)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (tanggal, jenis, jenis_dana, coa_id, donatur_id or None, penerima_id or None,
-             jumlah, keterangan, user_id, client_uuid or None))
+             jumlah, keterangan, user_id, client_uuid or None,
+             nama_kegiatan or None, lokasi or None, jumlah_mustahik or None))
     except sqlite3.IntegrityError:
         if client_uuid:
             existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
@@ -354,11 +358,18 @@ def tambah_transaksi():
     if jumlah is None:
         flash('Jumlah tidak valid — harus angka lebih dari 0.', 'danger')
         return redirect(url_for('admin_transaksi'))
+    jumlah_mustahik = None
+    if data.get('jumlah_mustahik'):
+        try: jumlah_mustahik = int(data['jumlah_mustahik'])
+        except ValueError: jumlah_mustahik = None
     conn = get_db()
     trx_id, dup = insert_transaksi(conn, data['tanggal'], data['jenis'],
         data.get('coa_id') or None, data.get('donatur_id') or None,
         data.get('penerima_id') or None, jumlah,
-        data.get('keterangan',''), session['user_id'], data.get('client_uuid'))
+        data.get('keterangan',''), session['user_id'], data.get('client_uuid'),
+        nama_kegiatan=data.get('nama_kegiatan') or None,
+        lokasi=data.get('lokasi') or None,
+        jumlah_mustahik=jumlah_mustahik)
     conn.commit(); conn.close()
     if dup:
         flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
@@ -933,6 +944,31 @@ def laporan_donatur_mustahik():
         trx_keluar_total=trx_keluar_total, trx_keluar_bernama=trx_keluar_bernama,
         trx_bernama_pct=round(trx_keluar_bernama * 100 / trx_keluar_total, 1) if trx_keluar_total else 0,
         inst=inst, hari_ini=date.today().strftime('%d %B %Y'))
+
+
+@app.route('/admin/laporan/kegiatan-penyaluran')
+@admin_required
+def laporan_kegiatan_penyaluran():
+    """Rekap kegiatan penyaluran (nama kegiatan, lokasi, jumlah mustahik, total) --
+    hanya transaksi keluar yg field 'Info Kegiatan' -nya sudah diisi saat dicatat."""
+    bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
+    conn = get_db()
+    kegiatan = conn.execute("""
+        SELECT t.id, t.tanggal, t.nama_kegiatan, t.lokasi, t.jumlah_mustahik, t.jumlah, t.keterangan,
+               c.kode as coa_kode, c.nama as coa_nama, c.jenis_dana
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE t.jenis='keluar' AND t.nama_kegiatan IS NOT NULL AND strftime('%Y-%m', t.tanggal)=?
+        ORDER BY t.tanggal DESC, t.id DESC
+    """, (bulan,)).fetchall()
+
+    total_disalurkan = sum(k['jumlah'] for k in kegiatan)
+    total_mustahik = sum(k['jumlah_mustahik'] or 0 for k in kegiatan)
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_kegiatan_penyaluran.html',
+        kegiatan=kegiatan, bulan=bulan, total_disalurkan=total_disalurkan,
+        total_mustahik=total_mustahik, inst=inst)
 
 
 @app.route('/admin/laporan/arus-kas')

@@ -18,6 +18,9 @@ def migrate(conn):
         ('jenis_dana',  'TEXT'),
         ('jurnal_id',   'INTEGER REFERENCES jurnal(id)'),
         ('client_uuid', 'TEXT'),
+        ('nama_kegiatan',   'TEXT'),
+        ('lokasi',          'TEXT'),
+        ('jumlah_mustahik', 'INTEGER'),
     ]:
         if col not in trx:
             c.execute(f"ALTER TABLE transaksi ADD COLUMN {col} {defn}")

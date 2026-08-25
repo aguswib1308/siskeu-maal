@@ -1,0 +1,104 @@
+{% extends 'admin/base.html' %}
+{% block title %}Kegiatan Penyaluran{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-event"></i> Laporan Kegiatan Penyaluran{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <form class="d-flex gap-2">
+    <input type="month" name="bulan" value="{{ bulan }}"
+           class="form-control form-control-sm" style="width:180px">
+    <button class="btn btn-sm btn-primary">Tampilkan</button>
+  </form>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-printer"></i> Cetak
+  </button>
+</div>
+
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}
+    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+    {% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">LAPORAN KEGIATAN PENYALURAN</div>
+    <div class="report-period">Periode: {{ bulan | bulan_label }}</div>
+    <div class="text-muted small mt-1">
+      Daftar kegiatan penyaluran (mis. santunan, kunjungan, distribusi) beserta lokasi &amp; jumlah
+      mustahik — diambil dari transaksi penyaluran yang diisi field "Info Kegiatan" saat dicatat.
+      Transaksi lama/agregat yang belum diisi tidak muncul di sini; lihat rincian transaksi apa
+      adanya di <a href="/admin/laporan/buku-besar">Buku Besar Program</a>.
+    </div>
+  </div>
+
+  {% if kegiatan %}
+  <div class="report-summary">
+    <div class="row g-3">
+      <div class="col-6 col-md-4">
+        <div class="sum-label">Jumlah Kegiatan</div>
+        <div class="sum-value">{{ kegiatan|length }}</div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="sum-label">Total Mustahik Terlayani</div>
+        <div class="sum-value">{{ total_mustahik }}</div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="sum-label">Total Disalurkan</div>
+        <div class="sum-value text-danger">{{ total_disalurkan|rupiah }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="p-4 pt-3">
+    <div class="table-responsive">
+      <table class="table table-sm report-table">
+        <thead class="report-thead">
+          <tr>
+            <th>Tanggal</th>
+            <th>Nama Kegiatan</th>
+            <th>Program</th>
+            <th>Lokasi</th>
+            <th class="text-end">Mustahik</th>
+            <th class="text-end">Total Disalurkan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in kegiatan %}
+          <tr>
+            <td class="small text-muted" style="white-space:nowrap">{{ k.tanggal }}</td>
+            <td class="report-item fw-semibold">{{ k.nama_kegiatan }}</td>
+            <td class="small"><span class="report-kode">{{ k.coa_kode }}</span> {{ k.coa_nama }}</td>
+            <td class="small text-muted">{{ k.lokasi or '—' }}</td>
+            <td class="text-end report-amount">{{ k.jumlah_mustahik or '—' }}</td>
+            <td class="text-end report-amount text-danger fw-semibold">{{ k.jumlah|rupiah }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-5">
+              <i class="bi bi-calendar-x fs-1 d-block mb-2" style="opacity:.25"></i>
+              Belum ada kegiatan tercatat pada periode ini.<br>
+              <span class="small fst-italic">
+                Isi kolom "Info Kegiatan Penyaluran" (Nama Kegiatan, Lokasi, Jumlah Mustahik) saat
+                mencatat transaksi penyaluran di menu Transaksi agar muncul di sini.
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if kegiatan %}
+        <tfoot>
+          <tr class="report-total">
+            <td colspan="4" class="ps-3">TOTAL {{ bulan | bulan_label | upper }}</td>
+            <td class="text-end">{{ total_mustahik }}</td>
+            <td class="text-end pe-3">{{ total_disalurkan|rupiah }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+
+{% include 'admin/_report_style.html' %}
+{% endblock %}
