@@ -754,25 +754,21 @@ def laporan_buku_besar():
         inst=inst, dana_types=DANA_TYPES)
 
 
-@app.route('/admin/laporan/rekap-sumber-infaq')
-@admin_required
-def laporan_rekap_sumber_infaq():
-    """Rekap tahunan penerimaan Infak Tidak Terikat per sumber (Kotak Infaq/Kencleng/Tunai) —
-    bahan rapat. Sesuai pengelolaan riil: ketiganya jadi satu saldo, ini murni rekap sumber dana."""
-    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
-    conn = get_db()
-
+def _rekap_penerimaan_tahunan(conn, parent_kode, tahun):
+    """Rekap tahunan penerimaan per akun anak dari `parent_kode`, per bulan (baris) x
+    per akun (kolom) -- bahan rapat. Dipakai bareng oleh rekap Infaq Tidak Terikat,
+    Zakat, & Infaq Terikat spy formatnya konsisten."""
     sumber_coa = conn.execute("""
         SELECT id, kode, nama FROM chart_of_accounts
-        WHERE parent_kode='4.2.2' AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode
-    """).fetchall()
+        WHERE parent_kode=? AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode
+    """, (parent_kode,)).fetchall()
 
     rows = conn.execute("""
         SELECT strftime('%m', t.tanggal) as bln, t.coa_id, SUM(t.jumlah) as total
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
-        WHERE c.parent_kode='4.2.2' AND t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        WHERE c.parent_kode=? AND t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
         GROUP BY bln, t.coa_id
-    """, (tahun,)).fetchall()
+    """, (parent_kode, tahun)).fetchall()
     per_bulan = {}
     for r in rows:
         per_bulan.setdefault(r['bln'], {})[r['coa_id']] = r['total']
@@ -794,11 +790,63 @@ def laporan_rekap_sumber_infaq():
         grand_total += baris['total']
         tabel.append(baris)
 
+    return sumber_coa, tabel, total_per_sumber, grand_total
+
+
+@app.route('/admin/laporan/rekap-sumber-infaq')
+@admin_required
+def laporan_rekap_sumber_infaq():
+    """Rekap tahunan penerimaan Infak Tidak Terikat per sumber (Kotak Infaq/Kencleng/Tunai) —
+    bahan rapat. Sesuai pengelolaan riil: ketiganya jadi satu saldo, ini murni rekap sumber dana."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.2.2', tahun)
+
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst)
+        grand_total=grand_total, tahun=tahun, inst=inst,
+        judul='PENERIMAAN INFAK TIDAK TERIKAT PER SUMBER',
+        deskripsi='Rincian sumber penerimaan (Kotak Infaq, Kencleng, Tunai) untuk bahan rapat — dalam '
+                  'pengelolaan sehari-hari ketiganya tetap satu saldo Infak Tidak Terikat.',
+    )
+
+
+@app.route('/admin/laporan/rekap-zakat')
+@admin_required
+def laporan_rekap_zakat():
+    """Rekap tahunan penerimaan Zakat per jenis (Zakat Maal, Fitrah, Fidyah, dst) — bahan rapat."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.1', tahun)
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_rekap_sumber.html',
+        sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
+        grand_total=grand_total, tahun=tahun, inst=inst,
+        judul='PENERIMAAN ZAKAT PER JENIS',
+        deskripsi='Rincian penerimaan Zakat per jenis (Zakat Maal, Zakat Fitrah, Zakat Penghasilan/Profesi, '
+                  'Fidyah, dst) per bulan selama setahun — bahan rapat.',
+    )
+
+
+@app.route('/admin/laporan/rekap-infaq-terikat')
+@admin_required
+def laporan_rekap_infaq_terikat():
+    """Rekap tahunan penerimaan Infaq Terikat per program (Yatim, Ambulance, Qurban, dst) — bahan rapat."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.2.1', tahun)
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_rekap_sumber.html',
+        sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
+        grand_total=grand_total, tahun=tahun, inst=inst,
+        judul='PENERIMAAN INFAQ TERIKAT PER PROGRAM',
+        deskripsi='Rincian penerimaan tiap program Infaq Terikat (Yatim, Ambulance, Sunat Sehat Gratis, '
+                  'Qurban, dst) per bulan selama setahun — bahan rapat.',
+    )
 
 
 @app.route('/admin/laporan/donatur-mustahik')

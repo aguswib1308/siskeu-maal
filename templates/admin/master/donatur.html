@@ -3,6 +3,11 @@
 {% block page_title %}<i class="bi bi-people"></i> Master Donatur{% endblock %}
 
 {% block content %}
+{% if sumber or area or aktif_f %}
+<a href="/admin/laporan/donatur-mustahik" class="btn btn-sm btn-outline-secondary mb-3">
+  <i class="bi bi-arrow-left"></i> Kembali ke Laporan Donatur &amp; Mustahik
+</a>
+{% endif %}
 <div class="row mb-3 align-items-center">
   <div class="col">
     <form class="d-flex gap-2 flex-wrap">
