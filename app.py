@@ -5,6 +5,7 @@ from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from functools import wraps
+import laz_pusat_report
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or 'BmtMaal@2026!'
@@ -313,6 +314,8 @@ def admin_dashboard():
 
 # ── Admin Transaksi ───────────────────────────────────────────────────────────
 
+MUSTAHIK_RE = re.compile(r'\((\d+)\s*mustahik\)', re.IGNORECASE)
+
 @app.route('/admin/transaksi')
 @admin_required
 def admin_transaksi():
@@ -320,6 +323,7 @@ def admin_transaksi():
     bulan = request.args.get('bulan', get_tanggal_kerja()[:7])
     jenis = request.args.get('jenis', '')
     jenis_dana = request.args.get('jenis_dana', '')
+    perlu_lengkap = request.args.get('perlu_lengkap', '')
     query = '''
         SELECT t.*, c.nama as coa_nama, c.kode as coa_kode, c.jenis_dana,
                d.nama as donatur_nama, p.nama as penerima_nama, u.nama as petugas
@@ -334,8 +338,16 @@ def admin_transaksi():
         query += ' AND t.jenis=?'; params.append(jenis)
     if jenis_dana:
         query += ' AND t.jenis_dana=?'; params.append(jenis_dana)
+    if perlu_lengkap:
+        query += " AND t.jenis='keluar' AND t.jumlah_mustahik IS NULL AND t.jurnal_id IS NULL"
     query += ' ORDER BY t.tanggal DESC, t.created_at DESC'
     transaksi   = conn.execute(query, params).fetchall()
+    tebakan_mustahik = {}
+    if perlu_lengkap:
+        for t in transaksi:
+            m = MUSTAHIK_RE.search(t['keterangan'] or '')
+            if m:
+                tebakan_mustahik[t['id']] = int(m.group(1))
     coa_list    = conn.execute("SELECT * FROM chart_of_accounts WHERE jenis_transaksi IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
     coa_parents = conn.execute(
         "SELECT * FROM chart_of_accounts WHERE parent_kode IS NOT NULL AND aktif=1 ORDER BY kode"
@@ -345,7 +357,34 @@ def admin_transaksi():
     conn.close()
     return render_template('admin/transaksi.html', transaksi=transaksi, coa_list=coa_list,
         coa_parents=coa_parents, donatur_list=donatur_list, penerima_list=penerima_list,
-        bulan=bulan, jenis=jenis, jenis_dana=jenis_dana)
+        bulan=bulan, jenis=jenis, jenis_dana=jenis_dana, perlu_lengkap=perlu_lengkap,
+        tebakan_mustahik=tebakan_mustahik)
+
+@app.route('/admin/transaksi/<int:id>/mustahik', methods=['POST'])
+@admin_required
+def set_jumlah_mustahik(id):
+    """Isi/perbaiki jumlah_mustahik pada transaksi keluar yang sudah ada — dipakai utk
+    backfill data lama yg dicatat sebelum field ini ada. Sengaja dibatasi hanya kolom ini
+    (bukan edit transaksi umum) krn belum ada fitur edit transaksi sama sekali di sistem."""
+    conn = get_db()
+    row = conn.execute("SELECT jenis FROM transaksi WHERE id=?", (id,)).fetchone()
+    if not row or row['jenis'] != 'keluar':
+        conn.close()
+        flash('Transaksi tidak ditemukan atau bukan penyaluran.', 'danger')
+        return redirect(url_for('admin_transaksi'))
+    raw = request.form.get('jumlah_mustahik', '').strip()
+    nilai = None
+    if raw:
+        try:
+            nilai = max(0, int(raw))
+        except ValueError:
+            flash('Jumlah mustahik harus angka.', 'danger')
+            conn.close()
+            return redirect(request.referrer or url_for('admin_transaksi'))
+    conn.execute("UPDATE transaksi SET jumlah_mustahik=? WHERE id=?", (nilai, id))
+    conn.commit(); conn.close()
+    flash('Jumlah mustahik disimpan.', 'success')
+    return redirect(request.referrer or url_for('admin_transaksi'))
 
 @app.route('/admin/transaksi/tambah', methods=['POST'])
 @admin_required
@@ -818,9 +857,9 @@ def laporan_rekap_sumber_infaq():
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
         grand_total=grand_total, tahun=tahun, inst=inst,
-        judul='PENERIMAAN INFAK TIDAK TERIKAT PER SUMBER',
-        deskripsi='Rincian sumber penerimaan (Kotak Infaq, Kencleng, Tunai) untuk bahan rapat — dalam '
-                  'pengelolaan sehari-hari ketiganya tetap satu saldo Infak Tidak Terikat.',
+        judul='PENERIMAAN INFAQ BEBAS PER SUMBER',
+        deskripsi='Rincian sumber penerimaan Infaq Bebas/Tidak Terikat (Kotak Infaq, Kencleng, Tunai) '
+                  'untuk bahan rapat — dalam pengelolaan sehari-hari ketiganya tetap satu saldo.',
     )
 
 
@@ -969,6 +1008,39 @@ def laporan_kegiatan_penyaluran():
     return render_template('admin/laporan_kegiatan_penyaluran.html',
         kegiatan=kegiatan, bulan=bulan, total_disalurkan=total_disalurkan,
         total_mustahik=total_mustahik, inst=inst)
+
+
+@app.route('/admin/laporan/laz-pusat')
+@admin_required
+def laporan_laz_pusat():
+    """Isi otomatis template Excel resmi Laporan ZIS ke Yayasan MKU Pusat (6 dari 8 sheet --
+    Saldo Rekening & Program Kegiatan tetap manual). Lihat laz_pusat_report.py utk detail."""
+    tahun = int(request.args.get('tahun', get_tanggal_kerja()[:4]))
+    bulan_sampai = int(request.args.get('bulan_sampai', get_tanggal_kerja()[5:7]))
+    conn = get_db()
+
+    if request.args.get('download'):
+        buf = laz_pusat_report.isi_template(conn, tahun, bulan_sampai)
+        conn.close()
+        nama_bulan = BULAN_IND[bulan_sampai]
+        return send_file(buf,
+            download_name=f'LAPORAN_ZIS_LAZ_MKU_{nama_bulan.upper()}_{tahun}.xlsx',
+            as_attachment=True,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    dp = laz_pusat_report.data_penghimpunan(conn, tahun)
+    pt = laz_pusat_report.pentasyarufan(conn, tahun)
+    total_penghimpunan = sum(dp[m]['zakat_maal'] + dp[m]['zakat_fitrah'] + dp[m]['infaq_bebas']
+                              + dp[m]['infaq_terikat'] for m in range(1, bulan_sampai + 1))
+    total_penyaluran = sum(sum(pt['bidang'][m].values()) + sum(pt['zakat_asnaf'][m].values())
+                            for m in range(1, bulan_sampai + 1))
+    kurang_mustahik = laz_pusat_report.hitung_kelengkapan_mustahik(conn, tahun, bulan_sampai)
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_laz_pusat.html',
+        tahun=tahun, bulan_sampai=bulan_sampai, inst=inst,
+        total_penghimpunan=total_penghimpunan, total_penyaluran=total_penyaluran,
+        kurang_mustahik=kurang_mustahik, BULAN_IND=BULAN_IND)
 
 
 @app.route('/admin/laporan/arus-kas')
@@ -2588,10 +2660,17 @@ def marketing_catat():
         if jumlah is None:
             conn.close(); flash('Jumlah tidak valid — harus angka lebih dari 0.', 'danger')
             return redirect(url_for('marketing_catat'))
+        jumlah_mustahik = None
+        if data.get('jumlah_mustahik'):
+            try: jumlah_mustahik = int(data['jumlah_mustahik'])
+            except ValueError: jumlah_mustahik = None
         trx_id, dup = insert_transaksi(conn, data['tanggal'], data['jenis'],
             data.get('coa_id') or None, data.get('donatur_id') or None,
             data.get('penerima_id') or None, jumlah,
-            data.get('keterangan',''), session['user_id'], data.get('client_uuid'))
+            data.get('keterangan',''), session['user_id'], data.get('client_uuid'),
+            nama_kegiatan=data.get('nama_kegiatan') or None,
+            lokasi=data.get('lokasi') or None,
+            jumlah_mustahik=jumlah_mustahik)
         conn.commit(); conn.close()
         if dup:
             flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
@@ -2806,13 +2885,20 @@ def api_marketing_transaksi():
     jumlah = parse_jumlah(data.get('jumlah'))
     if jumlah is None:
         return jsonify({'status': 'error', 'message': 'Jumlah tidak valid — harus angka lebih dari 0.'}), 400
+    jumlah_mustahik = None
+    if data.get('jumlah_mustahik'):
+        try: jumlah_mustahik = int(data['jumlah_mustahik'])
+        except (TypeError, ValueError): jumlah_mustahik = None
     conn = get_db()
     trx_id, dup = insert_transaksi(conn,
         data.get('tanggal') or date.today().isoformat(),
         data['jenis'], data.get('coa_id') or None,
         data.get('donatur_id') or None, data.get('penerima_id') or None,
         jumlah, data.get('keterangan',''), session['user_id'],
-        data.get('client_uuid'))
+        data.get('client_uuid'),
+        nama_kegiatan=data.get('nama_kegiatan') or None,
+        lokasi=data.get('lokasi') or None,
+        jumlah_mustahik=jumlah_mustahik)
     conn.commit(); conn.close()
     msg = ('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.'
            if dup else 'Transaksi berhasil dicatat.')
@@ -2847,13 +2933,20 @@ def api_marketing_sync():
                     results.append({'id': item.get('id'), 'status': 'error',
                                     'message': 'Data transaksi tidak valid.'})
                     continue
+                jumlah_mustahik = None
+                if body.get('jumlah_mustahik'):
+                    try: jumlah_mustahik = int(body['jumlah_mustahik'])
+                    except (TypeError, ValueError): jumlah_mustahik = None
                 conn = get_db()
                 trx_id, dup = insert_transaksi(conn,
                     body.get('tanggal') or date.today().isoformat(),
                     body['jenis'], body.get('coa_id') or None,
                     body.get('donatur_id') or None, body.get('penerima_id') or None,
                     jumlah, body.get('keterangan',''), session['user_id'],
-                    body.get('client_uuid'))
+                    body.get('client_uuid'),
+                    nama_kegiatan=body.get('nama_kegiatan') or None,
+                    lokasi=body.get('lokasi') or None,
+                    jumlah_mustahik=jumlah_mustahik)
                 conn.commit(); conn.close()
                 results.append({'id': item.get('id'), 'status': 'ok',
                                 'transaksi_id': trx_id, 'duplicate': dup})

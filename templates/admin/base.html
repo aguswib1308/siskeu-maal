@@ -165,17 +165,20 @@
     <a href="/admin/laporan/dana" class="nav-link sub {% if '/laporan/dana' in request.path %}active{% endif %}">
       <i class="bi bi-journal-text"></i> Sumber &amp; Penggunaan Dana
     </a>
+    <a href="/admin/laporan/arus-kas" class="nav-link sub {% if '/laporan/arus-kas' in request.path %}active{% endif %}">
+      <i class="bi bi-arrow-left-right"></i> Arus Kas
+    </a>
     <a href="/admin/laporan/saldo-program" class="nav-link sub {% if '/laporan/saldo-program' in request.path %}active{% endif %}">
       <i class="bi bi-pie-chart"></i> Saldo per Program
     </a>
     <a href="/admin/laporan/buku-besar" class="nav-link sub {% if '/laporan/buku-besar' in request.path %}active{% endif %}">
       <i class="bi bi-journal-text"></i> Buku Besar Program
     </a>
-    <a href="/admin/laporan/rekap-sumber-infaq" class="nav-link sub {% if '/laporan/rekap-sumber-infaq' in request.path %}active{% endif %}">
-      <i class="bi bi-pie-chart-fill"></i> Rekap Sumber Infaq
-    </a>
     <a href="/admin/laporan/rekap-zakat" class="nav-link sub {% if '/laporan/rekap-zakat' in request.path %}active{% endif %}">
       <i class="bi bi-moon-stars"></i> Rekap Zakat
+    </a>
+    <a href="/admin/laporan/rekap-sumber-infaq" class="nav-link sub {% if '/laporan/rekap-sumber-infaq' in request.path %}active{% endif %}">
+      <i class="bi bi-pie-chart-fill"></i> Rekap Infaq Bebas
     </a>
     <a href="/admin/laporan/rekap-infaq-terikat" class="nav-link sub {% if '/laporan/rekap-infaq-terikat' in request.path %}active{% endif %}">
       <i class="bi bi-gift"></i> Rekap Infaq Terikat
@@ -186,8 +189,8 @@
     <a href="/admin/laporan/kegiatan-penyaluran" class="nav-link sub {% if '/laporan/kegiatan-penyaluran' in request.path %}active{% endif %}">
       <i class="bi bi-calendar-event"></i> Kegiatan Penyaluran
     </a>
-    <a href="/admin/laporan/arus-kas" class="nav-link sub {% if '/laporan/arus-kas' in request.path %}active{% endif %}">
-      <i class="bi bi-arrow-left-right"></i> Arus Kas
+    <a href="/admin/laporan/laz-pusat" class="nav-link sub {% if '/laporan/laz-pusat' in request.path %}active{% endif %}">
+      <i class="bi bi-file-earmark-excel"></i> Laporan LAZ Pusat
     </a>
 
     <a href="/admin/target" class="nav-link {% if '/target' in request.path %}active{% endif %}">

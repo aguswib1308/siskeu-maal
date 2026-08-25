@@ -1,0 +1,81 @@
+{% extends 'admin/base.html' %}
+{% block title %}Laporan LAZ Pusat{% endblock %}
+{% block page_title %}<i class="bi bi-file-earmark-excel"></i> Laporan ZIS ke Yayasan MKU Pusat{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <form class="d-flex gap-2 align-items-center flex-wrap">
+    <select name="tahun" class="form-select form-select-sm" style="width:110px">
+      {% for y in range(tahun - 2, tahun + 2) %}
+      <option value="{{ y }}" {% if y == tahun %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <span class="text-muted small">sampai bulan</span>
+    <select name="bulan_sampai" class="form-select form-select-sm" style="width:150px">
+      {% for i in range(1, 13) %}
+      <option value="{{ i }}" {% if i == bulan_sampai %}selected{% endif %}>{{ BULAN_IND[i] }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm btn-primary">Tampilkan</button>
+  </form>
+</div>
+
+<div class="card report-card">
+  <div class="report-header">
+    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+    {% if inst.nama_lembaga %}<div class="report-sub-inst">{{ inst.nama_lembaga }}</div>{% endif %}
+    <div class="report-line"></div>
+    <div class="report-title">LAPORAN ZIS UNTUK YAYASAN MEMBANGUN KELUARGA UTAMA (LAZ PUSAT)</div>
+    <div class="report-period">Periode: Januari &ndash; {{ BULAN_IND[bulan_sampai] }} {{ tahun }}</div>
+  </div>
+
+  <div class="p-4">
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="p-3 rounded" style="background:var(--bg);border:1px solid var(--border)">
+          <div class="small text-muted">Total Penghimpunan (Zakat + Infaq)</div>
+          <div class="fs-5 fw-semibold text-success">{{ total_penghimpunan|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 rounded" style="background:var(--bg);border:1px solid var(--border)">
+          <div class="small text-muted">Total Penyaluran (Bidang + Asnaf Zakat)</div>
+          <div class="fs-5 fw-semibold text-danger">{{ total_penyaluran|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 rounded" style="background:var(--bg);border:1px solid var(--border)">
+          <div class="small text-muted">Transaksi Penyaluran Belum Ada Jumlah Mustahik</div>
+          <div class="fs-5 fw-semibold {{ 'text-warning' if kurang_mustahik else 'text-success' }}">
+            {{ kurang_mustahik }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if kurang_mustahik %}
+    <div class="alert alert-warning small">
+      <i class="bi bi-exclamation-triangle"></i>
+      Ada <strong>{{ kurang_mustahik }}</strong> transaksi penyaluran periode ini yang belum
+      diisi jumlah mustahik-nya — sheet <em>Penerima Manfaat</em> di file hasil download akan
+      understate (kurang dari jumlah sebenarnya) sampai dilengkapi.
+      <a href="/admin/transaksi?perlu_lengkap=1&bulan={{ tahun }}-{{ '%02d'|format(bulan_sampai) }}">Lengkapi sekarang &rarr;</a>
+    </div>
+    {% endif %}
+
+    <p class="text-muted small">
+      Download akan mengisi 6 sheet (Data Penghimpunan, Penghitungan Dana Amil, Jumlah Donatur,
+      Pentasyarufan, Penerima Manfaat, Dana Amil) dari data di atas ke template resmi HQ.
+      Sheet <strong>Saldo Rekening</strong> dan <strong>Program Kegiatan</strong> tetap kosong
+      untuk diisi manual seperti biasa.
+    </p>
+
+    <a class="btn btn-success"
+       href="/admin/laporan/laz-pusat?tahun={{ tahun }}&bulan_sampai={{ bulan_sampai }}&download=1">
+      <i class="bi bi-download"></i> Download Excel Laporan LAZ Pusat
+    </a>
+  </div>
+</div>
+
+{% include 'admin/_report_style.html' %}
+{% endblock %}

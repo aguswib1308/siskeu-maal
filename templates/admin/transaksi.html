@@ -20,6 +20,10 @@
         <option value="{{ kode }}" {% if jenis_dana==kode %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
+      <div class="form-check d-flex align-items-center gap-1 ms-1">
+        <input type="checkbox" class="form-check-input" id="perluLengkap" name="perlu_lengkap" value="1" {% if perlu_lengkap %}checked{% endif %}>
+        <label class="form-check-label small" for="perluLengkap">Perlu dilengkapi jumlah mustahik</label>
+      </div>
       <button class="btn btn-sm btn-primary">Filter</button>
     </form>
   </div>
@@ -29,12 +33,20 @@
     </button>
   </div>
 </div>
+{% if perlu_lengkap %}
+<div class="alert alert-warning py-2 small mb-3">
+  <i class="bi bi-info-circle"></i> Menampilkan transaksi penyaluran bulan ini yang belum ada
+  jumlah mustahik-nya. Kalau angkanya sudah ketebak dari catatan lama, kolom sudah terisi
+  otomatis — tinggal cek lalu Simpan. Transaksi Jurnal Umum (transfer antar dana) tidak
+  ditampilkan di sini karena bukan penyaluran ke penerima.
+</div>
+{% endif %}
 
 <div class="card p-3">
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>Tanggal</th><th>Jenis</th><th>Dana</th><th>Akun (CoA)</th><th>Donatur / Penerima</th><th>Keterangan</th><th>Petugas</th><th class="text-end">Jumlah</th><th></th></tr>
+        <tr><th>Tanggal</th><th>Jenis</th><th>Dana</th><th>Akun (CoA)</th><th>Donatur / Penerima</th><th>Keterangan</th>{% if perlu_lengkap %}<th>Mustahik</th>{% endif %}<th>Petugas</th><th class="text-end">Jumlah</th><th></th></tr>
       </thead>
       <tbody>
         {% for t in transaksi %}
@@ -54,6 +66,15 @@
           </td>
           <td class="small">{{ t.donatur_nama or t.penerima_nama or '—' }}</td>
           <td class="small text-muted">{{ t.keterangan or '—' }}</td>
+          {% if perlu_lengkap %}
+          <td>
+            <form method="POST" action="/admin/transaksi/{{ t.id }}/mustahik" class="d-flex gap-1">
+              <input type="number" name="jumlah_mustahik" min="0" class="form-control form-control-sm" style="width:70px"
+                     value="{{ tebakan_mustahik.get(t.id, '') }}" placeholder="-">
+              <button class="btn btn-sm btn-outline-primary py-0 px-2">Simpan</button>
+            </form>
+          </td>
+          {% endif %}
           <td class="small">{{ t.petugas }}</td>
           <td class="text-end fw-semibold {% if t.jenis=='masuk' %}text-success{% else %}text-danger{% endif %}">
             {% if t.jenis=='keluar' %}-{% endif %}{{ t.jumlah|rupiah }}
@@ -66,7 +87,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="text-center text-muted py-4">Belum ada transaksi</td></tr>
+        <tr><td colspan="{{ 10 if perlu_lengkap else 9 }}" class="text-center text-muted py-4">Belum ada transaksi</td></tr>
         {% endfor %}
       </tbody>
     </table>

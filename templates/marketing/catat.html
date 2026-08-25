@@ -103,13 +103,32 @@
   </div>
 
   {# ── Keterangan ──────────────────────────────────────── #}
-  <div class="mb-4">
+  <div class="mb-3">
     <label class="form-label fw-semibold small">
       Keterangan <span class="text-muted fw-normal">(opsional)</span>
     </label>
     <input type="text" name="keterangan" placeholder="Opsional…"
            style="border-radius:10px;font-size:.9rem"
            class="form-control">
+  </div>
+
+  {# ── Info Kegiatan (keluar) ──────────────────────────── #}
+  <div id="wrapKegiatan" class="mb-4 p-3" style="display:none;background:var(--bg);border-radius:12px">
+    <div class="fw-semibold small text-muted mb-2">
+      <i class="bi bi-calendar-event"></i> Info Kegiatan Penyaluran <span class="fw-normal fst-italic">(opsional)</span>
+    </div>
+    <div class="mb-2">
+      <input type="text" name="nama_kegiatan" placeholder="Nama kegiatan, cth: Santunan Dhuafa"
+             style="border-radius:10px;font-size:.88rem" class="form-control">
+    </div>
+    <div class="mb-2">
+      <input type="text" name="lokasi" placeholder="Tempat kegiatan"
+             style="border-radius:10px;font-size:.88rem" class="form-control">
+    </div>
+    <div>
+      <input type="number" name="jumlah_mustahik" placeholder="Jumlah mustahik" min="0"
+             style="border-radius:10px;font-size:.88rem" class="form-control">
+    </div>
   </div>
 
   <button type="submit" id="btnSimpan" class="btn btn-primary w-100 btn-lg">
@@ -234,6 +253,7 @@ function filterCoa() {
   const jenis = document.querySelector('input[name="jenis"]:checked').value;
   document.getElementById('wrapDonatur').style.display  = jenis==='masuk'  ? '' : 'none';
   document.getElementById('wrapPenerima').style.display = jenis==='keluar' ? '' : 'none';
+  document.getElementById('wrapKegiatan').style.display = jenis==='keluar' ? '' : 'none';
   buildInduk();
   document.getElementById('selCoa').innerHTML = '<option value="">— Pilih Sub Akun —</option>';
 }
@@ -350,7 +370,10 @@ form.addEventListener('submit', function(e) {
     penerima_id: fd.get('penerima_id') || null,
     jumlah: fd.get('jumlah'),
     keterangan: fd.get('keterangan') || '',
-    client_uuid: fd.get('client_uuid') || null
+    client_uuid: fd.get('client_uuid') || null,
+    nama_kegiatan: fd.get('nama_kegiatan') || null,
+    lokasi: fd.get('lokasi') || null,
+    jumlah_mustahik: fd.get('jumlah_mustahik') || null
   };
 
   fetch('/api/marketing/transaksi', {
