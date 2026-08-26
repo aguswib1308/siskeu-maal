@@ -10,9 +10,14 @@
            class="form-control form-control-sm" style="width:110px">
     <button class="btn btn-sm btn-primary">Buka</button>
   </form>
-  <a href="/admin/laporan/renstra?tahun={{ tahun }}" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-graph-up-arrow"></i> Lihat Evaluasi RKT vs Realisasi
-  </a>
+  <div class="d-flex gap-2">
+    <a href="/admin/laporan/rkt-cetak?tahun={{ tahun }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak RKT
+    </a>
+    <a href="/admin/laporan/renstra?tahun={{ tahun }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-graph-up-arrow"></i> Lihat Evaluasi RKT vs Realisasi
+    </a>
+  </div>
 </div>
 
 <div class="alert alert-info small py-2 mb-3">

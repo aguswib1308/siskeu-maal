@@ -1204,6 +1204,46 @@ def laporan_renstra():
         n_kegiatan_total=n_kegiatan_total, n_kegiatan_terlaksana=n_kegiatan_terlaksana, inst=inst)
 
 
+@app.route('/admin/laporan/rkt-cetak')
+@admin_required
+def laporan_rkt_cetak():
+    """Cetak Rencana Kerja Tahunan (RKT) apa adanya -- dokumen rencana murni tanpa
+    kolom realisasi, utk pengesahan/arsip di awal tahun sebelum ada data realisasi."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+    programs = _program_registry(conn)
+    target_rows = conn.execute(
+        "SELECT program_key, jenis, target_nominal FROM renstra_target WHERE tahun=?", (tahun,)
+    ).fetchall()
+    target_map = {}
+    for r in target_rows:
+        target_map.setdefault(r['program_key'], {})[r['jenis']] = r['target_nominal']
+
+    rows = []
+    for key, p in programs.items():
+        t = target_map.get(key, {})
+        tf = t.get('fundraising') or 0
+        tp = t.get('pentasharufan') or 0
+        if not (tf or tp):
+            continue
+        rows.append({'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
+                      'target_fundraising': tf, 'target_pentasharufan': tp})
+    rows.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, g['label']))
+
+    total_target_f = sum(r['target_fundraising'] for r in rows)
+    total_target_p = sum(r['target_pentasharufan'] for r in rows)
+
+    kegiatan = conn.execute(
+        "SELECT * FROM renstra_kegiatan WHERE tahun=? ORDER BY COALESCE(bulan_rencana,'99'), id", (tahun,)
+    ).fetchall()
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_rkt_cetak.html',
+        rows=rows, tahun=tahun, kegiatan=kegiatan, programs=programs,
+        total_target_f=total_target_f, total_target_p=total_target_p, inst=inst)
+
+
 @app.route('/admin/laporan/laz-pusat')
 @admin_required
 def laporan_laz_pusat():
