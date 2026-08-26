@@ -14,6 +14,44 @@
   <div class="hero-stat-amount">{{ total_masuk_bulan|rupiah }}</div>
 </div>
 
+{# ── RKT Tahun Ini (rujukan rencana kerja tahunan, org-wide) ────────── #}
+<div id="rktCard" class="mb-3" style="display:none"></div>
+<script>
+(function() {
+  fetch('/api/marketing/rkt', { credentials: 'same-origin' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok || !d.ada_rkt) return;
+      var pctF = d.pct_f === null ? 0 : Math.min(d.pct_f, 100);
+      var pctP = d.pct_p === null ? 0 : Math.min(d.pct_p, 100);
+      var clrF = pctF >= 80 ? '#166534' : pctF >= 50 ? '#92400e' : '#991b1b';
+      var clrP = pctP >= 80 ? '#166534' : pctP >= 50 ? '#92400e' : '#991b1b';
+      var html = '<div class="card p-3" style="border-left:4px solid var(--primary-mid)">' +
+        '<div class="d-flex justify-content-between align-items-center mb-2">' +
+        '<div style="font-size:.8rem;font-weight:700;color:var(--primary-mid)">' +
+        '<i class="bi bi-clipboard-data"></i> RKT ' + d.tahun + ' · Bulan ke-' + d.bulan_berjalan + '/12</div>' +
+        '</div>' +
+        '<div style="font-size:.7rem;color:#64748b;font-weight:600;margin-bottom:2px">FUNDRAISING (SELURUH LEMBAGA)</div>' +
+        '<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">' +
+        'Rp ' + Number(d.real_f).toLocaleString('id') + ' / Rp ' + Number(d.target_f).toLocaleString('id') +
+        (d.pct_f !== null ? ' (' + d.pct_f + '%)' : '') + '</div>' +
+        '<div style="background:var(--border);border-radius:6px;height:7px;overflow:hidden;margin-bottom:10px">' +
+        '<div style="width:' + pctF + '%;height:100%;background:' + clrF + ';border-radius:6px;transition:width .5s"></div></div>' +
+        '<div style="font-size:.7rem;color:#64748b;font-weight:600;margin-bottom:2px">PENTASHARUFAN (SELURUH LEMBAGA)</div>' +
+        '<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">' +
+        'Rp ' + Number(d.real_p).toLocaleString('id') + ' / Rp ' + Number(d.target_p).toLocaleString('id') +
+        (d.pct_p !== null ? ' (' + d.pct_p + '%)' : '') + '</div>' +
+        '<div style="background:var(--border);border-radius:6px;height:7px;overflow:hidden">' +
+        '<div style="width:' + pctP + '%;height:100%;background:' + clrP + ';border-radius:6px;transition:width .5s"></div></div>' +
+        '</div>';
+      var el = document.getElementById('rktCard');
+      el.innerHTML = html;
+      el.style.display = '';
+    })
+    .catch(function() {});
+})();
+</script>
+
 {# ── Target Bulanan ────────────────────────────────────── #}
 <div id="targetCards" class="mb-3" style="display:none"></div>
 <script>

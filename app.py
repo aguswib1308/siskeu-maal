@@ -1030,6 +1030,35 @@ def _realisasi_per_program(conn, tahun):
     return hasil, programs
 
 
+def _renstra_totals(conn, tahun):
+    """Total target & realisasi RKT utk `tahun` -- dipakai laporan admin & kartu
+    ringkasan RKT di dashboard marketing, spy angkanya selalu konsisten satu sumber.
+    Realisasi HANYA dijumlah dr program yg benar2 diberi target (bukan semua program
+    yg py aktivitas) -- kalau tidak, persentase bisa meledak krn kebawa realisasi
+    program lain yg memang tdk direncanakan sama sekali."""
+    realisasi, _ = _realisasi_per_program(conn, tahun)
+    target_rows = conn.execute(
+        "SELECT program_key, jenis, target_nominal FROM renstra_target WHERE tahun=?", (tahun,)
+    ).fetchall()
+
+    target_f = real_f = target_p = real_p = 0
+    for r in target_rows:
+        real = realisasi.get(r['program_key'], {'masuk': 0, 'keluar': 0})
+        if r['jenis'] == 'fundraising':
+            target_f += r['target_nominal']
+            real_f += real['masuk']
+        else:
+            target_p += r['target_nominal']
+            real_p += real['keluar']
+
+    return {
+        'target_f': target_f, 'real_f': real_f,
+        'pct_f': round(real_f * 100 / target_f, 1) if target_f else None,
+        'target_p': target_p, 'real_p': real_p,
+        'pct_p': round(real_p * 100 / target_p, 1) if target_p else None,
+    }
+
+
 @app.route('/admin/renstra', methods=['GET', 'POST'])
 @admin_required
 def admin_renstra():
@@ -1182,10 +1211,7 @@ def laporan_renstra():
         })
     rows.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, g['label']))
 
-    total_target_f = sum(r['target_fundraising'] for r in rows)
-    total_real_f   = sum(r['realisasi_fundraising'] for r in rows)
-    total_target_p = sum(r['target_pentasharufan'] for r in rows)
-    total_real_p   = sum(r['realisasi_pentasharufan'] for r in rows)
+    totals = _renstra_totals(conn, tahun)
 
     kegiatan = conn.execute(
         "SELECT * FROM renstra_kegiatan WHERE tahun=? ORDER BY COALESCE(bulan_rencana,'99'), id", (tahun,)
@@ -1197,10 +1223,9 @@ def laporan_renstra():
     conn.close()
     return render_template('admin/laporan_renstra.html',
         rows=rows, tahun=tahun, kegiatan=kegiatan,
-        total_target_f=total_target_f, total_real_f=total_real_f,
-        total_target_p=total_target_p, total_real_p=total_real_p,
-        pct_f=round(total_real_f * 100 / total_target_f, 1) if total_target_f else None,
-        pct_p=round(total_real_p * 100 / total_target_p, 1) if total_target_p else None,
+        total_target_f=totals['target_f'], total_real_f=totals['real_f'],
+        total_target_p=totals['target_p'], total_real_p=totals['real_p'],
+        pct_f=totals['pct_f'], pct_p=totals['pct_p'],
         n_kegiatan_total=n_kegiatan_total, n_kegiatan_terlaksana=n_kegiatan_terlaksana, inst=inst)
 
 
@@ -3333,6 +3358,23 @@ def api_marketing_target():
 
     conn.close()
     return jsonify({'bulan': bulan, 'target': result})
+
+@app.route('/api/marketing/rkt')
+@api_login_required
+def api_marketing_rkt():
+    """Ringkasan progres Rencana Kerja Tahunan (RKT) tahun berjalan -- dipanggil dashboard
+    marketing tiap dibuka, spy RKT org (bukan cuma target pribadi bulanan) selalu jadi
+    rujukan tiap bulan tanpa perlu setup apa pun tiap bulannya."""
+    tahun = date.today().strftime('%Y')
+    conn = get_db()
+    ada_rkt = conn.execute("SELECT 1 FROM renstra_target WHERE tahun=? LIMIT 1", (tahun,)).fetchone() is not None
+    if not ada_rkt:
+        conn.close()
+        return jsonify(ok=True, ada_rkt=False)
+    totals = _renstra_totals(conn, tahun)
+    conn.close()
+    return jsonify(ok=True, ada_rkt=True, tahun=tahun,
+        bulan_berjalan=int(date.today().strftime('%m')), **totals)
 
 @app.route('/admin/target', methods=['GET', 'POST'])
 @admin_required
