@@ -100,6 +100,35 @@ def migrate(conn):
         UNIQUE(bulan, user_id, jenis)
     )''')
 
+    # Rencana Kerja Tahunan (RKT) -- target per program (fundraising & pentasharufan),
+    # acuan evaluasi thd realisasi riil. program_key = key dr _program_registry() di app.py
+    # (kode braket spt 'CY', atau 'coa{id}' standalone, atau 'TIDAK_TERIKAT' gabungan).
+    c.execute('''CREATE TABLE IF NOT EXISTS renstra_target (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tahun TEXT NOT NULL,
+        program_key TEXT NOT NULL,
+        jenis TEXT NOT NULL CHECK(jenis IN ('fundraising','pentasharufan')),
+        target_nominal REAL NOT NULL DEFAULT 0,
+        keterangan TEXT,
+        UNIQUE(tahun, program_key, jenis)
+    )''')
+
+    # Rencana kegiatan penyaluran yg direncanakan setahun -- dibandingkan manual/visual
+    # dgn data riil di Laporan Kegiatan Penyaluran saat evaluasi akhir tahun.
+    c.execute('''CREATE TABLE IF NOT EXISTS renstra_kegiatan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tahun TEXT NOT NULL,
+        program_key TEXT,
+        bulan_rencana TEXT,
+        nama_kegiatan TEXT NOT NULL,
+        lokasi_rencana TEXT,
+        target_mustahik INTEGER,
+        target_nominal REAL DEFAULT 0,
+        keterangan TEXT,
+        status TEXT NOT NULL DEFAULT 'rencana' CHECK(status IN ('rencana','terlaksana','batal')),
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
+
     # Saldo awal manual per jenis dana (saldo sebelum transaksi pertama di sistem)
     c.execute('''CREATE TABLE IF NOT EXISTS saldo_awal (
         jenis_dana TEXT PRIMARY KEY,

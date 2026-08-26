@@ -196,6 +196,12 @@
     <a href="/admin/target" class="nav-link {% if '/target' in request.path %}active{% endif %}">
       <i class="bi bi-bullseye"></i> Target &amp; Capaian
     </a>
+    <a href="/admin/renstra" class="nav-link {% if '/renstra' in request.path %}active{% endif %}">
+      <i class="bi bi-clipboard-data"></i> Rencana Kerja Tahunan
+    </a>
+    <a href="/admin/laporan/renstra" class="nav-link sub {% if '/laporan/renstra' in request.path %}active{% endif %}">
+      <i class="bi bi-graph-up-arrow"></i> Evaluasi RKT vs Realisasi
+    </a>
 
     <div class="nav-section-label">Master Data</div>
     <a href="/admin/master/users" class="nav-link {% if '/master/users' in request.path %}active{% endif %}">

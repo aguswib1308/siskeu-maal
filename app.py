@@ -182,7 +182,8 @@ def format_bulan(b):
 app.jinja_env.filters['bulan_label'] = format_bulan
 app.jinja_env.globals.update(LABEL_DANA=LABEL_DANA, LABEL_ASNAF=LABEL_ASNAF,
                               LABEL_SUMBER=LABEL_SUMBER, DANA_TYPES=DANA_TYPES,
-                              KODE_KAS_DANA=KODE_KAS_DANA, KODE_SALDO_DANA=KODE_SALDO_DANA)
+                              KODE_KAS_DANA=KODE_KAS_DANA, KODE_SALDO_DANA=KODE_SALDO_DANA,
+                              BULAN_IND=BULAN_IND)
 
 def parse_gmaps_url(url):
     """Ekstrak (lat, lng) dari berbagai format URL Google Maps."""
@@ -1008,6 +1009,199 @@ def laporan_kegiatan_penyaluran():
     return render_template('admin/laporan_kegiatan_penyaluran.html',
         kegiatan=kegiatan, bulan=bulan, total_disalurkan=total_disalurkan,
         total_mustahik=total_mustahik, inst=inst)
+
+
+# ── Rencana Kerja Tahunan (RKT) ─────────────────────────────────────────────
+
+def _realisasi_per_program(conn, tahun):
+    """SUM masuk & keluar per program (key sama dgn _program_registry) sepanjang `tahun` --
+    dipakai laporan RKT vs Realisasi. Return {program_key: {'masuk':x,'keluar':y}}."""
+    programs = _program_registry(conn)
+    hasil = {}
+    for key, p in programs.items():
+        ph = ','.join('?' * len(p['coa_ids']))
+        row = conn.execute(
+            f"SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE 0 END),0) as masuk, "
+            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END),0) as keluar "
+            f"FROM transaksi WHERE coa_id IN ({ph}) AND strftime('%Y',tanggal)=?",
+            (*p['coa_ids'], tahun)
+        ).fetchone()
+        hasil[key] = {'masuk': row['masuk'], 'keluar': row['keluar']}
+    return hasil, programs
+
+
+@app.route('/admin/renstra', methods=['GET', 'POST'])
+@admin_required
+def admin_renstra():
+    """Susun Rencana Kerja Tahunan: target fundraising & pentasharufan per program,
+    plus daftar rencana kegiatan -- acuan evaluasi tahun berikutnya."""
+    conn = get_db()
+    if request.method == 'POST':
+        tahun = request.form.get('tahun', '').strip()
+        if not tahun:
+            flash('Tahun wajib diisi.', 'danger')
+            conn.close()
+            return redirect(url_for('admin_renstra'))
+        programs = _program_registry(conn)
+        for key in programs:
+            for jenis in ('fundraising', 'pentasharufan'):
+                raw = request.form.get(f'target_{jenis}_{key}', '').strip()
+                nominal = parse_jumlah(raw) if raw else None
+                if nominal is None:
+                    conn.execute("DELETE FROM renstra_target WHERE tahun=? AND program_key=? AND jenis=?",
+                                 (tahun, key, jenis))
+                else:
+                    conn.execute("""
+                        INSERT INTO renstra_target (tahun, program_key, jenis, target_nominal)
+                        VALUES (?,?,?,?)
+                        ON CONFLICT(tahun, program_key, jenis) DO UPDATE SET target_nominal=excluded.target_nominal
+                    """, (tahun, key, jenis, nominal))
+        conn.commit(); conn.close()
+        flash(f'Rencana Kerja Tahunan {tahun} berhasil disimpan.', 'success')
+        return redirect(url_for('admin_renstra', tahun=tahun))
+
+    tahun = request.args.get('tahun') or str(int(get_tanggal_kerja()[:4]) + 1)
+    programs = _program_registry(conn)
+    existing = conn.execute(
+        "SELECT program_key, jenis, target_nominal FROM renstra_target WHERE tahun=?", (tahun,)
+    ).fetchall()
+    target_map = {}
+    for r in existing:
+        target_map.setdefault(r['program_key'], {})[r['jenis']] = r['target_nominal']
+
+    rows = []
+    for key, p in programs.items():
+        t = target_map.get(key, {})
+        rows.append({
+            'key': key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
+            'target_fundraising': t.get('fundraising'),
+            'target_pentasharufan': t.get('pentasharufan'),
+        })
+    rows.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, g['label']))
+
+    kegiatan = conn.execute(
+        "SELECT * FROM renstra_kegiatan WHERE tahun=? ORDER BY COALESCE(bulan_rencana,'99'), id", (tahun,)
+    ).fetchall()
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/renstra.html', rows=rows, tahun=tahun, kegiatan=kegiatan,
+        programs=programs, dana_types=DANA_TYPES, inst=inst)
+
+
+@app.route('/admin/renstra/kegiatan/tambah', methods=['POST'])
+@admin_required
+def renstra_kegiatan_tambah():
+    data = request.form
+    tahun = data.get('tahun', '').strip()
+    if not tahun or not data.get('nama_kegiatan', '').strip():
+        flash('Tahun dan Nama Kegiatan wajib diisi.', 'danger')
+        return redirect(url_for('admin_renstra', tahun=tahun))
+    target_nominal = parse_jumlah(data.get('target_nominal')) or 0
+    target_mustahik = None
+    if data.get('target_mustahik'):
+        try: target_mustahik = int(data['target_mustahik'])
+        except ValueError: target_mustahik = None
+    conn = get_db()
+    conn.execute("""INSERT INTO renstra_kegiatan
+        (tahun, program_key, bulan_rencana, nama_kegiatan, lokasi_rencana, target_mustahik, target_nominal, keterangan)
+        VALUES (?,?,?,?,?,?,?,?)""",
+        (tahun, data.get('program_key') or None, data.get('bulan_rencana') or None,
+         data['nama_kegiatan'].strip(), data.get('lokasi_rencana') or None,
+         target_mustahik, target_nominal, data.get('keterangan') or None))
+    conn.commit(); conn.close()
+    flash('Rencana kegiatan ditambahkan.', 'success')
+    return redirect(url_for('admin_renstra', tahun=tahun))
+
+
+@app.route('/admin/renstra/kegiatan/edit/<int:id>', methods=['POST'])
+@admin_required
+def renstra_kegiatan_edit(id):
+    data = request.form
+    target_nominal = parse_jumlah(data.get('target_nominal')) or 0
+    target_mustahik = None
+    if data.get('target_mustahik'):
+        try: target_mustahik = int(data['target_mustahik'])
+        except ValueError: target_mustahik = None
+    conn = get_db()
+    conn.execute("""UPDATE renstra_kegiatan SET
+        program_key=?, bulan_rencana=?, nama_kegiatan=?, lokasi_rencana=?,
+        target_mustahik=?, target_nominal=?, keterangan=?, status=?
+        WHERE id=?""",
+        (data.get('program_key') or None, data.get('bulan_rencana') or None,
+         data.get('nama_kegiatan', '').strip(), data.get('lokasi_rencana') or None,
+         target_mustahik, target_nominal, data.get('keterangan') or None,
+         data.get('status', 'rencana'), id))
+    conn.commit()
+    row = conn.execute("SELECT tahun FROM renstra_kegiatan WHERE id=?", (id,)).fetchone()
+    conn.close()
+    flash('Rencana kegiatan diperbarui.', 'success')
+    return redirect(url_for('admin_renstra', tahun=row['tahun'] if row else ''))
+
+
+@app.route('/admin/renstra/kegiatan/hapus/<int:id>', methods=['POST'])
+@admin_required
+def renstra_kegiatan_hapus(id):
+    conn = get_db()
+    row = conn.execute("SELECT tahun FROM renstra_kegiatan WHERE id=?", (id,)).fetchone()
+    conn.execute("DELETE FROM renstra_kegiatan WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    flash('Rencana kegiatan dihapus.', 'success')
+    return redirect(url_for('admin_renstra', tahun=row['tahun'] if row else ''))
+
+
+@app.route('/admin/laporan/renstra')
+@admin_required
+def laporan_renstra():
+    """Evaluasi RKT vs Realisasi -- acuan evaluasi kegiatan tahun berjalan/berikutnya."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+    realisasi, programs = _realisasi_per_program(conn, tahun)
+    target_rows = conn.execute(
+        "SELECT program_key, jenis, target_nominal FROM renstra_target WHERE tahun=?", (tahun,)
+    ).fetchall()
+    target_map = {}
+    for r in target_rows:
+        target_map.setdefault(r['program_key'], {})[r['jenis']] = r['target_nominal']
+
+    rows = []
+    for key, p in programs.items():
+        t = target_map.get(key, {})
+        tf = t.get('fundraising') or 0
+        tp = t.get('pentasharufan') or 0
+        rf = realisasi[key]['masuk']
+        rp = realisasi[key]['keluar']
+        if not (tf or tp or rf or rp):
+            continue
+        rows.append({
+            'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
+            'target_fundraising': tf, 'realisasi_fundraising': rf,
+            'pct_fundraising': round(rf * 100 / tf, 1) if tf else None,
+            'target_pentasharufan': tp, 'realisasi_pentasharufan': rp,
+            'pct_pentasharufan': round(rp * 100 / tp, 1) if tp else None,
+        })
+    rows.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, g['label']))
+
+    total_target_f = sum(r['target_fundraising'] for r in rows)
+    total_real_f   = sum(r['realisasi_fundraising'] for r in rows)
+    total_target_p = sum(r['target_pentasharufan'] for r in rows)
+    total_real_p   = sum(r['realisasi_pentasharufan'] for r in rows)
+
+    kegiatan = conn.execute(
+        "SELECT * FROM renstra_kegiatan WHERE tahun=? ORDER BY COALESCE(bulan_rencana,'99'), id", (tahun,)
+    ).fetchall()
+    n_kegiatan_total = len(kegiatan)
+    n_kegiatan_terlaksana = sum(1 for k in kegiatan if k['status'] == 'terlaksana')
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_renstra.html',
+        rows=rows, tahun=tahun, kegiatan=kegiatan,
+        total_target_f=total_target_f, total_real_f=total_real_f,
+        total_target_p=total_target_p, total_real_p=total_real_p,
+        pct_f=round(total_real_f * 100 / total_target_f, 1) if total_target_f else None,
+        pct_p=round(total_real_p * 100 / total_target_p, 1) if total_target_p else None,
+        n_kegiatan_total=n_kegiatan_total, n_kegiatan_terlaksana=n_kegiatan_terlaksana, inst=inst)
 
 
 @app.route('/admin/laporan/laz-pusat')
