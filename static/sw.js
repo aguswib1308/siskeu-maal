@@ -1,4 +1,4 @@
-var CACHE_NAME = 'bm-shell-v2';
+var CACHE_NAME = 'bm-shell-v3';
 var SHELL_ASSETS = [
   '/static/css/marketing.css',
   '/static/js/pwa-register.js',

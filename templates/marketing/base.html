@@ -32,6 +32,10 @@
 <div class="app-shell">
 
 <div class="offline-bar">&#9888; Anda sedang offline — data tersimpan lokal</div>
+<div id="pendingSyncBar" class="pending-sync-bar">
+  <span id="pendingSyncText"></span>
+  <button type="button" onclick="OfflineStore.flushSyncQueue()">Sync sekarang</button>
+</div>
 
 <div id="install-banner" class="install-banner mx-3 mt-3">
   <div class="install-text">Install aplikasi untuk pengalaman lebih baik</div>

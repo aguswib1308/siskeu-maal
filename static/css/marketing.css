@@ -194,6 +194,32 @@ body {
 }
 body.is-offline .offline-bar { display: block; }
 
+/* ── Pending sync indicator (transaksi tersimpan lokal, belum sampai server) ── */
+.pending-sync-bar {
+  display: none;
+  background: #b45309;
+  color: #fef3c7;
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pending-sync-bar.show { display: flex; }
+.pending-sync-bar button {
+  background: rgba(255,255,255,.18);
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
 /* ── Sync badge ──────────────────────────────────────── */
 .sync-badge {
   position: absolute;

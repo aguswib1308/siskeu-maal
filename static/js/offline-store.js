@@ -134,6 +134,8 @@
   }
 
   // ── Sync badge UI ─────────────────────────────────────
+  // Badge kecil di nav gampang kelewat -> tambah bar mencolok jg (spy user
+  // sadar transaksinya BELUM benar2 nyampe server, bkn cuma toast 3 detik yg lewat).
   function updateSyncBadge() {
     getSyncCount().then(function(count) {
       var badges = document.querySelectorAll('.sync-badge');
@@ -145,6 +147,16 @@
           badge.classList.remove('show');
         }
       });
+      var bar = document.getElementById('pendingSyncBar');
+      var text = document.getElementById('pendingSyncText');
+      if (bar && text) {
+        if (count > 0) {
+          text.textContent = '⚠ ' + count + ' transaksi belum tersinkron ke server — tetap terhubung internet';
+          bar.classList.add('show');
+        } else {
+          bar.classList.remove('show');
+        }
+      }
     });
   }
 
@@ -276,6 +288,14 @@
       refreshReferenceData();
     }
   });
+
+  // Coba flush ulang tiap 30 detik selama halaman terbuka & msh ada antrean --
+  // 'online' event browser tdk selalu akurat (network flapping), jd sekali gagal
+  // jgn nunggu reload/reconnect utk coba lagi.
+  setInterval(function() {
+    if (!navigator.onLine) return;
+    getSyncCount().then(function(count) { if (count > 0) flushSyncQueue(); });
+  }, 30000);
 
   // ── Expose API ────────────────────────────────────────
   window.OfflineStore = {
