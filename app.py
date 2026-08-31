@@ -630,15 +630,28 @@ def _hitung_saldo_program(conn, bulan):
 
 def _saldo_program_list(groups, tidak_terikat):
     """Ratakan output _hitung_saldo_program() jadi list siap-tampil: akun2 tidak
-    terikat digabung jadi 1 baris, urut per jenis dana lalu saldo akhir terbesar."""
+    terikat digabung jadi 1 baris, akun2 Amil (penerimaan bagian amil + beban gaji/
+    operasional/dll) jg digabung jadi 1 baris -- itu kategori beban umum, bukan
+    program tersendiri, jd gak perlu tampil kepotong2 pemasukan/pengeluaran sendiri2.
+    Urut per jenis dana lalu saldo akhir terbesar."""
     data = []
+    amil = {'label': 'Dana Amil (gabungan)', 'code': None,
+            'jenis_dana': 'amil', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
     for g in groups.values():
         if g['jenis_dana'] == 'infak_tidak_terikat':
             continue
+        if g['jenis_dana'] == 'amil':
+            amil['saldo_awal'] += g['saldo_awal']
+            amil['masuk']      += g['masuk']
+            amil['keluar']     += g['keluar']
+            continue
         if g['saldo_awal'] or g['masuk'] or g['keluar']:
             data.append(g)
+    amil['saldo_akhir'] = amil['saldo_awal'] + amil['masuk'] - amil['keluar']
     if tidak_terikat['saldo_awal'] or tidak_terikat['masuk'] or tidak_terikat['keluar']:
         data.append(tidak_terikat)
+    if amil['saldo_awal'] or amil['masuk'] or amil['keluar']:
+        data.append(amil)
     data.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
     return data
 
