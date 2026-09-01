@@ -121,18 +121,16 @@
                   title="Klik untuk edit">{{ d.no_hp or '—' }}</span>
           </td>
           <td>
-            <span class="badge {% if d.aktif %}bg-success{% else %}bg-secondary{% endif %}">
+            <span class="badge st-badge {% if d.aktif %}bg-success{% else %}bg-secondary{% endif %}">
               {% if d.aktif %}Aktif{% else %}Nonaktif{% endif %}
             </span>
           </td>
           <td class="d-flex gap-1">
             <button class="btn btn-sm btn-outline-primary py-0"
               data-bs-toggle="modal" data-bs-target="#modalEdit{{ d.id }}">Edit</button>
-            <form method="POST" action="/admin/master/donatur/toggle/{{ d.id }}" class="d-inline">
-              <button class="btn btn-sm btn-outline-{% if d.aktif %}warning{% else %}success{% endif %} py-0">
-                {% if d.aktif %}Off{% else %}On{% endif %}
-              </button>
-            </form>
+            <button type="button" class="btn btn-sm btn-outline-{% if d.aktif %}warning{% else %}success{% endif %} py-0 btn-toggle-aktif" data-id="{{ d.id }}">
+              {% if d.aktif %}Off{% else %}On{% endif %}
+            </button>
           </td>
         </tr>
         {% else %}
@@ -503,6 +501,27 @@ document.querySelector('tbody').addEventListener('click', function(e) {
     if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
   });
   if (isSelect) el.addEventListener('change', save);
+});
+
+document.querySelector('tbody').addEventListener('click', async function(e) {
+  const btn = e.target.closest('.btn-toggle-aktif');
+  if (!btn) return;
+  const row = btn.closest('tr');
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/admin/master/donatur/toggle/${btn.dataset.id}`, { method: 'POST' });
+    const j = await r.json();
+    if (!j.ok) return;
+    row.classList.toggle('table-secondary', !j.aktif);
+    row.classList.toggle('text-muted', !j.aktif);
+    const badge = row.querySelector('.st-badge');
+    badge.className = 'badge st-badge ' + (j.aktif ? 'bg-success' : 'bg-secondary');
+    badge.textContent = j.aktif ? 'Aktif' : 'Nonaktif';
+    btn.className = 'btn btn-sm btn-outline-' + (j.aktif ? 'warning' : 'success') + ' py-0 btn-toggle-aktif';
+    btn.textContent = j.aktif ? 'Off' : 'On';
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 function finish(cell, label, field, val) {

@@ -1651,8 +1651,12 @@ def master_donatur_edit(id):
 def master_donatur_toggle(id):
     conn = get_db()
     conn.execute("UPDATE donatur SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
-    conn.commit(); conn.close()
-    return redirect(url_for('master_donatur'))
+    conn.commit()
+    row = conn.execute("SELECT aktif FROM donatur WHERE id=?", (id,)).fetchone()
+    conn.close()
+    if row is None:
+        return jsonify(ok=False, msg='Donatur tidak ditemukan'), 404
+    return jsonify(ok=True, aktif=row['aktif'])
 
 @app.route('/admin/master/donatur/quick/<int:id>', methods=['POST'])
 @admin_required
