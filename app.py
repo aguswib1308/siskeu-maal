@@ -913,6 +913,98 @@ def laporan_rekap_infaq_terikat():
     )
 
 
+def _rekap_donasi_donatur(conn, tahun):
+    """Rekap tahunan penerimaan per donatur (baris) x per bulan (kolom) + statistik --
+    bahan evaluasi akhir tahun. Hanya donatur dgn min. 1 transaksi masuk di tahun tsb
+    yg ditampilkan (dari 1000+ donatur, kebanyakan tak aktif tiap bulan)."""
+    rows = conn.execute("""
+        SELECT d.id, d.nama, d.sumber_infaq, d.aktif,
+               strftime('%m', t.tanggal) as bln, SUM(t.jumlah) as total
+        FROM transaksi t JOIN donatur d ON t.donatur_id = d.id
+        WHERE t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        GROUP BY d.id, bln
+    """, (tahun,)).fetchall()
+
+    donatur_map = {}
+    for r in rows:
+        e = donatur_map.setdefault(r['id'], {
+            'id': r['id'], 'nama': r['nama'], 'sumber_infaq': r['sumber_infaq'],
+            'aktif': r['aktif'], 'per_bulan': {}, 'total': 0, 'bulan_aktif': 0,
+        })
+        e['per_bulan'][r['bln']] = r['total']
+        e['total'] += r['total']
+        e['bulan_aktif'] += 1
+
+    tabel = list(donatur_map.values())
+    for e in tabel:
+        e['rata2'] = e['total'] / e['bulan_aktif'] if e['bulan_aktif'] else 0
+    tabel.sort(key=lambda e: -e['total'])
+
+    total_per_bulan = {f"{i:02d}": 0 for i in range(1, 13)}
+    grand_total = 0
+    for e in tabel:
+        for bm, v in e['per_bulan'].items():
+            total_per_bulan[bm] += v
+        grand_total += e['total']
+
+    return tabel, total_per_bulan, grand_total
+
+
+@app.route('/admin/laporan/rekap-donasi-donatur')
+@admin_required
+def laporan_rekap_donasi_donatur():
+    """Rekap tahunan penerimaan per donatur x bulan + statistik (bln aktif, rata-rata) --
+    bahan evaluasi akhir tahun (donatur konsisten vs jarang/berhenti)."""
+    tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    conn = get_db()
+    tabel, total_per_bulan, grand_total = _rekap_donasi_donatur(conn, tahun)
+
+    if request.args.get('download'):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f'Donasi {tahun}'[:31]
+        headers = (['Donatur', 'Kategori'] + [BULAN_IND[i][:3] for i in range(1, 13)]
+                   + ['Total Setahun', 'Bulan Aktif', 'Rata-rata per Bulan'])
+        hdr_font = Font(bold=True, color='FFFFFF', size=10)
+        fill = PatternFill('solid', fgColor='1B3B5A')
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=h)
+            cell.font = hdr_font
+            cell.fill = fill
+            cell.alignment = Alignment(horizontal='center')
+        for r, e in enumerate(tabel, 2):
+            ws.cell(row=r, column=1, value=e['nama'])
+            ws.cell(row=r, column=2, value=e['sumber_infaq'])
+            for i in range(1, 13):
+                ws.cell(row=r, column=2 + i, value=e['per_bulan'].get(f"{i:02d}", 0))
+            ws.cell(row=r, column=15, value=e['total'])
+            ws.cell(row=r, column=16, value=e['bulan_aktif'])
+            ws.cell(row=r, column=17, value=round(e['rata2']))
+        last = len(tabel) + 2
+        bold = Font(bold=True)
+        ws.cell(row=last, column=1, value=f'TOTAL {tahun}').font = bold
+        for i in range(1, 13):
+            ws.cell(row=last, column=2 + i, value=total_per_bulan[f"{i:02d}"]).font = bold
+        ws.cell(row=last, column=15, value=grand_total).font = bold
+        for col_idx in range(1, len(headers) + 1):
+            ws.column_dimensions[chr(64 + col_idx)].width = 24 if col_idx <= 2 else 14
+        ws.freeze_panes = 'C2'
+        ws.auto_filter.ref = f'A1:{chr(64 + len(headers))}{last}'
+        conn.close()
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return send_file(buf, download_name=f'rekap_donasi_donatur_{tahun}.xlsx',
+            as_attachment=True,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laporan_rekap_donasi_donatur.html',
+        tabel=tabel, total_per_bulan=total_per_bulan, grand_total=grand_total,
+        tahun=tahun, inst=inst, BULAN_IND=BULAN_IND)
+
+
 @app.route('/admin/laporan/donatur-mustahik')
 @admin_required
 def laporan_donatur_mustahik():
