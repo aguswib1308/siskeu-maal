@@ -1736,7 +1736,8 @@ def master_donatur_edit(id):
          lat, lng, 1 if data.get('aktif_infaq') else 0, program_id, id))
     conn.commit(); conn.close()
     flash('Donatur diperbarui.', 'success')
-    return redirect(url_for('master_donatur'))
+    filters = {k[1:]: v for k, v in data.items() if k in ('_q','_sumber','_area','_aktif') and v}
+    return redirect(url_for('master_donatur', **filters) + f'#row{id}')
 
 @app.route('/admin/master/donatur/toggle/<int:id>', methods=['POST'])
 @admin_required
