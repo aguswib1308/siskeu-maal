@@ -16,7 +16,7 @@
           <th>Penerima</th><th>No HP</th>{% if kelompok.pakai_token %}<th>Tipe</th>{% endif %}
           <th style="width:160px">Nominal</th>
           {% if kelompok.pakai_token %}<th style="width:180px">Token (kalau prepaid)</th>{% endif %}
-          <th>Status</th>
+          <th>Status</th><th>WA</th>
         </tr>
       </thead>
       <tbody>
@@ -47,16 +47,30 @@
               {% if b.status=='tersalur' %}Tersalur{% else %}Draft{% endif %}
             </span>
           </td>
+          <td class="small">
+            {% if b.wa_status=='terkirim' %}
+              <span class="badge bg-success">Terkirim</span>
+            {% elif b.wa_status=='gagal' %}
+              <span class="badge bg-danger" title="{{ b.wa_error }}">Gagal</span>
+              <form method="POST" action="{{ url_for('kelompok_bulanan_kirim_ulang', bulanan_id=b.id) }}" class="d-inline">
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" title="{{ b.wa_error }}">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </form>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">Belum ada baris — buka periode dulu dari halaman kelompok.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">Belum ada baris — buka periode dulu dari halaman kelompok.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% if baris %}
   <button type="submit" class="btn btn-success mt-2">
-    <i class="bi bi-check2-circle"></i> Simpan Semua
+    <i class="bi bi-check2-circle"></i> Simpan & Kirim Notifikasi WA
   </button>
   {% endif %}
 </div>

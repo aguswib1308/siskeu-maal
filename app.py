@@ -1,11 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
-import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod
+import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time
 import uuid as uuid_mod
 from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from functools import wraps
 import laz_pusat_report
+from wa import kirim_wa, render_pesan
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or 'BmtMaal@2026!'
@@ -2009,6 +2010,38 @@ def kelompok_bulanan_detail(id, bulan):
     conn.close()
     return render_template('admin/kelompok_bulanan.html', kelompok=kelompok, bulan=bulan, baris=baris)
 
+def kirim_notifikasi_penyaluran(conn, bulanan_id):
+    """Kirim WA notifikasi utk 1 baris kelompok_penyaluran_bulanan, lalu update
+    status kirimnya di DB (tidak commit — caller yang commit)."""
+    row = conn.execute("""
+        SELECT b.id, b.jumlah, b.token, b.bulan, p.nama AS penerima_nama, p.no_hp, a.tipe,
+               k.pakai_token, k.template_pesan, k.template_pesan_prepaid
+        FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        JOIN penerima_manfaat p ON a.penerima_id=p.id
+        JOIN kelompok_penyaluran k ON a.kelompok_id=k.id
+        WHERE b.id=?
+    """, (bulanan_id,)).fetchone()
+    if not row:
+        return
+    if not row['no_hp']:
+        conn.execute("UPDATE kelompok_penyaluran_bulanan SET wa_status='gagal', wa_error=? WHERE id=?",
+                     ('Nomor HP kosong', bulanan_id))
+        return
+    template = row['template_pesan']
+    if row['pakai_token'] and row['tipe'] == 'prepaid':
+        template = row['template_pesan_prepaid']
+    pesan = render_pesan(template or '', nama=row['penerima_nama'], bulan=format_bulan(row['bulan']),
+                          nominal=format_rupiah(row['jumlah']), token=row['token'] or '')
+    ok, error = kirim_wa(row['no_hp'], pesan)
+    if ok:
+        conn.execute("""UPDATE kelompok_penyaluran_bulanan
+            SET wa_status='terkirim', wa_error=NULL, wa_sent_at=datetime('now','localtime') WHERE id=?""",
+            (bulanan_id,))
+    else:
+        conn.execute("UPDATE kelompok_penyaluran_bulanan SET wa_status='gagal', wa_error=? WHERE id=?",
+                     (error, bulanan_id))
+
 @app.route('/admin/kelompok/<int:id>/<bulan>/simpan', methods=['POST'])
 @admin_required
 def kelompok_bulanan_simpan(id, bulan):
@@ -2045,9 +2078,33 @@ def kelompok_bulanan_simpan(id, bulan):
             SET jumlah=?, token=?, status='tersalur', transaksi_id=? WHERE id=?""",
             (jumlah, token or None, trx_id, b['id']))
         disimpan += 1
+        # ponytail: kirim WA sinkron dalam request (blocking ~1-2 detik x jumlah
+        # anggota) — aman utk skala saat ini (~40 anggota/bulan, sekali sebulan).
+        # Kalau kelompok makin besar/banyak, pindah ke background job sebelum
+        # request ini menabrak timeout gunicorn (lihat Task 9: timeout dinaikkan
+        # ke 180s sbg jaring pengaman, bukan solusi permanen).
+        kirim_notifikasi_penyaluran(conn, b['id'])
+        time.sleep(1)
     conn.commit(); conn.close()
     flash(f'{disimpan} penyaluran disimpan.', 'success')
     return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
+
+@app.route('/admin/kelompok/bulanan/<int:bulanan_id>/kirim-ulang', methods=['POST'])
+@admin_required
+def kelompok_bulanan_kirim_ulang(bulanan_id):
+    conn = get_db()
+    row = conn.execute("""
+        SELECT b.bulan, a.kelompok_id FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE b.id=?
+    """, (bulanan_id,)).fetchone()
+    if not row:
+        conn.close()
+        flash('Data tidak ditemukan.', 'danger')
+        return redirect(url_for('kelompok_list'))
+    kirim_notifikasi_penyaluran(conn, bulanan_id)
+    conn.commit(); conn.close()
+    return redirect(url_for('kelompok_bulanan_detail', id=row['kelompok_id'], bulan=row['bulan']))
 
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
