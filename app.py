@@ -2009,6 +2009,46 @@ def kelompok_bulanan_detail(id, bulan):
     conn.close()
     return render_template('admin/kelompok_bulanan.html', kelompok=kelompok, bulan=bulan, baris=baris)
 
+@app.route('/admin/kelompok/<int:id>/<bulan>/simpan', methods=['POST'])
+@admin_required
+def kelompok_bulanan_simpan(id, bulan):
+    conn = get_db()
+    kelompok = conn.execute("SELECT * FROM kelompok_penyaluran WHERE id=?", (id,)).fetchone()
+    if not kelompok:
+        conn.close()
+        flash('Kelompok tidak ditemukan.', 'danger')
+        return redirect(url_for('kelompok_list'))
+    baris = conn.execute("""
+        SELECT b.id, b.status, b.transaksi_id, a.penerima_id
+        FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE a.kelompok_id=? AND b.bulan=?
+    """, (id, bulan)).fetchall()
+    tanggal = get_tanggal_kerja()
+    disimpan = 0
+    for b in baris:
+        jumlah = parse_jumlah(request.form.get(f'jumlah_{b["id"]}'))
+        token = request.form.get(f'token_{b["id"]}', '').strip()
+        if jumlah is None:
+            continue
+        if b['status'] == 'tersalur' and b['transaksi_id']:
+            # Sudah pernah disimpan (mis. koreksi nominal) — update transaksi
+            # yang ada, jangan bikin baris baru supaya buku besar tidak dobel.
+            conn.execute("UPDATE transaksi SET jumlah=? WHERE id=?", (jumlah, b['transaksi_id']))
+            trx_id = b['transaksi_id']
+        else:
+            trx_id, _ = insert_transaksi(
+                conn, tanggal, 'keluar', kelompok['coa_id'], None, b['penerima_id'], jumlah,
+                f"Penyaluran {kelompok['nama']} – {format_bulan(bulan)}", session['user_id'],
+            )
+        conn.execute("""UPDATE kelompok_penyaluran_bulanan
+            SET jumlah=?, token=?, status='tersalur', transaksi_id=? WHERE id=?""",
+            (jumlah, token or None, trx_id, b['id']))
+        disimpan += 1
+    conn.commit(); conn.close()
+    flash(f'{disimpan} penyaluran disimpan.', 'success')
+    return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
+
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
 @app.route('/admin/master/penerima')
