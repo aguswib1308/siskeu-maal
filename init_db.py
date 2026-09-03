@@ -226,6 +226,43 @@ def init():
             created_at TEXT DEFAULT (datetime('now','localtime'))
         );
 
+        CREATE TABLE IF NOT EXISTS kelompok_penyaluran (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nama TEXT NOT NULL,
+            coa_id INTEGER REFERENCES chart_of_accounts(id),
+            pakai_token INTEGER DEFAULT 0,
+            template_pesan TEXT,
+            template_pesan_prepaid TEXT,
+            aktif INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS kelompok_penyaluran_anggota (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kelompok_id INTEGER REFERENCES kelompok_penyaluran(id),
+            penerima_id INTEGER REFERENCES penerima_manfaat(id),
+            tipe TEXT CHECK(tipe IN ('postpaid','prepaid')),
+            urutan INTEGER DEFAULT 0,
+            aktif INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(kelompok_id, penerima_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS kelompok_penyaluran_bulanan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            anggota_id INTEGER REFERENCES kelompok_penyaluran_anggota(id),
+            bulan TEXT NOT NULL,
+            jumlah REAL,
+            token TEXT,
+            status TEXT DEFAULT 'draft' CHECK(status IN ('draft','tersalur')),
+            transaksi_id INTEGER REFERENCES transaksi(id),
+            wa_status TEXT DEFAULT 'belum' CHECK(wa_status IN ('belum','terkirim','gagal')),
+            wa_error TEXT,
+            wa_sent_at TEXT,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(anggota_id, bulan)
+        );
+
         CREATE TABLE IF NOT EXISTS kategori (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nama TEXT NOT NULL,
