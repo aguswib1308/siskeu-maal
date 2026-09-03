@@ -1865,6 +1865,40 @@ def donatur_import():
     flash(msg, 'success' if not incomplete else 'warning')
     return redirect(url_for('master_donatur'))
 
+# ── Kelompok Penyaluran ───────────────────────────────────────────────────────
+
+@app.route('/admin/kelompok')
+@admin_required
+def kelompok_list():
+    conn = get_db()
+    kelompok = conn.execute("""
+        SELECT k.*, c.kode AS coa_kode, c.nama AS coa_nama,
+               (SELECT COUNT(*) FROM kelompok_penyaluran_anggota a
+                WHERE a.kelompok_id=k.id AND a.aktif=1) AS jml_anggota
+        FROM kelompok_penyaluran k
+        LEFT JOIN chart_of_accounts c ON k.coa_id=c.id
+        ORDER BY k.nama
+    """).fetchall()
+    coa_list = conn.execute(
+        "SELECT id, kode, nama FROM chart_of_accounts WHERE jenis_transaksi='keluar' AND aktif=1 ORDER BY kode"
+    ).fetchall()
+    conn.close()
+    return render_template('admin/kelompok.html', kelompok=kelompok, coa_list=coa_list)
+
+@app.route('/admin/kelompok/tambah', methods=['POST'])
+@admin_required
+def kelompok_tambah():
+    data = request.form
+    conn = get_db()
+    conn.execute("""INSERT INTO kelompok_penyaluran
+        (nama, coa_id, pakai_token, template_pesan, template_pesan_prepaid)
+        VALUES (?,?,?,?,?)""",
+        (data['nama'].strip(), int(data['coa_id']), 1 if data.get('pakai_token') else 0,
+         data.get('template_pesan', '').strip(), data.get('template_pesan_prepaid', '').strip()))
+    conn.commit(); conn.close()
+    flash('Kelompok penyaluran berhasil dibuat.', 'success')
+    return redirect(url_for('kelompok_list'))
+
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
 @app.route('/admin/master/penerima')
