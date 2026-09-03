@@ -7,3 +7,6 @@ data/
 venv/
 .venv/
 donatur_list.tsv
+wa-gateway/.env
+wa-gateway/node_modules/
+wa-gateway/auth_info_baileys/

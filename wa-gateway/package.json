@@ -1,0 +1,18 @@
+{
+  "name": "bmt-maal-wa-gateway",
+  "version": "1.0.0",
+  "description": "Gateway WA kirim-pesan-saja (Baileys) khusus notifikasi penyaluran Baitul Maal",
+  "main": "gateway.js",
+  "scripts": {
+    "start": "node gateway.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
