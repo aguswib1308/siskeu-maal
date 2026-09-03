@@ -46,9 +46,20 @@ def render_pesan(template, **kwargs):
 if __name__ == '__main__':
     # ponytail: self-check manual (proyek ini tidak pakai pytest) — jalankan
     # dengan `python wa.py`, harus print "OK" tanpa AssertionError.
-    ok, err = kirim_wa('', 'test')
-    assert ok is False and 'kosong' in err.lower() or 'WA_GATEWAY_URL' in err
 
+    # Test jalur "Nomor HP kosong" — butuh set WA_GATEWAY_URL supaya lolos
+    # cek di line 16 dan mencapai cek no_hp di line 18
+    import sys
+    _module = sys.modules[__name__]
+    _saved_url = _module.WA_GATEWAY_URL
+    try:
+        _module.WA_GATEWAY_URL = 'http://127.0.0.1:1'  # sengaja dummy, jangan pakai
+        ok, err = kirim_wa('', 'test')
+        assert ok is False and err == 'Nomor HP kosong'
+    finally:
+        _module.WA_GATEWAY_URL = _saved_url  # restore keadaan awal
+
+    # Test jalur "WA_GATEWAY_URL belum diset" dengan env var kosong
     ok, err = kirim_wa('6281234567890', 'test')
     assert ok is False and err == 'WA_GATEWAY_URL belum diset'
 
