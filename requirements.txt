@@ -2,3 +2,4 @@ flask
 gunicorn
 pywebpush
 py-vapid
+requests
