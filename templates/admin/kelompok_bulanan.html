@@ -1,0 +1,64 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ kelompok.nama }} — {{ bulan|bulan_label }}{% endblock %}
+{% block page_title %}<i class="bi bi-people-fill"></i> {{ kelompok.nama }} — {{ bulan|bulan_label }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('kelompok_detail', id=kelompok.id) }}" class="btn btn-sm btn-outline-secondary mb-3">
+  <i class="bi bi-arrow-left"></i> Kembali ke {{ kelompok.nama }}
+</a>
+
+<form method="POST" action="{{ url_for('kelompok_bulanan_simpan', id=kelompok.id, bulan=bulan) }}">
+<div class="card p-3">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Penerima</th><th>No HP</th>{% if kelompok.pakai_token %}<th>Tipe</th>{% endif %}
+          <th style="width:160px">Nominal</th>
+          {% if kelompok.pakai_token %}<th style="width:180px">Token (kalau prepaid)</th>{% endif %}
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in baris %}
+        <tr>
+          <td class="small">{{ b.penerima_nama }}</td>
+          <td class="small">{{ b.no_hp or '—' }}</td>
+          {% if kelompok.pakai_token %}
+          <td class="small">
+            {% if b.tipe=='prepaid' %}<span class="badge bg-warning text-dark">Prepaid</span>
+            {% elif b.tipe=='postpaid' %}<span class="badge bg-secondary">Postpaid</span>
+            {% else %}—{% endif %}
+          </td>
+          {% endif %}
+          <td>
+            <input type="text" name="jumlah_{{ b.id }}" class="form-control form-control-sm"
+                   value="{{ b.jumlah|int if b.jumlah else '' }}" placeholder="0">
+          </td>
+          {% if kelompok.pakai_token %}
+          <td>
+            {% if b.tipe=='prepaid' %}
+            <input type="text" name="token_{{ b.id }}" class="form-control form-control-sm" value="{{ b.token or '' }}">
+            {% else %}—{% endif %}
+          </td>
+          {% endif %}
+          <td>
+            <span class="badge {% if b.status=='tersalur' %}bg-success{% else %}bg-secondary{% endif %}">
+              {% if b.status=='tersalur' %}Tersalur{% else %}Draft{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Belum ada baris — buka periode dulu dari halaman kelompok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if baris %}
+  <button type="submit" class="btn btn-success mt-2">
+    <i class="bi bi-check2-circle"></i> Simpan Semua
+  </button>
+  {% endif %}
+</div>
+</form>
+{% endblock %}

@@ -1923,9 +1923,19 @@ def kelompok_detail(id):
             (SELECT penerima_id FROM kelompok_penyaluran_anggota WHERE kelompok_id=?)
         ORDER BY nama
     """, (id,)).fetchall()
+    periode = conn.execute("""
+        SELECT b.bulan,
+               COUNT(*) AS total,
+               SUM(CASE WHEN b.status='tersalur' THEN 1 ELSE 0 END) AS tersalur,
+               SUM(b.jumlah) AS total_nominal
+        FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE a.kelompok_id=?
+        GROUP BY b.bulan ORDER BY b.bulan DESC
+    """, (id,)).fetchall()
     conn.close()
     return render_template('admin/kelompok_detail.html', kelompok=kelompok, anggota=anggota,
-                            penerima_tersedia=penerima_tersedia, periode=[],
+                            penerima_tersedia=penerima_tersedia, periode=periode,
                             bulan_ini=date.today().strftime('%Y-%m'))
 
 @app.route('/admin/kelompok/<int:id>/anggota/tambah', methods=['POST'])
@@ -1951,6 +1961,53 @@ def kelompok_anggota_toggle(id, anggota_id):
         WHERE id=? AND kelompok_id=?""", (anggota_id, id))
     conn.commit(); conn.close()
     return redirect(url_for('kelompok_detail', id=id))
+
+@app.route('/admin/kelompok/<int:id>/buka', methods=['POST'])
+@admin_required
+def kelompok_buka_periode(id):
+    bulan = request.form.get('bulan', '').strip()
+    if not bulan:
+        flash('Bulan wajib diisi.', 'danger')
+        return redirect(url_for('kelompok_detail', id=id))
+    conn = get_db()
+    anggota = conn.execute(
+        "SELECT id FROM kelompok_penyaluran_anggota WHERE kelompok_id=? AND aktif=1", (id,)
+    ).fetchall()
+    created = 0
+    for a in anggota:
+        prefill = conn.execute("""
+            SELECT jumlah FROM kelompok_penyaluran_bulanan
+            WHERE anggota_id=? AND bulan < ? ORDER BY bulan DESC LIMIT 1
+        """, (a['id'], bulan)).fetchone()
+        try:
+            conn.execute("""INSERT INTO kelompok_penyaluran_bulanan (anggota_id, bulan, jumlah)
+                VALUES (?,?,?)""", (a['id'], bulan, prefill['jumlah'] if prefill else None))
+            created += 1
+        except sqlite3.IntegrityError:
+            pass
+    conn.commit(); conn.close()
+    flash(f'Periode {bulan} dibuka, {created} baris dibuat.', 'success')
+    return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
+
+@app.route('/admin/kelompok/<int:id>/<bulan>')
+@admin_required
+def kelompok_bulanan_detail(id, bulan):
+    conn = get_db()
+    kelompok = conn.execute("SELECT * FROM kelompok_penyaluran WHERE id=?", (id,)).fetchone()
+    if not kelompok:
+        conn.close()
+        flash('Kelompok tidak ditemukan.', 'danger')
+        return redirect(url_for('kelompok_list'))
+    baris = conn.execute("""
+        SELECT b.*, p.nama AS penerima_nama, p.no_hp, a.tipe
+        FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        JOIN penerima_manfaat p ON a.penerima_id=p.id
+        WHERE a.kelompok_id=? AND b.bulan=?
+        ORDER BY a.urutan, p.nama
+    """, (id, bulan)).fetchall()
+    conn.close()
+    return render_template('admin/kelompok_bulanan.html', kelompok=kelompok, bulan=bulan, baris=baris)
 
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
