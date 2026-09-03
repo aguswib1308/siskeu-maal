@@ -1,0 +1,118 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ kelompok.nama }}{% endblock %}
+{% block page_title %}<i class="bi bi-people-fill"></i> {{ kelompok.nama }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('kelompok_list') }}" class="btn btn-sm btn-outline-secondary mb-3">
+  <i class="bi bi-arrow-left"></i> Kembali ke Daftar Kelompok
+</a>
+
+<div class="card p-3 mb-4">
+  <div class="row g-2 small">
+    <div class="col-md-4"><span class="text-muted">Akun CoA:</span> <code>{{ kelompok.coa_kode }}</code> {{ kelompok.coa_nama }}</div>
+    <div class="col-md-4"><span class="text-muted">Pakai Token:</span> {% if kelompok.pakai_token %}Ya{% else %}Tidak{% endif %}</div>
+    <div class="col-md-4"><span class="text-muted">Anggota Aktif:</span> {{ anggota|selectattr('aktif')|list|length }}</div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card p-3">
+      <div class="fw-semibold mb-3">Anggota Kelompok</div>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-light">
+            <tr><th>Nama</th><th>No HP</th>{% if kelompok.pakai_token %}<th>Tipe</th>{% endif %}<th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for a in anggota %}
+            <tr class="{% if not a.aktif %}table-secondary text-muted{% endif %}">
+              <td class="small">{{ a.penerima_nama }}</td>
+              <td class="small">{{ a.no_hp or '—' }}</td>
+              {% if kelompok.pakai_token %}
+              <td class="small">
+                {% if a.tipe=='prepaid' %}<span class="badge bg-warning text-dark">Prepaid</span>
+                {% elif a.tipe=='postpaid' %}<span class="badge bg-secondary">Postpaid</span>
+                {% else %}—{% endif %}
+              </td>
+              {% endif %}
+              <td><span class="badge {% if a.aktif %}bg-success{% else %}bg-secondary{% endif %}">{% if a.aktif %}Aktif{% else %}Nonaktif{% endif %}</span></td>
+              <td>
+                <form method="POST" action="{{ url_for('kelompok_anggota_toggle', id=kelompok.id, anggota_id=a.id) }}">
+                  <button class="btn btn-sm btn-outline-{% if a.aktif %}warning{% else %}success{% endif %} py-0">
+                    {% if a.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="{% if kelompok.pakai_token %}5{% else %}4{% endif %}" class="text-center text-muted py-3">Belum ada anggota</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <hr>
+      <div class="fw-semibold mb-2 small">Tambah Anggota</div>
+      <form method="POST" action="{{ url_for('kelompok_anggota_tambah', id=kelompok.id) }}" class="d-flex gap-2 flex-wrap">
+        <select name="penerima_id" class="form-select form-select-sm" style="width:220px" required>
+          <option value="">— Pilih Penerima —</option>
+          {% for p in penerima_tersedia %}
+          <option value="{{ p.id }}">{{ p.nama }}</option>
+          {% endfor %}
+        </select>
+        {% if kelompok.pakai_token %}
+        <select name="tipe" class="form-select form-select-sm" style="width:140px" required>
+          <option value="">— Tipe —</option>
+          <option value="postpaid">Postpaid</option>
+          <option value="prepaid">Prepaid</option>
+        </select>
+        {% endif %}
+        <button class="btn btn-sm btn-success">Tambah</button>
+      </form>
+      <small class="text-muted d-block mt-2">
+        Penerima belum ada di daftar? Tambahkan dulu lewat
+        <a href="{{ url_for('master_penerima') }}">Master Penerima Manfaat</a> (bisa import Excel massal).
+      </small>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card p-3 mb-3">
+      <div class="fw-semibold mb-3">Buka Periode Baru</div>
+      <form method="POST" action="{{ url_for('kelompok_buka_periode', id=kelompok.id) }}" class="d-flex gap-2 align-items-end">
+        <div>
+          <label class="form-label fw-semibold small">Bulan</label>
+          <input type="month" name="bulan" value="{{ bulan_ini }}" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-play-circle"></i> Buka Periode
+        </button>
+      </form>
+    </div>
+
+    <div class="card p-3">
+      <div class="fw-semibold mb-3">Riwayat Periode</div>
+      {% if periode %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-light"><tr><th>Bulan</th><th class="text-center">Tersalur</th><th class="text-end">Nominal</th><th></th></tr></thead>
+          <tbody>
+            {% for p in periode %}
+            <tr>
+              <td class="fw-semibold">{{ p.bulan|bulan_label }}</td>
+              <td class="text-center">{{ p.tersalur }}/{{ p.total }}</td>
+              <td class="text-end">{{ (p.total_nominal or 0)|rupiah }}</td>
+              <td><a href="{{ url_for('kelompok_bulanan_detail', id=kelompok.id, bulan=p.bulan) }}" class="btn btn-sm btn-outline-primary py-0">Detail</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-3">Belum ada periode dibuka.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

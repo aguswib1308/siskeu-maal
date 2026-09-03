@@ -1899,6 +1899,59 @@ def kelompok_tambah():
     flash('Kelompok penyaluran berhasil dibuat.', 'success')
     return redirect(url_for('kelompok_list'))
 
+@app.route('/admin/kelompok/<int:id>')
+@admin_required
+def kelompok_detail(id):
+    conn = get_db()
+    kelompok = conn.execute("""
+        SELECT k.*, c.kode AS coa_kode, c.nama AS coa_nama
+        FROM kelompok_penyaluran k LEFT JOIN chart_of_accounts c ON k.coa_id=c.id
+        WHERE k.id=?
+    """, (id,)).fetchone()
+    if not kelompok:
+        conn.close()
+        flash('Kelompok tidak ditemukan.', 'danger')
+        return redirect(url_for('kelompok_list'))
+    anggota = conn.execute("""
+        SELECT a.*, p.nama AS penerima_nama, p.no_hp, p.alamat
+        FROM kelompok_penyaluran_anggota a JOIN penerima_manfaat p ON a.penerima_id=p.id
+        WHERE a.kelompok_id=? ORDER BY a.urutan, p.nama
+    """, (id,)).fetchall()
+    penerima_tersedia = conn.execute("""
+        SELECT id, nama FROM penerima_manfaat
+        WHERE aktif=1 AND id NOT IN
+            (SELECT penerima_id FROM kelompok_penyaluran_anggota WHERE kelompok_id=?)
+        ORDER BY nama
+    """, (id,)).fetchall()
+    conn.close()
+    return render_template('admin/kelompok_detail.html', kelompok=kelompok, anggota=anggota,
+                            penerima_tersedia=penerima_tersedia, periode=[],
+                            bulan_ini=date.today().strftime('%Y-%m'))
+
+@app.route('/admin/kelompok/<int:id>/anggota/tambah', methods=['POST'])
+@admin_required
+def kelompok_anggota_tambah(id):
+    data = request.form
+    conn = get_db()
+    try:
+        conn.execute("""INSERT INTO kelompok_penyaluran_anggota (kelompok_id, penerima_id, tipe)
+            VALUES (?,?,?)""", (id, int(data['penerima_id']), data.get('tipe') or None))
+        conn.commit()
+        flash('Anggota ditambahkan ke kelompok.', 'success')
+    except sqlite3.IntegrityError:
+        flash('Penerima ini sudah jadi anggota kelompok.', 'warning')
+    conn.close()
+    return redirect(url_for('kelompok_detail', id=id))
+
+@app.route('/admin/kelompok/<int:id>/anggota/<int:anggota_id>/toggle', methods=['POST'])
+@admin_required
+def kelompok_anggota_toggle(id, anggota_id):
+    conn = get_db()
+    conn.execute("""UPDATE kelompok_penyaluran_anggota SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END
+        WHERE id=? AND kelompok_id=?""", (anggota_id, id))
+    conn.commit(); conn.close()
+    return redirect(url_for('kelompok_detail', id=id))
+
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
 @app.route('/admin/master/penerima')
