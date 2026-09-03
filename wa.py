@@ -28,7 +28,7 @@ def kirim_wa(no_hp, message):
         if data.get('status'):
             return True, None
         return False, data.get('reason', f'HTTP {r.status_code}')
-    except requests.RequestException as e:
+    except (requests.RequestException, ValueError) as e:
         return False, str(e)
 
 

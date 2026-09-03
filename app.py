@@ -1928,7 +1928,7 @@ def kelompok_detail(id):
         SELECT b.bulan,
                COUNT(*) AS total,
                SUM(CASE WHEN b.status='tersalur' THEN 1 ELSE 0 END) AS tersalur,
-               SUM(b.jumlah) AS total_nominal
+               SUM(CASE WHEN b.status='tersalur' THEN b.jumlah ELSE 0 END) AS total_nominal
         FROM kelompok_penyaluran_bulanan b
         JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
         WHERE a.kelompok_id=?
@@ -1969,6 +1969,9 @@ def kelompok_buka_periode(id):
     bulan = request.form.get('bulan', '').strip()
     if not bulan:
         flash('Bulan wajib diisi.', 'danger')
+        return redirect(url_for('kelompok_detail', id=id))
+    if not re.fullmatch(r'\d{4}-\d{2}', bulan):
+        flash('Format bulan tidak valid.', 'danger')
         return redirect(url_for('kelompok_detail', id=id))
     conn = get_db()
     anggota = conn.execute(
@@ -2052,13 +2055,14 @@ def kelompok_bulanan_simpan(id, bulan):
         flash('Kelompok tidak ditemukan.', 'danger')
         return redirect(url_for('kelompok_list'))
     baris = conn.execute("""
-        SELECT b.id, b.status, b.transaksi_id, a.penerima_id
+        SELECT b.id, b.status, b.transaksi_id, b.wa_status, a.penerima_id
         FROM kelompok_penyaluran_bulanan b
         JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
         WHERE a.kelompok_id=? AND b.bulan=?
     """, (id, bulan)).fetchall()
     tanggal = get_tanggal_kerja()
     disimpan = 0
+    perlu_kirim = []
     for b in baris:
         jumlah = parse_jumlah(request.form.get(f'jumlah_{b["id"]}'))
         token = request.form.get(f'token_{b["id"]}', '').strip()
@@ -2067,8 +2071,16 @@ def kelompok_bulanan_simpan(id, bulan):
         if b['status'] == 'tersalur' and b['transaksi_id']:
             # Sudah pernah disimpan (mis. koreksi nominal) — update transaksi
             # yang ada, jangan bikin baris baru supaya buku besar tidak dobel.
-            conn.execute("UPDATE transaksi SET jumlah=? WHERE id=?", (jumlah, b['transaksi_id']))
-            trx_id = b['transaksi_id']
+            cur = conn.execute("UPDATE transaksi SET jumlah=? WHERE id=?", (jumlah, b['transaksi_id']))
+            if cur.rowcount:
+                trx_id = b['transaksi_id']
+            else:
+                # Transaksi lama sudah dihapus manual (mis. dari halaman
+                # Transaksi) — jangan diam-diam gagal, bikin transaksi baru.
+                trx_id, _ = insert_transaksi(
+                    conn, tanggal, 'keluar', kelompok['coa_id'], None, b['penerima_id'], jumlah,
+                    f"Penyaluran {kelompok['nama']} – {format_bulan(bulan)}", session['user_id'],
+                )
         else:
             trx_id, _ = insert_transaksi(
                 conn, tanggal, 'keluar', kelompok['coa_id'], None, b['penerima_id'], jumlah,
@@ -2078,14 +2090,20 @@ def kelompok_bulanan_simpan(id, bulan):
             SET jumlah=?, token=?, status='tersalur', transaksi_id=? WHERE id=?""",
             (jumlah, token or None, trx_id, b['id']))
         disimpan += 1
-        # ponytail: kirim WA sinkron dalam request (blocking ~1-2 detik x jumlah
-        # anggota) — aman utk skala saat ini (~40 anggota/bulan, sekali sebulan).
-        # Kalau kelompok makin besar/banyak, pindah ke background job sebelum
-        # request ini menabrak timeout gunicorn (lihat Task 9: timeout dinaikkan
-        # ke 180s sbg jaring pengaman, bukan solusi permanen).
-        kirim_notifikasi_penyaluran(conn, b['id'])
-        time.sleep(1)
-    conn.commit(); conn.close()
+        if b['wa_status'] != 'terkirim':
+            perlu_kirim.append(b['id'])
+    conn.commit()
+    # ponytail: kirim WA setelah transaksi ter-commit, satu commit per baris --
+    # supaya gateway yg macet tidak menahan lock DB / menggagalkan seluruh batch
+    # keuangan yg sudah tersimpan. Sinkron dalam request (blocking ~1-2 detik x
+    # jumlah anggota) aman utk skala saat ini (~40 anggota/bulan, sekali sebulan).
+    # Kalau kelompok makin besar, pindah ke background job sebelum ini menabrak
+    # timeout gunicorn (timeout dinaikkan ke 180s sbg jaring pengaman, bukan solusi permanen).
+    for bid in perlu_kirim:
+        kirim_notifikasi_penyaluran(conn, bid)
+        conn.commit()
+        time.sleep(2)
+    conn.close()
     flash(f'{disimpan} penyaluran disimpan.', 'success')
     return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
 
