@@ -1938,7 +1938,7 @@ def kelompok_detail(id):
     anggota = conn.execute("""
         SELECT a.*, p.nama AS penerima_nama, p.no_hp, p.alamat
         FROM kelompok_penyaluran_anggota a JOIN penerima_manfaat p ON a.penerima_id=p.id
-        WHERE a.kelompok_id=? ORDER BY a.urutan, p.nama
+        WHERE a.kelompok_id=? ORDER BY a.tipe, p.nama
     """, (id,)).fetchall()
     penerima_tersedia = conn.execute("""
         SELECT id, nama FROM penerima_manfaat
@@ -2030,7 +2030,7 @@ def kelompok_bulanan_detail(id, bulan):
         JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
         JOIN penerima_manfaat p ON a.penerima_id=p.id
         WHERE a.kelompok_id=? AND b.bulan=?
-        ORDER BY a.urutan, p.nama
+        ORDER BY a.tipe, p.nama
     """, (id, bulan)).fetchall()
     conn.close()
     return render_template('admin/kelompok_bulanan.html', kelompok=kelompok, bulan=bulan, baris=baris)
