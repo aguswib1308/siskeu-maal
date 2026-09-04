@@ -15,25 +15,33 @@
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>Nama Kelompok</th><th>Akun CoA</th><th class="text-center">Anggota Aktif</th><th class="text-center">Token</th><th></th></tr>
+        <tr><th>Nama Kelompok</th><th>Akun CoA</th><th class="text-center">Anggota Aktif</th><th class="text-center">Token</th><th class="text-center">Status</th><th></th></tr>
       </thead>
       <tbody>
         {% for k in kelompok %}
-        <tr>
+        <tr class="{% if not k.aktif %}table-secondary text-muted{% endif %}">
           <td class="fw-semibold">{{ k.nama }}</td>
           <td class="small"><code class="me-1" style="font-size:.75rem">{{ k.coa_kode }}</code>{{ k.coa_nama }}</td>
           <td class="text-center">{{ k.jml_anggota }}</td>
           <td class="text-center">
             {% if k.pakai_token %}<span class="badge bg-info">Ya</span>{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
+          <td class="text-center">
+            <span class="badge {% if k.aktif %}bg-success{% else %}bg-secondary{% endif %}">{% if k.aktif %}Aktif{% else %}Nonaktif{% endif %}</span>
+          </td>
           <td class="d-flex gap-1">
             <button type="button" class="btn btn-sm btn-outline-secondary py-0"
               data-bs-toggle="modal" data-bs-target="#modalEdit{{ k.id }}">Edit</button>
             <a href="{{ url_for('kelompok_detail', id=k.id) }}" class="btn btn-sm btn-outline-primary py-0">Detail</a>
+            <form method="POST" action="{{ url_for('kelompok_toggle', id=k.id) }}">
+              <button type="submit" class="btn btn-sm btn-outline-{% if k.aktif %}warning{% else %}success{% endif %} py-0">
+                {% if k.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}
+              </button>
+            </form>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">Belum ada kelompok penyaluran</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">Belum ada kelompok penyaluran</td></tr>
         {% endfor %}
       </tbody>
     </table>

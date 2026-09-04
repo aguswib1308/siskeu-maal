@@ -1914,6 +1914,14 @@ def kelompok_edit(id):
     flash('Kelompok penyaluran diperbarui.', 'success')
     return redirect(url_for('kelompok_list'))
 
+@app.route('/admin/kelompok/<int:id>/toggle', methods=['POST'])
+@admin_required
+def kelompok_toggle(id):
+    conn = get_db()
+    conn.execute("UPDATE kelompok_penyaluran SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return redirect(url_for('kelompok_list'))
+
 @app.route('/admin/kelompok/<int:id>')
 @admin_required
 def kelompok_detail(id):
