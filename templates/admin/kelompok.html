@@ -26,7 +26,11 @@
           <td class="text-center">
             {% if k.pakai_token %}<span class="badge bg-info">Ya</span>{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
-          <td><a href="{{ url_for('kelompok_detail', id=k.id) }}" class="btn btn-sm btn-outline-primary py-0">Detail</a></td>
+          <td class="d-flex gap-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+              data-bs-toggle="modal" data-bs-target="#modalEdit{{ k.id }}">Edit</button>
+            <a href="{{ url_for('kelompok_detail', id=k.id) }}" class="btn btn-sm btn-outline-primary py-0">Detail</a>
+          </td>
         </tr>
         {% else %}
         <tr><td colspan="5" class="text-center text-muted py-4">Belum ada kelompok penyaluran</td></tr>
@@ -85,14 +89,68 @@
     </form>
   </div></div>
 </div>
+
+{% for k in kelompok %}
+<div class="modal fade" id="modalEdit{{ k.id }}" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="POST" action="{{ url_for('kelompok_edit', id=k.id) }}">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Edit: {{ k.nama }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Nama Kelompok</label>
+          <input type="text" name="nama" class="form-control" value="{{ k.nama }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Akun CoA (tetap untuk semua anggota)</label>
+          <select name="coa_id" class="form-select" required>
+            <option value="">— Pilih Akun —</option>
+            {% for c in coa_list %}
+            <option value="{{ c.id }}" {% if c.id == k.coa_id %}selected{% endif %}>{{ c.kode }} — {{ c.nama }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="pakai_token" value="1"
+                   id="pakaiToken{{ k.id }}" {% if k.pakai_token %}checked{% endif %}
+                   onchange="toggleTokenFields({{ k.id }})">
+            <label class="form-check-label small" for="pakaiToken{{ k.id }}">
+              Kelompok ini punya anggota postpaid/prepaid (butuh field token)
+            </label>
+          </div>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Template Pesan WA <span id="labelDefault{{ k.id }}">{% if k.pakai_token %}(postpaid){% else %}(default){% endif %}</span></label>
+          <textarea name="template_pesan" class="form-control" rows="3">{{ k.template_pesan or '' }}</textarea>
+          <small class="text-muted">Placeholder: {nama}, {bulan}, {nominal}</small>
+        </div>
+        <div class="col-12" id="wrapTemplatePrepaid{{ k.id }}" style="{% if not k.pakai_token %}display:none{% endif %}">
+          <label class="form-label fw-semibold">Template Pesan WA (khusus prepaid)</label>
+          <textarea name="template_pesan_prepaid" class="form-control" rows="3">{{ k.template_pesan_prepaid or '' }}</textarea>
+          <small class="text-muted">Placeholder tambahan: {token}</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endfor %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-function toggleTokenFields() {
-  const on = document.getElementById('pakaiToken').checked;
-  document.getElementById('wrapTemplatePrepaid').style.display = on ? '' : 'none';
-  document.getElementById('labelDefault').textContent = on ? '(postpaid)' : '(default)';
+function toggleTokenFields(id) {
+  const suffix = id === undefined ? '' : id;
+  const checkbox = id === undefined ? document.getElementById('pakaiToken') : document.getElementById('pakaiToken' + id);
+  const on = checkbox.checked;
+  document.getElementById('wrapTemplatePrepaid' + suffix).style.display = on ? '' : 'none';
+  document.getElementById('labelDefault' + suffix).textContent = on ? '(postpaid)' : '(default)';
 }
 </script>
 {% endblock %}

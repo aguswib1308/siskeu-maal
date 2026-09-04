@@ -1900,6 +1900,20 @@ def kelompok_tambah():
     flash('Kelompok penyaluran berhasil dibuat.', 'success')
     return redirect(url_for('kelompok_list'))
 
+@app.route('/admin/kelompok/<int:id>/edit', methods=['POST'])
+@admin_required
+def kelompok_edit(id):
+    data = request.form
+    conn = get_db()
+    conn.execute("""UPDATE kelompok_penyaluran SET
+        nama=?, coa_id=?, pakai_token=?, template_pesan=?, template_pesan_prepaid=?
+        WHERE id=?""",
+        (data['nama'].strip(), int(data['coa_id']), 1 if data.get('pakai_token') else 0,
+         data.get('template_pesan', '').strip(), data.get('template_pesan_prepaid', '').strip(), id))
+    conn.commit(); conn.close()
+    flash('Kelompok penyaluran diperbarui.', 'success')
+    return redirect(url_for('kelompok_list'))
+
 @app.route('/admin/kelompok/<int:id>')
 @admin_required
 def kelompok_detail(id):
