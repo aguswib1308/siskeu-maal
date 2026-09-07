@@ -37,6 +37,7 @@
 
   <div class="p-4">
     {% set current_dana = namespace(v=None) %}
+    <div class="table-responsive">
     <table class="table table-sm report-table">
       <thead>
         <tr style="background:#f8f9fa">
@@ -44,7 +45,9 @@
           <th class="text-end" style="font-size:.78rem;color:#64748b">Saldo Awal</th>
           <th class="text-end" style="font-size:.78rem;color:#64748b">Penerimaan</th>
           <th class="text-end" style="font-size:.78rem;color:#64748b">Penyaluran</th>
-          <th class="text-end pe-3" style="font-size:.78rem;color:#64748b">Saldo Akhir</th>
+          <th class="text-end" style="font-size:.78rem;color:#64748b">Saldo Akhir</th>
+          <th class="text-end" style="font-size:.78rem;color:#64748b">Total Nominal</th>
+          <th class="text-end pe-3" style="font-size:.78rem;color:#64748b">Jumlah Orang</th>
         </tr>
       </thead>
       <tbody>
@@ -52,7 +55,7 @@
         {% if g.jenis_dana != current_dana.v %}
         {% set current_dana.v = g.jenis_dana %}
         <tr style="background:#eef2f7">
-          <td colspan="5" class="ps-3 fw-bold" style="font-size:.8rem">
+          <td colspan="7" class="ps-3 fw-bold" style="font-size:.8rem">
             {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya')|upper }}
           </td>
         </tr>
@@ -62,23 +65,24 @@
             {{ g.label }}{% if g.code %} <span class="text-muted small">[{{ g.code }}]</span>{% endif %}
           </td>
           <td class="text-end report-amount">{{ g.saldo_awal|rupiah }}</td>
-          <td class="text-end report-amount text-success">
-            {{ g.masuk|rupiah }}
-            {% if g.n_donatur %}<div class="report-count">{{ g.n_donatur }} donatur</div>{% endif %}
-          </td>
-          <td class="text-end report-amount text-danger">
-            {{ g.keluar|rupiah }}
-            {% if g.n_mustahik %}<div class="report-count">{{ g.n_mustahik }} penerima manfaat</div>{% endif %}
-          </td>
-          <td class="text-end pe-3 fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
+          <td class="text-end report-amount text-success">{{ g.masuk|rupiah }}</td>
+          <td class="text-end report-amount text-danger">{{ g.keluar|rupiah }}</td>
+          <td class="text-end fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
             {{ g.saldo_akhir|rupiah }}
+          </td>
+          <td class="text-end report-amount">{{ (g.masuk + g.keluar)|rupiah }}</td>
+          <td class="text-end pe-3 report-amount">
+            {% if g.n_donatur %}<div class="report-count">{{ g.n_donatur }} donatur</div>{% endif %}
+            {% if g.n_mustahik %}<div class="report-count">{{ g.n_mustahik }} penerima manfaat</div>{% endif %}
+            {% if not g.n_donatur and not g.n_mustahik %}<span class="text-muted">—</span>{% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-center text-muted small fst-italic py-3">Tidak ada aktivitas</td></tr>
+        <tr><td colspan="7" class="text-center text-muted small fst-italic py-3">Tidak ada aktivitas</td></tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 

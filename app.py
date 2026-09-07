@@ -774,7 +774,9 @@ def laporan_buku_besar():
         ).fetchone()[0]
         agg = conn.execute(
             f"SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE 0 END),0) as masuk, "
-            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END),0) as keluar "
+            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END),0) as keluar, "
+            f"COALESCE(SUM(CASE WHEN jenis='masuk' THEN 1 ELSE 0 END),0) as n_donatur, "
+            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah_mustahik ELSE 0 END),0) as n_mustahik "
             f"FROM transaksi WHERE coa_id IN ({ph}) AND tanggal BETWEEN ? AND ?",
             (*p['coa_ids'], fd, ld)
         ).fetchone()
@@ -782,16 +784,19 @@ def laporan_buku_besar():
         if saldo_awal or agg['masuk'] or agg['keluar']:
             ringkasan.append({'key': key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
                                'saldo_awal': saldo_awal, 'masuk': agg['masuk'], 'keluar': agg['keluar'],
-                               'saldo_akhir': saldo_akhir})
+                               'saldo_akhir': saldo_akhir, 'n_donatur': agg['n_donatur'], 'n_mustahik': agg['n_mustahik']})
     ringkasan.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
 
     subtotal_per_dana = {}
     for g in ringkasan:
-        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'saldo_akhir': 0})
+        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'saldo_akhir': 0,
+                                                             'n_donatur': 0, 'n_mustahik': 0})
         s['saldo_awal']  += g['saldo_awal']
         s['masuk']       += g['masuk']
         s['keluar']      += g['keluar']
         s['saldo_akhir'] += g['saldo_akhir']
+        s['n_donatur']   += g['n_donatur']
+        s['n_mustahik']  += g['n_mustahik']
 
     detail = None
     if program_key and program_key in programs:
@@ -803,7 +808,7 @@ def laporan_buku_besar():
             (*p['coa_ids'], fd)
         ).fetchone()[0]
         rows = conn.execute(
-            f"SELECT t.id, t.tanggal, t.jenis, t.jumlah, t.keterangan, c.kode as coa_kode, c.nama as coa_nama, "
+            f"SELECT t.id, t.tanggal, t.jenis, t.jumlah, t.jumlah_mustahik, t.keterangan, c.kode as coa_kode, c.nama as coa_nama, "
             f"d.nama as donatur_nama, pm.nama as penerima_nama "
             f"FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id "
             f"LEFT JOIN donatur d ON t.donatur_id=d.id "
@@ -814,15 +819,16 @@ def laporan_buku_besar():
         ).fetchall()
         baris = []
         running = saldo_awal
-        total_masuk = total_keluar = 0
+        total_masuk = total_keluar = total_donatur = total_mustahik = 0
         for r in rows:
             if r['jenis'] == 'masuk':
-                running += r['jumlah']; total_masuk += r['jumlah']
+                running += r['jumlah']; total_masuk += r['jumlah']; total_donatur += 1
             else:
-                running -= r['jumlah']; total_keluar += r['jumlah']
+                running -= r['jumlah']; total_keluar += r['jumlah']; total_mustahik += r['jumlah_mustahik'] or 0
             baris.append({**dict(r), 'saldo': running})
         detail = {'key': program_key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
                    'saldo_awal': saldo_awal, 'baris': baris, 'total_masuk': total_masuk,
+                   'total_donatur': total_donatur, 'total_mustahik': total_mustahik,
                    'total_keluar': total_keluar, 'saldo_akhir': running}
 
     inst = get_instansi(conn)
