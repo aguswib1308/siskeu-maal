@@ -47,11 +47,6 @@
   <div class="report-panel" style="--panel-accent: {{ dana_color.get(dana,'#94a3b8') }}">
     <div class="report-panel-head">
       <span class="report-panel-title">DANA {{ LABEL_DANA.get(dana, dana)|upper }}</span>
-      <span class="report-panel-meta">
-        Saldo Awal <strong>{{ d.saldo_awal|rupiah }}</strong>
-        &nbsp;→&nbsp;
-        Saldo Akhir <strong>{{ d.saldo_akhir|rupiah }}</strong>
-      </span>
     </div>
 
     <table class="table table-sm report-table mb-0">
@@ -71,14 +66,22 @@
         <tr>
           {% if i < d.masuk|length %}
           <td class="ps-3 report-kode">{{ d.masuk[i].kode }}</td>
-          <td class="report-item">{{ d.masuk[i].nama }}</td>
+          <td class="report-item">
+            {{ d.masuk[i].nama }}
+            <div class="report-count"><i class="bi bi-people"></i> {{ d.masuk[i].n_donatur }} donatur</div>
+          </td>
           <td class="text-end text-success fw-semibold report-amount">{{ d.masuk[i].total|rupiah }}</td>
           {% else %}
           <td></td><td></td><td></td>
           {% endif %}
           {% if i < d.keluar|length %}
           <td class="ps-3 report-kode" style="border-left:1px solid var(--border)">{{ d.keluar[i].kode }}</td>
-          <td class="report-item">{{ d.keluar[i].nama }}</td>
+          <td class="report-item">
+            {{ d.keluar[i].nama }}
+            {% if d.keluar[i].n_mustahik %}
+            <div class="report-count"><i class="bi bi-people"></i> {{ d.keluar[i].n_mustahik }} penerima manfaat</div>
+            {% endif %}
+          </td>
           <td class="text-end pe-3 text-danger fw-semibold report-amount">{{ d.keluar[i].total|rupiah }}</td>
           {% else %}
           <td style="border-left:1px solid var(--border)"></td><td></td><td></td>
@@ -94,19 +97,37 @@
       </tbody>
       <tfoot>
         <tr class="report-subtotal">
-          <td colspan="2" class="ps-3">Total Penerimaan</td>
+          <td colspan="2" class="ps-3">
+            Total Penerimaan
+            <span class="report-count">({{ d.total_donatur }} donatur)</span>
+          </td>
           <td class="text-end text-success">{{ d.total_masuk|rupiah }}</td>
-          <td colspan="2" class="ps-3" style="border-left:1px solid var(--border)">Total Penyaluran</td>
+          <td colspan="2" class="ps-3" style="border-left:1px solid var(--border)">
+            Total Penyaluran
+            <span class="report-count">({{ d.total_mustahik }} penerima manfaat)</span>
+          </td>
           <td class="text-end pe-3 text-danger">{{ d.total_keluar|rupiah }}</td>
         </tr>
       </tfoot>
     </table>
 
-    <div class="report-panel-foot">
-      <span class="text-muted">Saldo Awal: <strong class="val">{{ d.saldo_awal|rupiah }}</strong></span>
-      <span class="text-muted">+ Penerimaan: <strong class="val text-success">{{ d.total_masuk|rupiah }}</strong></span>
-      <span class="text-muted">− Penyaluran: <strong class="val text-danger">{{ d.total_keluar|rupiah }}</strong></span>
-      <span>= Saldo Akhir: <strong class="val {{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.92rem">{{ d.saldo_akhir|rupiah }}</strong></span>
+    <div class="report-panel-stats">
+      <div class="stat-cell">
+        <div class="stat-label">Saldo Awal</div>
+        <div class="stat-value">{{ d.saldo_awal|rupiah }}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">+ Penerimaan</div>
+        <div class="stat-value text-success">{{ d.total_masuk|rupiah }}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">− Penyaluran</div>
+        <div class="stat-value text-danger">{{ d.total_keluar|rupiah }}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">= Saldo Akhir</div>
+        <div class="stat-value {{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.95rem">{{ d.saldo_akhir|rupiah }}</div>
+      </div>
     </div>
   </div>
 

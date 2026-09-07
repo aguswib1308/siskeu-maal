@@ -64,7 +64,10 @@
                 {% endif %}
                 <tr>
                   <td class="ps-3 report-kode" style="width:56px">{{ r.kode }}</td>
-                  <td class="report-item">{{ r.nama }}</td>
+                  <td class="report-item">
+                    {{ r.nama }}
+                    <div class="report-count"><i class="bi bi-people"></i> {{ r.n_donatur }} donatur</div>
+                  </td>
                   <td class="text-end pe-3 text-success fw-semibold report-amount">{{ r.total|rupiah }}</td>
                 </tr>
               {% else %}
@@ -106,7 +109,12 @@
                 {% endif %}
                 <tr>
                   <td class="ps-3 report-kode" style="width:56px">{{ r.kode }}</td>
-                  <td class="report-item">{{ r.nama }}</td>
+                  <td class="report-item">
+                    {{ r.nama }}
+                    {% if r.n_mustahik %}
+                    <div class="report-count"><i class="bi bi-people"></i> {{ r.n_mustahik }} penerima manfaat</div>
+                    {% endif %}
+                  </td>
                   <td class="text-end pe-3 text-danger fw-semibold report-amount">{{ r.total|rupiah }}</td>
                 </tr>
               {% else %}

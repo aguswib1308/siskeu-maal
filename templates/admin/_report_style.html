@@ -43,6 +43,11 @@
 }
 .report-item { color: var(--text-main) !important; font-size: .82rem; }
 .report-amount { white-space: nowrap; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.report-count {
+  font-size: .68rem; color: var(--text-muted); font-weight: 400; margin-top: 1px;
+  white-space: nowrap; letter-spacing: 0;
+}
+.report-count i { font-size: .66rem; }
 .report-subtotal td { font-weight: 600; border-top: 1px solid var(--border); font-size: .82rem; }
 .report-total td {
   font-weight: 700; background: rgba(184,146,42,.09); font-size: .85rem;
@@ -81,10 +86,30 @@
   padding: .6rem 1rem; background: var(--bg); border-top: 1px solid var(--border); font-size: .8rem;
 }
 .report-panel-foot .val { font-variant-numeric: tabular-nums; }
+
+/* Baris statistik saldo per panel (4 sel rata, dipakai LSPD) — dibuat konsisten dgn
+   .report-summary/.sum-value (dipakai Arus Kas) drpd baris teks rata-kanan yg lama */
+.report-panel-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--bg); border-top: 1px solid var(--border);
+}
+.report-panel-stats .stat-cell {
+  padding: .6rem .5rem; text-align: center; border-left: 1px solid var(--border);
+}
+.report-panel-stats .stat-cell:first-child { border-left: none; }
+.report-panel-stats .stat-label {
+  font-size: .66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em;
+}
+.report-panel-stats .stat-value {
+  font-weight: 700; font-size: .84rem; margin-top: 2px;
+  font-variant-numeric: tabular-nums; color: var(--text-main);
+}
 @media print {
   .report-panel { border-color: #ddd !important; }
-  .report-panel-head, .report-panel-foot { background: #f8f8f8 !important; }
+  .report-panel-head, .report-panel-foot, .report-panel-stats { background: #f8f8f8 !important; }
   .report-panel-title { color: #111 !important; }
+  .report-panel-stats .stat-cell { border-color: #ddd !important; }
+  .report-count { color: #666 !important; }
 }
 
 @media print {

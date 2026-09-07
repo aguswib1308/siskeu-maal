@@ -62,8 +62,14 @@
             {{ g.label }}{% if g.code %} <span class="text-muted small">[{{ g.code }}]</span>{% endif %}
           </td>
           <td class="text-end report-amount">{{ g.saldo_awal|rupiah }}</td>
-          <td class="text-end report-amount text-success">{{ g.masuk|rupiah }}</td>
-          <td class="text-end report-amount text-danger">{{ g.keluar|rupiah }}</td>
+          <td class="text-end report-amount text-success">
+            {{ g.masuk|rupiah }}
+            {% if g.n_donatur %}<div class="report-count">{{ g.n_donatur }} donatur</div>{% endif %}
+          </td>
+          <td class="text-end report-amount text-danger">
+            {{ g.keluar|rupiah }}
+            {% if g.n_mustahik %}<div class="report-count">{{ g.n_mustahik }} penerima manfaat</div>{% endif %}
+          </td>
           <td class="text-end pe-3 fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
             {{ g.saldo_akhir|rupiah }}
           </td>

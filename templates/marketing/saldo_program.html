@@ -41,9 +41,9 @@
           {{ g.saldo_akhir|rupiah }}
         </div>
       </div>
-      <div class="text-muted d-flex gap-3" style="font-size:.7rem">
-        <span><i class="bi bi-arrow-down-circle"></i> {{ g.masuk|rupiah }}</span>
-        <span><i class="bi bi-arrow-up-circle"></i> {{ g.keluar|rupiah }}</span>
+      <div class="text-muted d-flex gap-3 flex-wrap" style="font-size:.7rem">
+        <span><i class="bi bi-arrow-down-circle"></i> {{ g.masuk|rupiah }}{% if g.n_donatur %} · {{ g.n_donatur }} donatur{% endif %}</span>
+        <span><i class="bi bi-arrow-up-circle"></i> {{ g.keluar|rupiah }}{% if g.n_mustahik %} · {{ g.n_mustahik }} penerima{% endif %}</span>
       </div>
     </div>
   </div>

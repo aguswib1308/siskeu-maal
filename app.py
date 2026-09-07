@@ -461,14 +461,16 @@ def _dana_summary(conn, bulan):
         saldo_awal.setdefault(dana, saldo_manual.get(dana, 0))
 
     masuk_rows = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total,
+               COUNT(*) as n_donatur
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
         WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?
         GROUP BY c.id ORDER BY c.kode
     """, (bulan,)).fetchall()
 
     keluar_rows = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total,
+               COALESCE(SUM(t.jumlah_mustahik),0) as n_mustahik
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
         WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?
         GROUP BY c.id ORDER BY c.kode
@@ -484,6 +486,8 @@ def _dana_summary(conn, bulan):
         data[dana] = {
             'masuk': masuk, 'keluar': keluar,
             'total_masuk': tm, 'total_keluar': tk,
+            'total_donatur': sum(r['n_donatur'] for r in masuk),
+            'total_mustahik': sum(r['n_mustahik'] for r in keluar),
             'saldo_awal': sa, 'saldo_akhir': sa + tm - tk,
         }
     return data
@@ -558,7 +562,9 @@ def _hitung_saldo_program(conn, bulan):
     period_rows = conn.execute("""
         SELECT c.id as coa_id,
                COALESCE(SUM(CASE WHEN t.jenis='masuk' THEN t.jumlah ELSE 0 END),0) as masuk,
-               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END),0) as keluar
+               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END),0) as keluar,
+               COALESCE(SUM(CASE WHEN t.jenis='masuk' THEN 1 ELSE 0 END),0) as n_donatur,
+               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah_mustahik ELSE 0 END),0) as n_mustahik
         FROM chart_of_accounts c
         LEFT JOIN transaksi t ON t.coa_id=c.id AND t.tanggal BETWEEN ? AND ?
         WHERE c.jenis_transaksi IS NOT NULL AND c.aktif=1
@@ -575,13 +581,15 @@ def _hitung_saldo_program(conn, bulan):
         if key not in groups:
             label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
             groups[key] = {'label': label, 'code': code, 'jenis_dana': r['jenis_dana'],
-                            'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+                            'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'n_donatur': 0, 'n_mustahik': 0}
         g = groups[key]
         g['saldo_awal'] += r['saldo']
         p = period_map.get(r['coa_id'])
         if p:
             g['masuk']  += p['masuk']
             g['keluar'] += p['keluar']
+            g['n_donatur']  += p['n_donatur']
+            g['n_mustahik'] += p['n_mustahik']
         # program gabungan bisa punya jenis_dana beda di sisi penerimaan vs penyaluran
         # (mis. akun penyaluran lama masih tertandai tidak-terikat) -> pakai jenis_dana sisi penerimaan
         if r['kelompok'] == 'penerimaan':
@@ -618,12 +626,15 @@ def _hitung_saldo_program(conn, bulan):
     # di penerimaan; Kafalah Guru TPQ, Safari Masjid, Sembako Dhuafa, Hibah ke Dana
     # Lain, dll di penyaluran) — bukan program per-akun, jadi digabung jadi 1 baris.
     tidak_terikat = {'label': 'Infaq Tidak Terikat (gabungan)', 'code': None,
-                      'jenis_dana': 'infak_tidak_terikat', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+                      'jenis_dana': 'infak_tidak_terikat', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0,
+                      'n_donatur': 0, 'n_mustahik': 0}
     for g in groups.values():
         if g['jenis_dana'] == 'infak_tidak_terikat':
             tidak_terikat['saldo_awal'] += g['saldo_awal']
             tidak_terikat['masuk']      += g['masuk']
             tidak_terikat['keluar']     += g['keluar']
+            tidak_terikat['n_donatur']  += g['n_donatur']
+            tidak_terikat['n_mustahik'] += g['n_mustahik']
     tidak_terikat['saldo_akhir'] = tidak_terikat['saldo_awal'] + tidak_terikat['masuk'] - tidak_terikat['keluar']
 
     return groups, tidak_terikat, coa_key
@@ -637,7 +648,8 @@ def _saldo_program_list(groups, tidak_terikat):
     Urut per jenis dana lalu saldo akhir terbesar."""
     data = []
     amil = {'label': 'Dana Amil (gabungan)', 'code': None,
-            'jenis_dana': 'amil', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+            'jenis_dana': 'amil', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0,
+            'n_donatur': 0, 'n_mustahik': 0}
     for g in groups.values():
         if g['jenis_dana'] == 'infak_tidak_terikat':
             continue
@@ -645,6 +657,8 @@ def _saldo_program_list(groups, tidak_terikat):
             amil['saldo_awal'] += g['saldo_awal']
             amil['masuk']      += g['masuk']
             amil['keluar']     += g['keluar']
+            amil['n_donatur']  += g['n_donatur']
+            amil['n_mustahik'] += g['n_mustahik']
             continue
         if g['saldo_awal'] or g['masuk'] or g['keluar']:
             data.append(g)
@@ -838,24 +852,35 @@ def _rekap_penerimaan_tahunan(conn, parent_kode, tahun):
     for r in rows:
         per_bulan.setdefault(r['bln'], {})[r['coa_id']] = r['total']
 
+    count_rows = conn.execute("""
+        SELECT strftime('%m', t.tanggal) as bln, COUNT(*) as n
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE c.parent_kode=? AND t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        GROUP BY bln
+    """, (parent_kode, tahun)).fetchall()
+    count_map = {r['bln']: r['n'] for r in count_rows}
+
     bulan_urut = [f"{i:02d}" for i in range(1, 13)]
     tabel = []
     total_per_sumber = {c['id']: 0 for c in sumber_coa}
     grand_total = 0
+    grand_total_donatur = 0
     for bm in bulan_urut:
         vals = per_bulan.get(bm, {})
         if not vals:
             continue
-        baris = {'bulan': bm, 'label': BULAN_IND[int(bm)], 'per_sumber': {}, 'total': 0}
+        baris = {'bulan': bm, 'label': BULAN_IND[int(bm)], 'per_sumber': {}, 'total': 0,
+                 'n_donatur': count_map.get(bm, 0)}
         for c in sumber_coa:
             v = vals.get(c['id'], 0)
             baris['per_sumber'][c['id']] = v
             baris['total'] += v
             total_per_sumber[c['id']] += v
         grand_total += baris['total']
+        grand_total_donatur += baris['n_donatur']
         tabel.append(baris)
 
-    return sumber_coa, tabel, total_per_sumber, grand_total
+    return sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur
 
 
 @app.route('/admin/laporan/rekap-sumber-infaq')
@@ -865,13 +890,13 @@ def laporan_rekap_sumber_infaq():
     bahan rapat. Sesuai pengelolaan riil: ketiganya jadi satu saldo, ini murni rekap sumber dana."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
     conn = get_db()
-    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.2.2', tahun)
+    sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur = _rekap_penerimaan_tahunan(conn, '4.2.2', tahun)
 
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst,
+        grand_total=grand_total, grand_total_donatur=grand_total_donatur, tahun=tahun, inst=inst,
         judul='PENERIMAAN INFAQ BEBAS PER SUMBER',
         deskripsi='Rincian sumber penerimaan Infaq Bebas/Tidak Terikat (Kotak Infaq, Kencleng, Tunai) '
                   'untuk bahan rapat — dalam pengelolaan sehari-hari ketiganya tetap satu saldo.',
@@ -884,12 +909,12 @@ def laporan_rekap_zakat():
     """Rekap tahunan penerimaan Zakat per jenis (Zakat Maal, Fitrah, Fidyah, dst) — bahan rapat."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
     conn = get_db()
-    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.1', tahun)
+    sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur = _rekap_penerimaan_tahunan(conn, '4.1', tahun)
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst,
+        grand_total=grand_total, grand_total_donatur=grand_total_donatur, tahun=tahun, inst=inst,
         judul='PENERIMAAN ZAKAT PER JENIS',
         deskripsi='Rincian penerimaan Zakat per jenis (Zakat Maal, Zakat Fitrah, Zakat Penghasilan/Profesi, '
                   'Fidyah, dst) per bulan selama setahun — bahan rapat.',
@@ -902,12 +927,12 @@ def laporan_rekap_infaq_terikat():
     """Rekap tahunan penerimaan Infaq Terikat per program (Yatim, Ambulance, Qurban, dst) — bahan rapat."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
     conn = get_db()
-    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.2.1', tahun)
+    sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur = _rekap_penerimaan_tahunan(conn, '4.2.1', tahun)
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst,
+        grand_total=grand_total, grand_total_donatur=grand_total_donatur, tahun=tahun, inst=inst,
         judul='PENERIMAAN INFAQ TERIKAT PER PROGRAM',
         deskripsi='Rincian penerimaan tiap program Infaq Terikat (Yatim, Ambulance, Sunat Sehat Gratis, '
                   'Qurban, dst) per bulan selama setahun — bahan rapat.',
@@ -1422,14 +1447,15 @@ def laporan_arus_kas():
     saldo_awal = saldo_awal_trans + sum(get_saldo_awal(conn).values())
 
     masuk = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total, COUNT(*) as n_donatur
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
         WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?
         GROUP BY c.id ORDER BY c.kode
     """, (bulan,)).fetchall()
 
     keluar = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total,
+               COALESCE(SUM(t.jumlah_mustahik),0) as n_mustahik
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
         WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?
         GROUP BY c.id ORDER BY c.kode
