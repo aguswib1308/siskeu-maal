@@ -12,9 +12,15 @@
 <div class="card p-4">
   <p class="text-muted small">
     Tentukan setiap program penyaluran masuk ke bidang mana, khusus untuk tabel "Penyaluran per Bidang
-    Program" di Laporan LAZ Pusat. Program dengan bidang <span class="text-muted fst-italic">(belum ditentukan)</span>
-    tidak ikut terhitung di tabel itu sampai dipilih di sini. Akun zakat per-asnaf, beban Hak Amil, wakaf,
-    dan hibah antar-dana tidak ditampilkan di sini karena bukan bagian dari 6 bidang ini.
+    Program" & "Program Kegiatan Pentasharufan" di Laporan LAZ Pusat. Program dengan bidang
+    <span class="text-muted fst-italic">(belum ditentukan)</span> tidak ikut terhitung di tabel itu sampai
+    dipilih di sini. Akun zakat per-asnaf, beban Hak Amil, wakaf, dan hibah antar-dana tidak ditampilkan
+    di sini karena bukan bagian dari 6 bidang ini.
+  </p>
+  <p class="text-muted small">
+    <strong>Tujuan</strong> & <strong>Asnaf</strong> dipakai di tabel "Program Kegiatan Pentasharufan" —
+    kalimat tujuan tetap per program (mis. "Pemberian santunan anak yatim") dan klasifikasi asnaf
+    penerimanya, karena keduanya tidak tercatat di transaksi.
   </p>
 
   <form method="POST" action="{{ url_for('laz_pusat_kelompok') }}">
@@ -23,7 +29,9 @@
         <thead class="table-light">
           <tr>
             <th>Program</th>
-            <th style="width:260px">Bidang</th>
+            <th style="width:180px">Bidang</th>
+            <th>Tujuan</th>
+            <th style="width:140px">Asnaf</th>
           </tr>
         </thead>
         <tbody>
@@ -41,9 +49,17 @@
                 {% endfor %}
               </select>
             </td>
+            <td>
+              <input type="text" name="tujuan_{{ r.key }}" class="form-control form-control-sm"
+                     value="{{ r.tujuan or '' }}" placeholder="mis. Pemberian santunan anak yatim">
+            </td>
+            <td>
+              <input type="text" name="asnaf_{{ r.key }}" class="form-control form-control-sm"
+                     value="{{ r.asnaf or '' }}" placeholder="mis. Miskin">
+            </td>
           </tr>
           {% else %}
-          <tr><td colspan="2" class="text-center text-muted py-4">Tidak ada program penyaluran ditemukan.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted py-4">Tidak ada program penyaluran ditemukan.</td></tr>
           {% endfor %}
         </tbody>
       </table>

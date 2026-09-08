@@ -1545,25 +1545,90 @@ def laz_pusat_kelompok():
     if request.method == 'POST':
         for key in request.form.getlist('program_key'):
             bidang = request.form.get(f'bidang_{key}', '').strip()
-            if bidang in LAZ_BIDANG_LIST:
-                conn.execute("INSERT OR REPLACE INTO program_bidang_laz (program_key, bidang) VALUES (?,?)",
-                             (key, bidang))
-            else:
-                conn.execute("DELETE FROM program_bidang_laz WHERE program_key=?", (key,))
+            tujuan = request.form.get(f'tujuan_{key}', '').strip()
+            asnaf = request.form.get(f'asnaf_{key}', '').strip()
+            bidang_val = bidang if bidang in LAZ_BIDANG_LIST else None
+            conn.execute("""INSERT OR REPLACE INTO program_bidang_laz (program_key, bidang, tujuan, asnaf)
+                VALUES (?,?,?,?)""", (key, bidang_val, tujuan or None, asnaf or None))
         conn.commit()
         conn.close()
         flash('Pengelompokan program berhasil disimpan.', 'success')
         return redirect(url_for('laz_pusat_kelompok'))
 
     programs = _laz_program_registry(conn)
-    bidang_map = {r['program_key']: r['bidang']
-                  for r in conn.execute("SELECT * FROM program_bidang_laz")}
+    meta_map = {r['program_key']: r for r in conn.execute("SELECT * FROM program_bidang_laz")}
     conn.close()
-    rows = [{'key': k, 'label': p['label'], 'code': p['code'], 'bidang': bidang_map.get(k)}
+    rows = [{'key': k, 'label': p['label'], 'code': p['code'],
+             'bidang': meta_map[k]['bidang'] if k in meta_map else None,
+             'tujuan': meta_map[k]['tujuan'] if k in meta_map else None,
+             'asnaf': meta_map[k]['asnaf'] if k in meta_map else None}
             for k, p in programs.items()]
     rows.sort(key=lambda r: (r['bidang'] or 'zzz_belum', r['label']))
     return render_template('admin/laz_pusat_kelompok.html', rows=rows,
                             bidang_list=LAZ_BIDANG_LIST, bidang_label=LAZ_BIDANG_LABEL)
+
+
+def _laz_kegiatan_data(conn, tahun):
+    """Rincian kegiatan pentasharufan per bidang LAZ x bulan, 1 baris per transaksi
+    keluar (bkn digabung) -- meniru sheet resmi HQ "Program Kegiatan Pentasharufan"
+    (No/Nama Kegiatan/Tujuan/Tanggal/Lokasi/Asnaf/Jumlah/Nominal per bulan, dlm 6
+    bidang). Nama Kegiatan = label program BAM; Tujuan & Asnaf diambil dr
+    program_bidang_laz (diisi manual, lihat laz_pusat_kelompok()); Lokasi dr field
+    lokasi transaksi, default 'Wonogiri' kalau kosong. Return {bidang: {bulan(1-12): [baris,...]}}."""
+    programs = _laz_program_registry(conn)
+    meta_map = {r['program_key']: r for r in conn.execute("SELECT * FROM program_bidang_laz")}
+    coa_to_key = {}
+    for key, p in programs.items():
+        for cid in p['coa_ids']:
+            coa_to_key[cid] = key
+
+    rows = conn.execute("""
+        SELECT t.coa_id, t.tanggal, t.jumlah, t.jumlah_mustahik, t.lokasi
+        FROM transaksi t
+        WHERE t.jenis='keluar' AND strftime('%Y', t.tanggal)=?
+        ORDER BY t.tanggal, t.id
+    """, (str(tahun),)).fetchall()
+
+    kegiatan = {b: {m: [] for m in range(1, 13)} for b in LAZ_BIDANG_LIST}
+    for r in rows:
+        key = coa_to_key.get(r['coa_id'])
+        meta = meta_map.get(key) if key else None
+        bidang = meta['bidang'] if meta else None
+        if bidang not in kegiatan:
+            continue
+        bulan = int(r['tanggal'][5:7])
+        kegiatan[bidang][bulan].append({
+            'tanggal': r['tanggal'],
+            'nama_kegiatan': programs[key]['label'],
+            'tujuan': (meta['tujuan'] or '') if meta else '',
+            'lokasi': r['lokasi'] or 'Wonogiri',
+            'asnaf': (meta['asnaf'] or '') if meta else '',
+            'jumlah': r['jumlah_mustahik'] or 0,
+            'nominal': r['jumlah'],
+        })
+    for b in LAZ_BIDANG_LIST:
+        for m in range(1, 13):
+            for i, item in enumerate(kegiatan[b][m], start=1):
+                item['no'] = i
+    return kegiatan
+
+
+@app.route('/admin/laporan/laz-pusat/kegiatan')
+@admin_required
+def laz_pusat_kegiatan():
+    """Rincian kegiatan pentasharufan per bidang x bulan (sheet 'Program Kegiatan'
+    resmi HQ, tetap diisi manual di file Excel -- ini versi web-nya, dibuat dr data
+    sistem spy tinggal disalin manual ke Excel)."""
+    tahun = int(request.args.get('tahun', get_tanggal_kerja()[:4]))
+    conn = get_db()
+    kegiatan_data = _laz_kegiatan_data(conn, tahun)
+    total_bidang = {b: sum(item['nominal'] for m in range(1, 13) for item in kegiatan_data[b][m])
+                     for b in LAZ_BIDANG_LIST}
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laz_pusat_kegiatan.html',
+        tahun=tahun, kegiatan_data=kegiatan_data, total_bidang=total_bidang, inst=inst,
+        LAZ_BIDANG_LIST=LAZ_BIDANG_LIST, LAZ_BIDANG_LABEL=LAZ_BIDANG_LABEL, BULAN_IND=BULAN_IND)
 
 
 @app.route('/admin/laporan/laz-pusat')

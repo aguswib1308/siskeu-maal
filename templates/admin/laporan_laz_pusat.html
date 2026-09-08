@@ -18,9 +18,14 @@
     </select>
     <button class="btn btn-sm btn-primary">Tampilkan</button>
   </form>
-  <a href="{{ url_for('laz_pusat_kelompok') }}" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-diagram-3"></i> Atur Kelompok Program
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('laz_pusat_kegiatan', tahun=tahun) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-list-check"></i> Program Kegiatan Pentasharufan
+    </a>
+    <a href="{{ url_for('laz_pusat_kelompok') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-diagram-3"></i> Atur Kelompok Program
+    </a>
+  </div>
 </div>
 
 <div class="card report-card">

@@ -174,6 +174,26 @@ def migrate(conn):
     c.executemany("INSERT OR IGNORE INTO program_bidang_laz (program_key, bidang) VALUES (?,?)",
                   LAZ_BIDANG_SEED)
 
+    # Tujuan (kalimat tetap per program, diisi manual lewat halaman Atur Kelompok
+    # Program -- tdk ada sumber datanya di sistem) & Asnaf (klasifikasi tetap per
+    # program, dipakai sheet "Program Kegiatan" laporan LAZ Pusat) utk tiap program.
+    pblaz_cols = {r[1] for r in c.execute("PRAGMA table_info(program_bidang_laz)")}
+    for col in ('tujuan', 'asnaf'):
+        if col not in pblaz_cols:
+            c.execute(f"ALTER TABLE program_bidang_laz ADD COLUMN {col} TEXT")
+
+    # Default asnaf per bidang (pola dr contoh riil: Kesehatan & Sosial -> Miskin,
+    # Dakwah/Advokasi -> Fisabilillah; Pendidikan/Ekonomi/Qurban blm py contoh,
+    # disamakan ke "Fakir/Miskin" sesuai arahan pengguna 2026-09-08). Cuma isi yg
+    # msh kosong -- tdk pernah menimpa perubahan manual pengguna.
+    ASNAF_DEFAULT_BIDANG = {
+        'kesehatan': 'Miskin', 'sosial': 'Miskin', 'dakwah': 'Fisabilillah',
+        'pendidikan': 'Fakir/Miskin', 'ekonomi': 'Fakir/Miskin', 'qurban': 'Fakir/Miskin',
+    }
+    for bidang, asnaf in ASNAF_DEFAULT_BIDANG.items():
+        c.execute("UPDATE program_bidang_laz SET asnaf=? WHERE bidang=? AND (asnaf IS NULL OR asnaf='')",
+                  (asnaf, bidang))
+
     conn.commit()
 
 def init():
