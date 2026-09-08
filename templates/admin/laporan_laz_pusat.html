@@ -18,6 +18,9 @@
     </select>
     <button class="btn btn-sm btn-primary">Tampilkan</button>
   </form>
+  <a href="{{ url_for('laz_pusat_kelompok') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-diagram-3"></i> Atur Kelompok Program
+  </a>
 </div>
 
 <div class="card report-card">
@@ -74,6 +77,107 @@
        href="/admin/laporan/laz-pusat?tahun={{ tahun }}&bulan_sampai={{ bulan_sampai }}&download=1">
       <i class="bi bi-download"></i> Download Excel Laporan LAZ Pusat
     </a>
+  </div>
+</div>
+
+<div class="card report-card mt-4">
+  <div class="report-header">
+    <div class="report-title">PENYALURAN PER BIDANG PROGRAM (LAZ MKU PUSAT)</div>
+    <div class="report-period">Tahun {{ tahun }} — Januari s/d Desember</div>
+    <div class="text-muted small mt-1">
+      Pengelompokan khusus laporan ini (beda dari sheet Pentasyarufan di file Excel) —
+      lihat/ubah program apa saja masuk tiap bidang di
+      <a href="{{ url_for('laz_pusat_kelompok') }}">Atur Kelompok Program</a>.
+    </div>
+  </div>
+
+  {% if unmapped_program %}
+  {% set unmapped_aktif = unmapped_program | selectattr('total_nominal', 'gt', 0) | list
+                         + unmapped_program | selectattr('total_mustahik', 'gt', 0) | list %}
+  {% if unmapped_aktif %}
+  <div class="px-4 pt-3">
+    <div class="alert alert-warning small mb-0">
+      <i class="bi bi-exclamation-triangle"></i>
+      Ada <strong>{{ unmapped_aktif | unique(attribute='key') | list | length }}</strong> program dengan transaksi
+      tahun {{ tahun }} yang belum masuk ke salah satu dari 6 bidang di atas, jadi belum ikut terhitung di tabel
+      ini: {% for u in unmapped_aktif | unique(attribute='key') %}<strong>{{ u.label }}</strong>{% if u.code %} [{{ u.code }}]{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}.
+      <a href="{{ url_for('laz_pusat_kelompok') }}">Kelompokkan sekarang &rarr;</a>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <div class="p-4">
+    <div class="fw-semibold small mb-2">Total Penyaluran (Rp)</div>
+    <div class="table-responsive mb-4">
+      <table class="table table-sm report-table">
+        <thead class="report-thead">
+          <tr>
+            <th class="ps-3">Bidang</th>
+            {% for m in range(1,13) %}<th class="text-end">{{ BULAN_IND[m][:3] }}</th>{% endfor %}
+            <th class="text-end pe-3">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set gt_nominal = namespace(v=0) %}
+          {% for b in LAZ_BIDANG_LIST %}
+          {% set row_total = bidang_data[b].values() | map(attribute='nominal') | sum %}
+          {% set gt_nominal.v = gt_nominal.v + row_total %}
+          <tr>
+            <td class="ps-3 report-item">{{ LAZ_BIDANG_LABEL[b] }}</td>
+            {% for m in range(1,13) %}<td class="text-end report-amount">{{ bidang_data[b][m].nominal|rupiah }}</td>{% endfor %}
+            <td class="text-end pe-3 fw-semibold report-amount">{{ row_total|rupiah }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="report-total">
+            <td class="ps-3">TOTAL</td>
+            {% for m in range(1,13) %}
+            {% set col_total = namespace(v=0) %}
+            {% for b in LAZ_BIDANG_LIST %}{% set col_total.v = col_total.v + bidang_data[b][m].nominal %}{% endfor %}
+            <td class="text-end">{{ col_total.v|rupiah }}</td>
+            {% endfor %}
+            <td class="text-end pe-3">{{ gt_nominal.v|rupiah }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="fw-semibold small mb-2">Total Penerima Manfaat (orang)</div>
+    <div class="table-responsive">
+      <table class="table table-sm report-table">
+        <thead class="report-thead">
+          <tr>
+            <th class="ps-3">Bidang</th>
+            {% for m in range(1,13) %}<th class="text-end">{{ BULAN_IND[m][:3] }}</th>{% endfor %}
+            <th class="text-end pe-3">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set gt_mustahik = namespace(v=0) %}
+          {% for b in LAZ_BIDANG_LIST %}
+          {% set row_total = bidang_data[b].values() | map(attribute='mustahik') | sum %}
+          {% set gt_mustahik.v = gt_mustahik.v + row_total %}
+          <tr>
+            <td class="ps-3 report-item">{{ LAZ_BIDANG_LABEL[b] }}</td>
+            {% for m in range(1,13) %}<td class="text-end report-amount">{{ bidang_data[b][m].mustahik }}</td>{% endfor %}
+            <td class="text-end pe-3 fw-semibold report-amount">{{ row_total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="report-total">
+            <td class="ps-3">TOTAL</td>
+            {% for m in range(1,13) %}
+            {% set col_total = namespace(v=0) %}{% for b in LAZ_BIDANG_LIST %}{% set col_total.v = col_total.v + bidang_data[b][m].mustahik %}{% endfor %}
+            <td class="text-end">{{ col_total.v }}</td>
+            {% endfor %}
+            <td class="text-end pe-3">{{ gt_mustahik.v }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
 </div>
 

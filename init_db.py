@@ -149,6 +149,25 @@ def migrate(conn):
         if col not in inst_cols:
             c.execute(f"ALTER TABLE instansi ADD COLUMN {col} {defn}")
 
+    # Pengelompokan program penyaluran -> 6 bidang laporan LAZ MKU Pusat (khusus
+    # laporan ini, beda dr bidang_dari_kode() yg dipakai isi Excel resmi). Seed
+    # sesuai arahan pengguna 2026-09-08; program lain dibiarkan blm dikelompokkan
+    # (bidang NULL), diisi manual lewat halaman Atur Kelompok Program.
+    c.execute('''CREATE TABLE IF NOT EXISTS program_bidang_laz (
+        program_key TEXT PRIMARY KEY,
+        bidang TEXT
+    )''')
+    LAZ_BIDANG_SEED = [
+        ('OTA', 'pendidikan'), ('PTQ', 'pendidikan'), ('coa89', 'pendidikan'),  # Beasiswa Pendidikan
+        ('SSG', 'kesehatan'),
+        ('CY', 'sosial'), ('SD', 'sosial'), ('IDHU', 'sosial'), ('AM', 'sosial'), ('DI', 'sosial'),
+        ('DAYA', 'ekonomi'),
+        ('ID', 'dakwah'), ('SM', 'dakwah'), ('IL', 'dakwah'), ('KD', 'dakwah'), ('OP', 'dakwah'),
+        ('TQUR', 'qurban'),
+    ]
+    c.executemany("INSERT OR IGNORE INTO program_bidang_laz (program_key, bidang) VALUES (?,?)",
+                  LAZ_BIDANG_SEED)
+
     conn.commit()
 
 def init():

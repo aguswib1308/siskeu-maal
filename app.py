@@ -218,6 +218,17 @@ LABEL_SUMBER = {'tunai':'Tunai','kencleng':'Kencleng','kotak_infaq':'Kotak Infaq
 BULAN_IND   = {1:'Januari',2:'Februari',3:'Maret',4:'April',5:'Mei',6:'Juni',
                7:'Juli',8:'Agustus',9:'September',10:'Oktober',11:'November',12:'Desember'}
 
+# 6 bidang laporan penyaluran ke LAZ MKU Pusat -- pengelompokan KHUSUS laporan ini
+# (beda dr bidang_dari_kode() di laz_pusat_report.py yg ngisi cell Excel resmi),
+# diatur manual per program lewat tabel program_bidang_laz & halaman Atur Kelompok
+# Program. Kode akun zakat-asnaf, beban Hak Amil, wakaf, & hibah antar-dana sengaja
+# di luar cakupan (bkn "program penyaluran" dlm arti ini).
+LAZ_BIDANG_LIST = ['pendidikan', 'kesehatan', 'sosial', 'ekonomi', 'dakwah', 'qurban']
+LAZ_BIDANG_LABEL = {'pendidikan': 'Pendidikan', 'kesehatan': 'Kesehatan',
+                     'sosial': 'Sosial/Kemanusiaan', 'ekonomi': 'Ekonomi',
+                     'dakwah': 'Dakwah/Advokasi', 'qurban': 'Qurban'}
+LAZ_KODE_DIKECUALIKAN_PREFIX = ('5.1.', '5.3.', '5.4.', '5.2.8')  # asnaf zakat, beban amil, wakaf, hibah antar-dana
+
 def format_bulan(b):
     try:
         y, m = b.split('-')
@@ -1452,6 +1463,109 @@ def laporan_rkt_cetak():
         total_target_f=total_target_f, total_target_p=total_target_p, inst=inst)
 
 
+def _laz_program_registry(conn):
+    """Semua program penyaluran (kode bracket, mis. [CY], atau coa{id} kalau akunnya
+    tanpa bracket) apa adanya -- TIDAK digabung jadi 'Infaq Tidak Terikat' spt
+    _program_registry(), krn laporan LAZ MKU perlu tiap program aslinya kelihatan
+    (mis. [SD]/[KD]/[SM] terpisah) spy bisa dikelompokkan ke salah satu dari 6
+    bidang LAZ_BIDANG_LIST. Akun zakat-asnaf/beban-amil/wakaf/hibah dikecualikan."""
+    rows = conn.execute("""
+        SELECT id, kode, nama FROM chart_of_accounts
+        WHERE jenis_transaksi='keluar' AND aktif=1
+    """).fetchall()
+    programs = {}
+    for r in rows:
+        if r['kode'].startswith(LAZ_KODE_DIKECUALIKAN_PREFIX):
+            continue
+        code = _program_code(r['nama'])
+        key = code or f"coa{r['id']}"
+        if key not in programs:
+            label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
+            programs[key] = {'label': label, 'code': code, 'coa_ids': []}
+        programs[key]['coa_ids'].append(r['id'])
+    return programs
+
+
+def _laz_bidang_data(conn, tahun):
+    """Total penyaluran (Rp) & penerima manfaat (orang) per bidang LAZ x bulan
+    utk tabel di halaman Laporan LAZ Pusat. Return (bidang_data, unmapped):
+      - bidang_data: {bidang: {bulan(1-12): {'nominal':.., 'mustahik':..}}}
+      - unmapped: list program yg blm dikelompokkan (bidang IS NULL/tak ada di
+        program_bidang_laz), lengkap dgn total setahun -- ditampilkan sbg
+        peringatan + bahan isi menu Atur Kelompok Program."""
+    programs = _laz_program_registry(conn)
+    bidang_map = {r['program_key']: r['bidang']
+                  for r in conn.execute("SELECT * FROM program_bidang_laz")}
+
+    coa_to_key = {}
+    for key, p in programs.items():
+        for cid in p['coa_ids']:
+            coa_to_key[cid] = key
+
+    rows = conn.execute("""
+        SELECT t.coa_id, CAST(strftime('%m', t.tanggal) AS INTEGER) as bln,
+               SUM(t.jumlah) as nominal, COALESCE(SUM(t.jumlah_mustahik),0) as mustahik
+        FROM transaksi t
+        WHERE t.jenis='keluar' AND strftime('%Y', t.tanggal)=?
+        GROUP BY t.coa_id, bln
+    """, (str(tahun),)).fetchall()
+
+    per_program = {key: {m: {'nominal': 0, 'mustahik': 0} for m in range(1, 13)} for key in programs}
+    for r in rows:
+        key = coa_to_key.get(r['coa_id'])
+        if not key:
+            continue  # akun dikecualikan (zakat-asnaf/beban-amil/wakaf/hibah)
+        per_program[key][r['bln']]['nominal']  += r['nominal'] or 0
+        per_program[key][r['bln']]['mustahik'] += r['mustahik'] or 0
+
+    bidang_data = {b: {m: {'nominal': 0, 'mustahik': 0} for m in range(1, 13)} for b in LAZ_BIDANG_LIST}
+    unmapped = []
+    for key, p in programs.items():
+        bidang = bidang_map.get(key)
+        if bidang in bidang_data:
+            for m in range(1, 13):
+                bidang_data[bidang][m]['nominal']  += per_program[key][m]['nominal']
+                bidang_data[bidang][m]['mustahik'] += per_program[key][m]['mustahik']
+        else:
+            total_nominal  = sum(per_program[key][m]['nominal'] for m in range(1, 13))
+            total_mustahik = sum(per_program[key][m]['mustahik'] for m in range(1, 13))
+            unmapped.append({'key': key, 'label': p['label'], 'code': p['code'],
+                              'total_nominal': total_nominal, 'total_mustahik': total_mustahik})
+    unmapped.sort(key=lambda u: -u['total_nominal'])
+    return bidang_data, unmapped
+
+
+@app.route('/admin/laporan/laz-pusat/kelompok', methods=['GET', 'POST'])
+@admin_required
+def laz_pusat_kelompok():
+    """Atur pengelompokan tiap program penyaluran ke salah satu 6 bidang LAZ MKU
+    Pusat (dipakai tabel di halaman Laporan LAZ Pusat). Satu form, satu tombol
+    simpan utk semua baris."""
+    conn = get_db()
+    if request.method == 'POST':
+        for key in request.form.getlist('program_key'):
+            bidang = request.form.get(f'bidang_{key}', '').strip()
+            if bidang in LAZ_BIDANG_LIST:
+                conn.execute("INSERT OR REPLACE INTO program_bidang_laz (program_key, bidang) VALUES (?,?)",
+                             (key, bidang))
+            else:
+                conn.execute("DELETE FROM program_bidang_laz WHERE program_key=?", (key,))
+        conn.commit()
+        conn.close()
+        flash('Pengelompokan program berhasil disimpan.', 'success')
+        return redirect(url_for('laz_pusat_kelompok'))
+
+    programs = _laz_program_registry(conn)
+    bidang_map = {r['program_key']: r['bidang']
+                  for r in conn.execute("SELECT * FROM program_bidang_laz")}
+    conn.close()
+    rows = [{'key': k, 'label': p['label'], 'code': p['code'], 'bidang': bidang_map.get(k)}
+            for k, p in programs.items()]
+    rows.sort(key=lambda r: (r['bidang'] or 'zzz_belum', r['label']))
+    return render_template('admin/laz_pusat_kelompok.html', rows=rows,
+                            bidang_list=LAZ_BIDANG_LIST, bidang_label=LAZ_BIDANG_LABEL)
+
+
 @app.route('/admin/laporan/laz-pusat')
 @admin_required
 def laporan_laz_pusat():
@@ -1477,12 +1591,15 @@ def laporan_laz_pusat():
     total_penyaluran = sum(sum(pt['bidang'][m].values()) + sum(pt['zakat_asnaf'][m].values())
                             for m in range(1, bulan_sampai + 1))
     kurang_mustahik = laz_pusat_report.hitung_kelengkapan_mustahik(conn, tahun, bulan_sampai)
+    bidang_data, unmapped_program = _laz_bidang_data(conn, tahun)
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_laz_pusat.html',
         tahun=tahun, bulan_sampai=bulan_sampai, inst=inst,
         total_penghimpunan=total_penghimpunan, total_penyaluran=total_penyaluran,
-        kurang_mustahik=kurang_mustahik, BULAN_IND=BULAN_IND)
+        kurang_mustahik=kurang_mustahik, BULAN_IND=BULAN_IND,
+        bidang_data=bidang_data, unmapped_program=unmapped_program,
+        LAZ_BIDANG_LIST=LAZ_BIDANG_LIST, LAZ_BIDANG_LABEL=LAZ_BIDANG_LABEL)
 
 
 @app.route('/admin/laporan/arus-kas')
