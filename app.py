@@ -71,32 +71,37 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
 DEFAULT_TEMPLATE_DONASI = (
     "Assalamu'alaikum {nama}, jazakumullahu khairan atas donasi Anda sebesar "
     "{nominal} untuk {program} pada {tanggal}. Semoga menjadi amal jariyah yang "
-    "berkah. - Baitul Maal BMT Amal Muslim{alamat}"
+    "berkah.\n- Baitul Maal BMT Amal Muslim\n{alamat}"
 )
 
 def kirim_notifikasi_donasi(conn, trx_id):
     """Kirim WA ucapan terima kasih ke donatur stlh transaksi 'masuk' tersimpan
     (dipanggil dr insert_transaksi(), jg dr auto_transaksi_koleksi()). Tidak commit
-    -- caller yg commit. No-op diam2 kalau fitur blm diaktifkan, transaksi tanpa
-    donatur, atau donatur tak py no_hp -- transaksi ttp tersimpan walau WA gagal/
-    tak berlaku, sama spt kirim_notifikasi_penyaluran()."""
+    -- caller yg commit. Diamkan (tanpa jejak status) kalau fitur blm diaktifkan atau
+    transaksi ini memang bkn donasi ber-donatur (mis. setoran kotak/kencleng anonim)
+    -- itu bkn kegagalan, cuma tak relevan. Tapi kalau donatur-nya ADA tapi no_hp
+    kosong, tetap dicatat wa_status='gagal' spy admin py jejak audit (sama spt
+    kirim_notifikasi_penyaluran())."""
     inst = get_instansi(conn)
     if not inst.get('notif_donasi_aktif'):
         return
     row = conn.execute("""
-        SELECT t.jenis, t.jumlah, t.tanggal, d.nama AS donatur_nama, d.no_hp, c.nama AS coa_nama
+        SELECT t.jenis, t.jumlah, t.tanggal, t.donatur_id, d.nama AS donatur_nama, d.no_hp, c.nama AS coa_nama
         FROM transaksi t
         LEFT JOIN donatur d ON t.donatur_id = d.id
         LEFT JOIN chart_of_accounts c ON t.coa_id = c.id
         WHERE t.id=?
     """, (trx_id,)).fetchone()
-    if not row or row['jenis'] != 'masuk' or not row['no_hp']:
+    if not row or row['jenis'] != 'masuk' or not row['donatur_id']:
+        return
+    if not row['no_hp']:
+        conn.execute("UPDATE transaksi SET wa_status='gagal', wa_error=? WHERE id=?",
+                     ('Nomor HP donatur kosong', trx_id))
         return
     template = inst.get('template_pesan_donasi') or DEFAULT_TEMPLATE_DONASI
-    alamat = f", {inst['alamat']}" if inst.get('alamat') else ''
     pesan = render_pesan(template, nama=row['donatur_nama'] or 'Bapak/Ibu',
                           nominal=format_rupiah(row['jumlah']), program=row['coa_nama'] or '-',
-                          tanggal=row['tanggal'], alamat=alamat)
+                          tanggal=row['tanggal'], alamat=inst.get('alamat') or '')
     ok, error = kirim_wa(row['no_hp'], pesan)
     if ok:
         conn.execute("""UPDATE transaksi
