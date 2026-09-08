@@ -61,6 +61,29 @@
                placeholder="Nama Bendahara">
       </div>
 
+      <div class="col-12"><hr class="my-1"></div>
+
+      <div class="col-12">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch" name="notif_donasi_aktif" value="1"
+                 id="notifDonasiAktif" {% if inst.notif_donasi_aktif %}checked{% endif %}>
+          <label class="form-check-label fw-semibold" for="notifDonasiAktif">
+            Kirim WA otomatis ke donatur setelah transaksi penerimaan disimpan
+          </label>
+        </div>
+        <div class="form-text">
+          Berlaku utk transaksi penerimaan (koleksi rutin, input admin/marketing) yang tercatat atas
+          nama donatur &amp; nomor HP-nya terisi. Butuh gateway WA (<code>WA_GATEWAY_URL</code>) sudah
+          aktif — kalau gateway mati, transaksi tetap tersimpan, cuma WA-nya gagal terkirim.
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">Template Pesan WA</label>
+        <textarea name="template_pesan_donasi" class="form-control" rows="3"
+          placeholder="{{ default_template_donasi }}">{{ inst.template_pesan_donasi or '' }}</textarea>
+        <small class="text-muted">Placeholder: {nama}, {nominal}, {program}, {tanggal}. Kosongkan utk pakai template bawaan.</small>
+      </div>
+
       <div class="col-12 mt-3">
         <button type="submit" class="btn btn-success">
           <i class="bi bi-check-lg"></i> Simpan

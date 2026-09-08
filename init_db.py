@@ -21,6 +21,9 @@ def migrate(conn):
         ('nama_kegiatan',   'TEXT'),
         ('lokasi',          'TEXT'),
         ('jumlah_mustahik', 'INTEGER'),
+        ('wa_status',       "TEXT DEFAULT 'belum'"),
+        ('wa_error',        'TEXT'),
+        ('wa_sent_at',      'TEXT'),
     ]:
         if col not in trx:
             c.execute(f"ALTER TABLE transaksi ADD COLUMN {col} {defn}")
@@ -136,6 +139,15 @@ def migrate(conn):
         keterangan TEXT,
         updated_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
+
+    # Notifikasi WA otomatis ke donatur stlh transaksi penerimaan tersimpan
+    inst_cols = {r[1] for r in c.execute("PRAGMA table_info(instansi)")}
+    for col, defn in [
+        ('notif_donasi_aktif',   'INTEGER DEFAULT 0'),
+        ('template_pesan_donasi', 'TEXT'),
+    ]:
+        if col not in inst_cols:
+            c.execute(f"ALTER TABLE instansi ADD COLUMN {col} {defn}")
 
     conn.commit()
 

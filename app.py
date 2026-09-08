@@ -63,7 +63,46 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
             if existing:
                 return existing['id'], True
         raise
-    return cur.lastrowid, False
+    trx_id = cur.lastrowid
+    if jenis == 'masuk':
+        kirim_notifikasi_donasi(conn, trx_id)
+    return trx_id, False
+
+DEFAULT_TEMPLATE_DONASI = (
+    "Assalamu'alaikum {nama}, jazakumullahu khairan atas donasi Anda sebesar "
+    "{nominal} untuk {program} pada {tanggal}. Semoga menjadi amal jariyah yang "
+    "berkah. - Baitul Maal BMT Amal Muslim"
+)
+
+def kirim_notifikasi_donasi(conn, trx_id):
+    """Kirim WA ucapan terima kasih ke donatur stlh transaksi 'masuk' tersimpan
+    (dipanggil dr insert_transaksi(), jg dr auto_transaksi_koleksi()). Tidak commit
+    -- caller yg commit. No-op diam2 kalau fitur blm diaktifkan, transaksi tanpa
+    donatur, atau donatur tak py no_hp -- transaksi ttp tersimpan walau WA gagal/
+    tak berlaku, sama spt kirim_notifikasi_penyaluran()."""
+    inst = get_instansi(conn)
+    if not inst.get('notif_donasi_aktif'):
+        return
+    row = conn.execute("""
+        SELECT t.jenis, t.jumlah, t.tanggal, d.nama AS donatur_nama, d.no_hp, c.nama AS coa_nama
+        FROM transaksi t
+        LEFT JOIN donatur d ON t.donatur_id = d.id
+        LEFT JOIN chart_of_accounts c ON t.coa_id = c.id
+        WHERE t.id=?
+    """, (trx_id,)).fetchone()
+    if not row or row['jenis'] != 'masuk' or not row['no_hp']:
+        return
+    template = inst.get('template_pesan_donasi') or DEFAULT_TEMPLATE_DONASI
+    pesan = render_pesan(template, nama=row['donatur_nama'] or 'Bapak/Ibu',
+                          nominal=format_rupiah(row['jumlah']), program=row['coa_nama'] or '-',
+                          tanggal=row['tanggal'])
+    ok, error = kirim_wa(row['no_hp'], pesan)
+    if ok:
+        conn.execute("""UPDATE transaksi
+            SET wa_status='terkirim', wa_error=NULL, wa_sent_at=datetime('now','localtime') WHERE id=?""",
+            (trx_id,))
+    else:
+        conn.execute("UPDATE transaksi SET wa_status='gagal', wa_error=? WHERE id=?", (error, trx_id))
 
 app.jinja_env.globals['new_form_uuid'] = lambda: uuid_mod.uuid4().hex
 
@@ -238,7 +277,7 @@ def get_instansi(conn=None):
         return dict(row)
     return {'nama': 'BAITUL MAAL BMT', 'nama_lembaga': '', 'alamat': '', 'telepon': '',
             'email': '', 'website': '', 'ketua': '', 'bendahara': '', 'sekretaris': '',
-            'no_izin': ''}
+            'no_izin': '', 'notif_donasi_aktif': 0, 'template_pesan_donasi': ''}
 
 def get_saldo_awal(conn):
     """Saldo awal manual per jenis dana (sebelum transaksi pertama tercatat di sistem)."""
@@ -256,6 +295,7 @@ def auto_transaksi_koleksi(conn, koleksi_id, donatur_id, bulan, sumber, jumlah, 
           donatur_id, jumlah, keterangan, user_id))
     trx_id = cur.lastrowid
     conn.execute("UPDATE koleksi_bulanan SET transaksi_id=? WHERE id=?", (trx_id, koleksi_id))
+    kirim_notifikasi_donasi(conn, trx_id)
     return trx_id
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -2398,7 +2438,8 @@ def master_instansi():
     conn = get_db()
     inst = get_instansi(conn)
     conn.close()
-    return render_template('admin/master/instansi.html', inst=inst)
+    return render_template('admin/master/instansi.html', inst=inst,
+                            default_template_donasi=DEFAULT_TEMPLATE_DONASI)
 
 @app.route('/admin/master/instansi/simpan', methods=['POST'])
 @admin_required
@@ -2408,13 +2449,15 @@ def master_instansi_simpan():
     conn.execute("""UPDATE instansi SET
         nama=?, nama_lembaga=?, alamat=?, telepon=?, email=?, website=?,
         ketua=?, bendahara=?, sekretaris=?, no_izin=?,
+        notif_donasi_aktif=?, template_pesan_donasi=?,
         updated_at=datetime('now','localtime')
         WHERE id=1""",
         (data.get('nama','').strip(), data.get('nama_lembaga','').strip(),
          data.get('alamat','').strip(), data.get('telepon','').strip(),
          data.get('email','').strip(), data.get('website','').strip(),
          data.get('ketua','').strip(), data.get('bendahara','').strip(),
-         data.get('sekretaris','').strip(), data.get('no_izin','').strip()))
+         data.get('sekretaris','').strip(), data.get('no_izin','').strip(),
+         1 if data.get('notif_donasi_aktif') else 0, data.get('template_pesan_donasi','').strip()))
     conn.commit(); conn.close()
     flash('Data instansi berhasil diperbarui.', 'success')
     return redirect(url_for('master_instansi'))
