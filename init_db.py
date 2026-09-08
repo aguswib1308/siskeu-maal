@@ -151,18 +151,24 @@ def migrate(conn):
 
     # Pengelompokan program penyaluran -> 6 bidang laporan LAZ MKU Pusat (khusus
     # laporan ini, beda dr bidang_dari_kode() yg dipakai isi Excel resmi). Seed
-    # sesuai arahan pengguna 2026-09-08; program lain dibiarkan blm dikelompokkan
-    # (bidang NULL), diisi manual lewat halaman Atur Kelompok Program.
+    # awal sesuai arahan pengguna 2026-09-08, dilengkapi pengguna sendiri lewat
+    # halaman Atur Kelompok Program utk program yg semula blm dikelompokkan
+    # (coa53/coa56 = akun induk generik "Program Pendidikan"/"Program Sosial/
+    # Kemanusiaan"; sisanya program berkode bracket spt biasa).
     c.execute('''CREATE TABLE IF NOT EXISTS program_bidang_laz (
         program_key TEXT PRIMARY KEY,
         bidang TEXT
     )''')
     LAZ_BIDANG_SEED = [
         ('OTA', 'pendidikan'), ('PTQ', 'pendidikan'), ('coa89', 'pendidikan'),  # Beasiswa Pendidikan
+        ('coa53', 'pendidikan'),  # Program Pendidikan (akun induk)
         ('SSG', 'kesehatan'),
         ('CY', 'sosial'), ('SD', 'sosial'), ('IDHU', 'sosial'), ('AM', 'sosial'), ('DI', 'sosial'),
+        ('AB', 'sosial'), ('BW', 'sosial'), ('IKEM', 'sosial'), ('SAT', 'sosial'),
+        ('coa56', 'sosial'),  # Program Sosial/Kemanusiaan (akun induk)
         ('DAYA', 'ekonomi'),
         ('ID', 'dakwah'), ('SM', 'dakwah'), ('IL', 'dakwah'), ('KD', 'dakwah'), ('OP', 'dakwah'),
+        ('HM', 'dakwah'), ('IQRA', 'dakwah'), ('ITAH', 'dakwah'), ('MOP', 'dakwah'),
         ('TQUR', 'qurban'),
     ]
     c.executemany("INSERT OR IGNORE INTO program_bidang_laz (program_key, bidang) VALUES (?,?)",
