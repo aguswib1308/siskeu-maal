@@ -71,7 +71,7 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
 DEFAULT_TEMPLATE_DONASI = (
     "Assalamu'alaikum {nama}, jazakumullahu khairan atas donasi Anda sebesar "
     "{nominal} untuk {program} pada {tanggal}. Semoga menjadi amal jariyah yang "
-    "berkah. - Baitul Maal BMT Amal Muslim"
+    "berkah. - Baitul Maal BMT Amal Muslim{alamat}"
 )
 
 def kirim_notifikasi_donasi(conn, trx_id):
@@ -93,9 +93,10 @@ def kirim_notifikasi_donasi(conn, trx_id):
     if not row or row['jenis'] != 'masuk' or not row['no_hp']:
         return
     template = inst.get('template_pesan_donasi') or DEFAULT_TEMPLATE_DONASI
+    alamat = f", {inst['alamat']}" if inst.get('alamat') else ''
     pesan = render_pesan(template, nama=row['donatur_nama'] or 'Bapak/Ibu',
                           nominal=format_rupiah(row['jumlah']), program=row['coa_nama'] or '-',
-                          tanggal=row['tanggal'])
+                          tanggal=row['tanggal'], alamat=alamat)
     ok, error = kirim_wa(row['no_hp'], pesan)
     if ok:
         conn.execute("""UPDATE transaksi

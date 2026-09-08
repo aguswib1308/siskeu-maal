@@ -81,7 +81,11 @@
         <label class="form-label fw-semibold">Template Pesan WA</label>
         <textarea name="template_pesan_donasi" class="form-control" rows="3"
           placeholder="{{ default_template_donasi }}">{{ inst.template_pesan_donasi or '' }}</textarea>
-        <small class="text-muted">Placeholder: {nama}, {nominal}, {program}, {tanggal}. Kosongkan utk pakai template bawaan.</small>
+        <small class="text-muted">
+          Placeholder: {nama}, {nominal}, {program}, {tanggal}, {alamat} (otomatis ambil dari field
+          Alamat di atas, sudah termasuk ", " di depannya kalau diisi — kosong kalau Alamat belum diisi).
+          Kosongkan kotak ini utk pakai template bawaan.
+        </small>
       </div>
 
       <div class="col-12 mt-3">
