@@ -1,0 +1,145 @@
+{% extends 'marketing/base.html' %}
+{% block title %}{{ mustahik.nama }}{% endblock %}
+
+{% set asnaf_list = [
+  ('fakir','Fakir','#e74c3c'),
+  ('miskin','Miskin','#e67e22'),
+  ('amil','Amil','#9b59b6'),
+  ('muallaf','Muallaf','#3498db'),
+  ('riqab','Riqab','#1abc9c'),
+  ('gharim','Gharim','#f39c12'),
+  ('fisabilillah','Fisabilillah','#27ae60'),
+  ('ibnu_sabil','Ibnu Sabil','#7f8c8d')
+] %}
+{% set ns = namespace(label=mustahik.asnaf, warna='#94a3b8') %}
+{% for kode, label, warna in asnaf_list if kode == mustahik.asnaf %}{% set ns.label = label %}{% set ns.warna = warna %}{% endfor %}
+
+{% block content %}
+<div class="card p-3 mb-3" style="border-left:4px solid {{ ns.warna }}">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="fw-bold fs-6">{{ mustahik.nama }}</div>
+      {% if mustahik.asnaf %}
+      <div class="mt-2">
+        <span class="badge" style="background:{{ ns.warna }}">{{ ns.label }}</span>
+        {% if not mustahik.aktif %}
+        <span class="badge bg-light text-muted border">Nonaktif</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% if mustahik.alamat %}
+  <div class="small text-muted mt-2"><i class="bi bi-house"></i> {{ mustahik.alamat }}</div>
+  {% endif %}
+  {% if mustahik.no_hp %}
+  <div class="small text-muted mt-1"><i class="bi bi-telephone"></i> {{ mustahik.no_hp }}</div>
+  {% endif %}
+  {% if mustahik.nik %}
+  <div class="small text-muted mt-1"><i class="bi bi-card-text"></i> NIK {{ mustahik.nik }}</div>
+  {% endif %}
+  {% if mustahik.keterangan %}
+  <div class="small text-muted mt-1"><i class="bi bi-info-circle"></i> {{ mustahik.keterangan }}</div>
+  {% endif %}
+</div>
+
+{# ── Tombol edit ── #}
+<button class="btn btn-outline-primary w-100 mb-3" style="border-radius:10px;font-weight:600"
+        onclick="var f=document.getElementById('formEdit');
+                 f.style.display = f.style.display==='none' ? '' : 'none';">
+  <i class="bi bi-pencil-square"></i> Edit Data Penerima Manfaat
+</button>
+
+{# ── Form edit ── #}
+<div id="formEdit" class="card p-3 mb-3" style="display:none">
+  <form method="POST" action="/marketing/mustahik/edit/{{ mustahik.id }}">
+    <div class="fw-bold mb-3" style="font-size:.95rem">Edit Penerima Manfaat</div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Nama Lengkap</label>
+      <input type="text" name="nama" class="form-control" required value="{{ mustahik.nama }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Asnaf</label>
+      <select name="asnaf" class="form-select"
+              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+        <option value="">— Pilih Asnaf —</option>
+        {% for kode, label, warna in asnaf_list %}
+        <option value="{{ kode }}" {% if mustahik.asnaf==kode %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">No HP
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="no_hp" class="form-control" placeholder="628xxx"
+             value="{{ mustahik.no_hp or '' }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">NIK
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="nik" class="form-control" placeholder="16 digit" maxlength="16"
+             value="{{ mustahik.nik or '' }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Alamat
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <textarea name="alamat" class="form-control" rows="2"
+                style="border-radius:10px;border-color:var(--border);font-size:.9rem">{{ mustahik.alamat or '' }}</textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Keterangan
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="keterangan" class="form-control" placeholder="Kondisi, kebutuhan, dsb."
+             value="{{ mustahik.keterangan or '' }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="button" onclick="document.getElementById('formEdit').style.display='none'"
+              style="flex:1;padding:.65rem;border-radius:10px;border:1.5px solid var(--border);
+                     background:var(--surface);color:var(--text-muted);font-weight:600;font-size:.88rem;cursor:pointer">
+        Batal
+      </button>
+      <button type="submit"
+              style="flex:2;padding:.65rem;border-radius:10px;border:none;
+                     background:#1e8449;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer">
+        <i class="bi bi-check2"></i> Simpan Perubahan
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="fw-semibold mb-2 text-secondary small text-uppercase">Riwayat Penyaluran</div>
+
+{% for r in riwayat %}
+<div class="card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <div class="fw-semibold">{{ r.coa_nama }}</div>
+      <div class="small text-muted">{{ r.tanggal }}{% if r.jumlah_mustahik %} · {{ r.jumlah_mustahik }} mustahik{% endif %}</div>
+    </div>
+    <div class="text-end">
+      <div class="fw-bold text-danger">{{ r.jumlah | rupiah }}</div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card p-4 text-center text-muted">
+  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+  Belum ada riwayat penyaluran
+</div>
+{% endfor %}
+
+<a href="/marketing/mustahik" class="btn btn-outline-secondary w-100 mt-3">
+  <i class="bi bi-arrow-left"></i> Kembali
+</a>
+{% endblock %}

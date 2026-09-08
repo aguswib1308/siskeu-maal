@@ -75,13 +75,36 @@
 
     <div class="mb-3">
       <label class="form-label fw-semibold" style="font-size:.85rem">Kategori</label>
-      <select name="sumber_infaq" class="form-select"
+      <select name="sumber_infaq" id="editSumber" onchange="toggleProgram('edit')" class="form-select"
               style="border-radius:10px;border-color:var(--border);font-size:.9rem">
         {% for val, label in [('tunai','💵 Tunai'),('kencleng','🏠 Kencleng'),
                               ('kotak_infaq','🕌 Kotak Infaq'),('zakat','🌙 Zakat'),
                               ('infaq_terikat','🎯 Infaq Terikat'),('wakaf','🏛️ Wakaf')] %}
         <option value="{{ val }}" {% if donatur.sumber_infaq==val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3" id="editProgramWrap" style="{% if donatur.sumber_infaq not in ('zakat','infaq_terikat','wakaf') %}display:none{% endif %}">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Program</label>
+      <select name="program_id" class="form-select"
+              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+        <option value="">— Pilih Program —</option>
+        <optgroup label="🌙 Zakat" class="opt-zakat">
+          {% for p in produk_list if p.parent_kode == '4.1' %}
+          <option value="{{ p.id }}" {% if donatur.program_id == p.id %}selected{% endif %}>{{ p.nama }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="🎯 Infaq Terikat" class="opt-infaq_terikat">
+          {% for p in produk_list if p.parent_kode == '4.2.1' %}
+          <option value="{{ p.id }}" {% if donatur.program_id == p.id %}selected{% endif %}>{{ p.nama }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="🏛️ Wakaf" class="opt-wakaf">
+          {% for p in produk_list if p.parent_kode == '4.4' %}
+          <option value="{{ p.id }}" {% if donatur.program_id == p.id %}selected{% endif %}>{{ p.nama }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </div>
 
@@ -98,6 +121,14 @@
         <span class="text-muted fw-normal">(opsional)</span></label>
       <input type="text" name="no_hp" class="form-control" placeholder="628xxx"
              value="{{ donatur.no_hp or '' }}"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">NIK
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="nik" class="form-control" placeholder="16 digit" maxlength="16"
+             value="{{ donatur.nik or '' }}"
              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
     </div>
 
@@ -201,4 +232,5 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/js/coord-picker.js"></script>
+<script src="/static/js/program-toggle.js"></script>
 {% endblock %}

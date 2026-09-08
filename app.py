@@ -3446,9 +3446,12 @@ def marketing_donatur_detail(id):
         WHERE kb.donatur_id=? ORDER BY kb.bulan DESC
     ''', (id,)).fetchall()
     areas = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
+    produk_list = conn.execute(
+        "SELECT id, kode, nama, parent_kode FROM chart_of_accounts WHERE parent_kode IN ('4.1','4.2.1','4.4') AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode"
+    ).fetchall()
     conn.close()
     return render_template('marketing/donatur_detail.html', donatur=donatur,
-                           riwayat=riwayat, areas=areas)
+                           riwayat=riwayat, areas=areas, produk_list=produk_list)
 
 # ── Marketing Peta ────────────────────────────────────────────────────────────
 
@@ -3491,8 +3494,11 @@ def marketing_donatur_list():
     query += " ORDER BY nama"
     donatur = conn.execute(query, params).fetchall()
     areas = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
+    produk_list = conn.execute(
+        "SELECT id, kode, nama, parent_kode FROM chart_of_accounts WHERE parent_kode IN ('4.1','4.2.1','4.4') AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode"
+    ).fetchall()
     conn.close()
-    return render_template('marketing/donatur.html', donatur=donatur, areas=areas, q=q)
+    return render_template('marketing/donatur.html', donatur=donatur, areas=areas, produk_list=produk_list, q=q)
 
 @app.route('/marketing/donatur/tambah', methods=['POST'])
 @login_required
@@ -3511,13 +3517,14 @@ def marketing_donatur_tambah():
     if not nama:
         conn.close(); flash('Nama donatur wajib diisi.', 'danger')
         return redirect(url_for('marketing_donatur_list'))
+    program_id = int(data['program_id']) if data.get('program_id') else None
     cur = conn.execute("""INSERT INTO donatur
-        (nama,no_hp,alamat,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq)
-        VALUES (?,?,?,?,?,?,?,?,?)""",
-        (nama, data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
+        (nama,nik,no_hp,alamat,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq,program_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
          sumber,
          data.get('area', '').strip(), data.get('lokasi_nama', '').strip(),
-         lat, lng, 1 if data.get('aktif_infaq') else 0))
+         lat, lng, 1 if data.get('aktif_infaq') else 0, program_id))
     auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
     flash(f'Donatur "{nama}" berhasil ditambahkan.', 'success')
@@ -3546,17 +3553,89 @@ def marketing_donatur_edit(id):
     if lat is None:
         lat, lng = existing['lat'], existing['lng']
     sumber = data.get('sumber_infaq') or existing['sumber_infaq']
+    program_id = int(data['program_id']) if data.get('program_id') else None
     conn.execute("""UPDATE donatur SET
-        nama=?, no_hp=?, alamat=?, sumber_infaq=?, area=?, lokasi_nama=?,
-        lat=?, lng=?, aktif_infaq=?
+        nama=?, nik=?, no_hp=?, alamat=?, sumber_infaq=?, area=?, lokasi_nama=?,
+        lat=?, lng=?, aktif_infaq=?, program_id=?
         WHERE id=?""",
-        (nama, data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
          sumber, data.get('area', '').strip(), data.get('lokasi_nama', '').strip(),
-         lat, lng, 1 if data.get('aktif_infaq') else 0, id))
+         lat, lng, 1 if data.get('aktif_infaq') else 0, program_id, id))
     auto_koleksi_donatur_baru(conn, id, sumber)
     conn.commit(); conn.close()
     flash('Data donatur berhasil diperbarui.', 'success')
     return redirect(url_for('marketing_donatur_detail', id=id))
+
+# ── Marketing Mustahik (Penerima Manfaat) ───────────────────────────────────────
+
+@app.route('/marketing/mustahik')
+@login_required
+def marketing_mustahik_list():
+    conn = get_db()
+    q = request.args.get('q', '').strip()
+    query = "SELECT * FROM penerima_manfaat WHERE aktif=1"
+    params = []
+    if q:
+        query += " AND (nama LIKE ? OR nik LIKE ? OR no_hp LIKE ?)"
+        params += [f'%{q}%'] * 3
+    query += " ORDER BY nama"
+    mustahik = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('marketing/mustahik.html', mustahik=mustahik, q=q)
+
+@app.route('/marketing/mustahik/tambah', methods=['POST'])
+@login_required
+def marketing_mustahik_tambah():
+    data = request.form
+    nama = (data.get('nama') or '').strip()
+    if not nama:
+        flash('Nama penerima manfaat wajib diisi.', 'danger')
+        return redirect(url_for('marketing_mustahik_list'))
+    conn = get_db()
+    conn.execute("""INSERT INTO penerima_manfaat (nama,nik,no_hp,alamat,asnaf,keterangan)
+        VALUES (?,?,?,?,?,?)""",
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(),
+         data.get('alamat', '').strip(), data.get('asnaf', '') or None, data.get('keterangan', '').strip()))
+    conn.commit(); conn.close()
+    flash(f'Penerima manfaat "{nama}" berhasil ditambahkan.', 'success')
+    return redirect(url_for('marketing_mustahik_list'))
+
+@app.route('/marketing/mustahik/<int:id>')
+@login_required
+def marketing_mustahik_detail(id):
+    conn = get_db()
+    mustahik = conn.execute("SELECT * FROM penerima_manfaat WHERE id=?", (id,)).fetchone()
+    if not mustahik:
+        conn.close(); flash('Penerima manfaat tidak ditemukan.', 'danger')
+        return redirect(url_for('marketing_mustahik_list'))
+    riwayat = conn.execute("""
+        SELECT t.tanggal, t.jumlah, t.jumlah_mustahik, t.keterangan, c.nama AS coa_nama
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id = c.id
+        WHERE t.penerima_id=? ORDER BY t.tanggal DESC
+    """, (id,)).fetchall()
+    conn.close()
+    return render_template('marketing/mustahik_detail.html', mustahik=mustahik, riwayat=riwayat)
+
+@app.route('/marketing/mustahik/edit/<int:id>', methods=['POST'])
+@login_required
+def marketing_mustahik_edit(id):
+    data = request.form
+    nama = (data.get('nama') or '').strip()
+    if not nama:
+        flash('Nama penerima manfaat wajib diisi.', 'danger')
+        return redirect(url_for('marketing_mustahik_detail', id=id))
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM penerima_manfaat WHERE id=?", (id,)).fetchone()
+    if not existing:
+        conn.close(); flash('Penerima manfaat tidak ditemukan.', 'danger')
+        return redirect(url_for('marketing_mustahik_list'))
+    conn.execute("""UPDATE penerima_manfaat SET
+        nama=?, nik=?, no_hp=?, alamat=?, asnaf=?, keterangan=? WHERE id=?""",
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(),
+         data.get('alamat', '').strip(), data.get('asnaf', '') or None, data.get('keterangan', '').strip(), id))
+    conn.commit(); conn.close()
+    flash('Data penerima manfaat berhasil diperbarui.', 'success')
+    return redirect(url_for('marketing_mustahik_detail', id=id))
 
 # ── Marketing Transaksi Tunai ─────────────────────────────────────────────────
 
