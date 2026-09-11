@@ -46,7 +46,6 @@
           <th class="text-end" style="font-size:.78rem;color:#64748b">Penerimaan</th>
           <th class="text-end" style="font-size:.78rem;color:#64748b">Penyaluran</th>
           <th class="text-end" style="font-size:.78rem;color:#64748b">Saldo Akhir</th>
-          <th class="text-end" style="font-size:.78rem;color:#64748b">Total Nominal</th>
           <th class="text-end pe-3" style="font-size:.78rem;color:#64748b">Jumlah Orang</th>
         </tr>
       </thead>
@@ -55,7 +54,7 @@
         {% if g.jenis_dana != current_dana.v %}
         {% set current_dana.v = g.jenis_dana %}
         <tr style="background:#eef2f7">
-          <td colspan="7" class="ps-3 fw-bold" style="font-size:.8rem">
+          <td colspan="6" class="ps-3 fw-bold" style="font-size:.8rem">
             {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya')|upper }}
           </td>
         </tr>
@@ -70,15 +69,27 @@
           <td class="text-end fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
             {{ g.saldo_akhir|rupiah }}
           </td>
-          <td class="text-end report-amount">{{ (g.masuk + g.keluar)|rupiah }}</td>
           <td class="text-end pe-3 report-amount">
             {% if g.n_donatur %}<div class="report-count">{{ g.n_donatur }} donatur</div>{% endif %}
             {% if g.n_mustahik %}<div class="report-count">{{ g.n_mustahik }} penerima manfaat</div>{% endif %}
             {% if not g.n_donatur and not g.n_mustahik %}<span class="text-muted">—</span>{% endif %}
           </td>
         </tr>
+        {% if loop.nextitem is not defined or loop.nextitem.jenis_dana != g.jenis_dana %}
+        {% set st = subtotal_per_dana[g.jenis_dana] %}
+        <tr class="report-subtotal">
+          <td class="ps-3">Total {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
+          <td class="text-end report-amount">{{ st.saldo_awal|rupiah }}</td>
+          <td class="text-end report-amount">{{ st.masuk|rupiah }}</td>
+          <td class="text-end report-amount">{{ st.keluar|rupiah }}</td>
+          <td class="text-end report-amount {% if st.saldo_akhir < 0 %}text-danger{% endif %}">{{ st.saldo_akhir|rupiah }}</td>
+          <td class="text-end pe-3 report-amount">
+            {% if st.n_donatur %}{{ st.n_donatur }} donatur{% endif %}{% if st.n_donatur and st.n_mustahik %} · {% endif %}{% if st.n_mustahik %}{{ st.n_mustahik }} penerima{% endif %}
+          </td>
+        </tr>
+        {% endif %}
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted small fst-italic py-3">Tidak ada aktivitas</td></tr>
+        <tr><td colspan="6" class="text-center text-muted small fst-italic py-3">Tidak ada aktivitas</td></tr>
         {% endfor %}
       </tbody>
     </table>

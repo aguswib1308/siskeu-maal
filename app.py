@@ -737,10 +737,21 @@ def laporan_saldo_program():
     groups, tidak_terikat, _ = _hitung_saldo_program(conn, bulan)
     data = _saldo_program_list(groups, tidak_terikat)
 
+    subtotal_per_dana = {}
+    for g in data:
+        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0,
+                                                             'saldo_akhir': 0, 'n_donatur': 0, 'n_mustahik': 0})
+        s['saldo_awal']  += g['saldo_awal']
+        s['masuk']       += g['masuk']
+        s['keluar']      += g['keluar']
+        s['saldo_akhir'] += g['saldo_akhir']
+        s['n_donatur']   += g['n_donatur']
+        s['n_mustahik']  += g['n_mustahik']
+
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_saldo_program.html',
-        data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+        data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES, subtotal_per_dana=subtotal_per_dana)
 
 
 @app.route('/api/coa/<int:coa_id>/saldo')
@@ -4156,6 +4167,33 @@ def admin_target():
         SELECT marketing_id, COUNT(*) AS n, COALESCE(SUM(jumlah),0) AS nominal
         FROM koleksi_bulanan WHERE bulan=? AND status='terkumpul'
         GROUP BY marketing_id""", (bulan,)).fetchall()}
+
+    # ── Transaksi yg diinput bukan oleh marketing aktif (biasanya admin) --
+    # tidak masuk baris capaian siapapun di atas; direkap terpisah di sini spy
+    # kelihatan angkanya kemana, bukan sekadar hilang dr laporan.
+    marketing_ids = {u['id'] for u in marketing_users}
+    non_marketing_uids = (set(masuk_map) | set(keluar_map)) - marketing_ids
+    admin_rows = []
+    if non_marketing_uids:
+        uid_list = [uid for uid in non_marketing_uids if uid is not None]
+        nama_map = {}
+        if uid_list:
+            ph = ','.join('?' * len(uid_list))
+            nama_map = {r['id']: r['nama'] for r in conn.execute(
+                f"SELECT id, nama FROM users WHERE id IN ({ph})", uid_list).fetchall()}
+        for uid in non_marketing_uids:
+            m, k = masuk_map.get(uid), keluar_map.get(uid)
+            admin_rows.append({
+                'nama': nama_map.get(uid, 'Tanpa user (data lama)'),
+                'fund_real': m['nominal'] if m else 0, 'fund_n': m['n'] if m else 0,
+                'pent_real': k['nominal'] if k else 0, 'pent_kegiatan': k['kegiatan'] if k else 0,
+            })
+        admin_rows.sort(key=lambda r: -r['fund_real'])
+    admin_total = {
+        'fund_real': sum(r['fund_real'] for r in admin_rows),
+        'fund_n':    sum(r['fund_n'] for r in admin_rows),
+        'pent_real': sum(r['pent_real'] for r in admin_rows),
+    }
     conn.close()
 
     def _persen(real, tgt):
@@ -4167,6 +4205,7 @@ def admin_target():
         tp = tmap.get((u['id'], 'pentasharufan')) or tmap.get((None, 'pentasharufan'))
         m, k, kol = masuk_map.get(u['id']), keluar_map.get(u['id']), koleksi_map.get(u['id'])
         row = {
+            'id': u['id'],
             'nama': u['nama'],
             'fund_real':   m['nominal'] if m else 0,
             'fund_n':      m['n'] if m else 0,
@@ -4196,7 +4235,7 @@ def admin_target():
 
     return render_template('admin/target.html',
         targets=targets, marketing_users=marketing_users, bulan=bulan,
-        capaian=capaian, total=total)
+        capaian=capaian, total=total, admin_rows=admin_rows, admin_total=admin_total)
 
 @app.route('/admin/target/delete/<int:id>', methods=['POST'])
 @admin_required
@@ -4206,6 +4245,90 @@ def admin_target_delete(id):
     conn.commit(); conn.close()
     flash('Target dihapus.', 'success')
     return redirect(url_for('admin_target'))
+
+@app.route('/admin/target/marketing/<int:user_id>')
+@admin_required
+def admin_target_marketing(user_id):
+    """Rincian capaian 1 marketing: donatur/penerimaan & kegiatan/pentasharufan yg dia
+    catat bulan terpilih, plus tren capaian 12 bulan sepanjang tahun tsb."""
+    conn = get_db()
+    user = conn.execute("SELECT id, nama FROM users WHERE id=? AND role='marketing'", (user_id,)).fetchone()
+    if not user:
+        conn.close(); flash('Marketing tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_target'))
+
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    tahun = bulan[:4]
+
+    masuk_rows = conn.execute("""
+        SELECT t.id, t.tanggal, t.jumlah, t.keterangan, d.nama as donatur_nama, c.nama as coa_nama
+        FROM transaksi t
+        LEFT JOIN donatur d ON t.donatur_id = d.id
+        JOIN chart_of_accounts c ON t.coa_id = c.id
+        WHERE t.jenis='masuk' AND t.user_id=? AND strftime('%Y-%m', t.tanggal)=?
+        ORDER BY t.tanggal DESC, t.id DESC
+    """, (user_id, bulan)).fetchall()
+
+    keluar_rows = conn.execute("""
+        SELECT t.id, t.tanggal, t.jumlah, t.jumlah_mustahik, t.nama_kegiatan, t.lokasi,
+               c.nama as coa_nama, pm.nama as penerima_nama
+        FROM transaksi t
+        JOIN chart_of_accounts c ON t.coa_id = c.id
+        LEFT JOIN penerima_manfaat pm ON t.penerima_id = pm.id
+        WHERE t.jenis='keluar' AND t.user_id=? AND strftime('%Y-%m', t.tanggal)=?
+        ORDER BY t.tanggal DESC, t.id DESC
+    """, (user_id, bulan)).fetchall()
+
+    koleksi_rows = conn.execute("""
+        SELECT kb.tanggal_koleksi, kb.jumlah, d.nama as donatur_nama, d.sumber_infaq
+        FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id = d.id
+        WHERE kb.marketing_id=? AND kb.bulan=? AND kb.status='terkumpul'
+        ORDER BY kb.tanggal_koleksi DESC
+    """, (user_id, bulan)).fetchall()
+
+    # ── Tren capaian 12 bulan (tahun dr `bulan`) ────────────────────────────
+    trend_masuk = {r['bln']: r for r in conn.execute("""
+        SELECT strftime('%m', tanggal) as bln, COALESCE(SUM(jumlah),0) as nominal, COUNT(*) as n
+        FROM transaksi WHERE jenis='masuk' AND user_id=? AND strftime('%Y', tanggal)=?
+        GROUP BY bln""", (user_id, tahun)).fetchall()}
+    trend_keluar = {r['bln']: r for r in conn.execute("""
+        SELECT strftime('%m', tanggal) as bln, COALESCE(SUM(jumlah),0) as nominal,
+               COUNT(DISTINCT tanggal || coa_id) as kegiatan
+        FROM transaksi WHERE jenis='keluar' AND user_id=? AND strftime('%Y', tanggal)=?
+        GROUP BY bln""", (user_id, tahun)).fetchall()}
+    # Target personal menang atas global (user_id NULL), sama spt di admin_target()
+    tmap_year = {}
+    for t in conn.execute("""
+        SELECT * FROM target_bulanan WHERE strftime('%Y', bulan||'-01')=? AND (user_id=? OR user_id IS NULL)
+        ORDER BY user_id DESC""", (tahun, user_id)).fetchall():
+        tmap_year.setdefault((t['bulan'], t['jenis']), t)
+
+    def _persen(real, tgt):
+        return round(real / tgt * 100, 1) if tgt else None
+
+    trend = []
+    for m in range(1, 13):
+        bln_key = f"{m:02d}"
+        bulan_str = f"{tahun}-{bln_key}"
+        mk, kl = trend_masuk.get(bln_key), trend_keluar.get(bln_key)
+        tf = tmap_year.get((bulan_str, 'fundraising'))
+        tp = tmap_year.get((bulan_str, 'pentasharufan'))
+        fund_real = mk['nominal'] if mk else 0
+        pent_real = kl['nominal'] if kl else 0
+        trend.append({
+            'bulan': bulan_str, 'label': BULAN_IND[m],
+            'fund_real': fund_real, 'fund_target': (tf['target_nominal'] if tf else 0) or 0,
+            'pent_real': pent_real, 'pent_kegiatan': kl['kegiatan'] if kl else 0,
+            'pent_target': (tp['target_nominal'] if tp else 0) or 0,
+        })
+        trend[-1]['fund_persen'] = _persen(trend[-1]['fund_real'], trend[-1]['fund_target'])
+        trend[-1]['pent_persen'] = _persen(trend[-1]['pent_real'], trend[-1]['pent_target'])
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/target_marketing.html',
+        user=user, bulan=bulan, tahun=tahun, inst=inst, LABEL_SUMBER=LABEL_SUMBER,
+        masuk_rows=masuk_rows, keluar_rows=keluar_rows, koleksi_rows=koleksi_rows, trend=trend)
 
 # ── Slip Penerimaan (Cetak Thermal 58mm) ──────────────────────────────────────
 

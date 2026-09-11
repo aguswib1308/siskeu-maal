@@ -1,0 +1,174 @@
+{% extends 'admin/base.html' %}
+{% block title %}Capaian — {{ user.nama }}{% endblock %}
+{% block page_title %}<i class="bi bi-person-check"></i> Capaian — {{ user.nama }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
+  <a href="{{ url_for('admin_target', bulan=bulan) }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Kembali ke Target &amp; Capaian
+  </a>
+  <form method="GET" class="d-flex gap-2">
+    <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm"
+           onchange="this.form.submit()">
+  </form>
+</div>
+
+{% set fund_total = masuk_rows | sum(attribute='jumlah') %}
+{% set pent_total = keluar_rows | sum(attribute='jumlah') %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="small text-muted">Penerimaan {{ bulan|bulan_label }}</div>
+      <div class="fs-5 fw-semibold text-success">{{ fund_total|rupiah }}</div>
+      <div class="small text-muted">{{ masuk_rows|length }} transaksi</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="small text-muted">Penyaluran {{ bulan|bulan_label }}</div>
+      <div class="fs-5 fw-semibold text-danger">{{ pent_total|rupiah }}</div>
+      <div class="small text-muted">{{ keluar_rows|length }} transaksi</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="small text-muted">Koleksi Kencleng/Kotak</div>
+      <div class="fs-5 fw-semibold">{{ koleksi_rows|length }}</div>
+      <div class="small text-muted">{{ (koleksi_rows | sum(attribute='jumlah'))|rupiah }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card p-4 mb-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-people"></i> Donatur / Penerimaan — {{ bulan|bulan_label }}</h6>
+  {% if masuk_rows %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Tanggal</th><th>Donatur</th><th>Program</th><th class="text-end">Nominal</th></tr>
+      </thead>
+      <tbody>
+        {% for r in masuk_rows %}
+        <tr>
+          <td class="small text-muted" style="white-space:nowrap">{{ r.tanggal }}</td>
+          <td class="small">{{ r.donatur_nama or '—' }}</td>
+          <td class="small">{{ r.coa_nama }}</td>
+          <td class="text-end small fw-semibold text-success">{{ r.jumlah|rupiah }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-muted text-center py-3 small">Belum ada penerimaan yang dicatat bulan ini.</div>
+  {% endif %}
+</div>
+
+<div class="card p-4 mb-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-heart"></i> Kegiatan / Pentasharufan — {{ bulan|bulan_label }}</h6>
+  {% if keluar_rows %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Tanggal</th><th>Kegiatan / Program</th><th>Lokasi</th><th class="text-center">Mustahik</th><th class="text-end">Nominal</th></tr>
+      </thead>
+      <tbody>
+        {% for r in keluar_rows %}
+        <tr>
+          <td class="small text-muted" style="white-space:nowrap">{{ r.tanggal }}</td>
+          <td class="small">
+            {{ r.nama_kegiatan or r.coa_nama }}
+            {% if r.penerima_nama %}<div class="text-muted" style="font-size:.72rem">{{ r.penerima_nama }}</div>{% endif %}
+          </td>
+          <td class="small">{{ r.lokasi or '—' }}</td>
+          <td class="text-center small">{{ r.jumlah_mustahik or '—' }}</td>
+          <td class="text-end small fw-semibold text-danger">{{ r.jumlah|rupiah }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-muted text-center py-3 small">Belum ada penyaluran yang dicatat bulan ini.</div>
+  {% endif %}
+</div>
+
+{% if koleksi_rows %}
+<div class="card p-4 mb-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-basket"></i> Koleksi Kencleng/Kotak — {{ bulan|bulan_label }}</h6>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Tanggal</th><th>Donatur</th><th>Sumber</th><th class="text-end">Nominal</th></tr>
+      </thead>
+      <tbody>
+        {% for r in koleksi_rows %}
+        <tr>
+          <td class="small text-muted" style="white-space:nowrap">{{ r.tanggal_koleksi or '—' }}</td>
+          <td class="small">{{ r.donatur_nama }}</td>
+          <td class="small">{{ LABEL_SUMBER.get(r.sumber_infaq, r.sumber_infaq) }}</td>
+          <td class="text-end small fw-semibold">{{ r.jumlah|rupiah }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card p-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-graph-up"></i> Tren Capaian — Tahun {{ tahun }}</h6>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Bulan</th>
+          <th class="text-end">Fundraising</th>
+          <th class="text-end">Target</th>
+          <th class="text-end">%</th>
+          <th class="text-end">Pentasharufan</th>
+          <th class="text-center">Kegiatan</th>
+          <th class="text-end">Target</th>
+          <th class="text-end">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in trend %}
+        <tr class="{% if r.bulan == bulan %}table-active{% endif %}">
+          <td class="small fw-semibold">
+            <a href="{{ url_for('admin_target_marketing', user_id=user.id, bulan=r.bulan) }}" class="text-decoration-none">
+              {{ r.label }}
+            </a>
+          </td>
+          <td class="text-end small text-success">{{ r.fund_real|rupiah }}</td>
+          <td class="text-end small text-muted">{{ r.fund_target|rupiah if r.fund_target else '—' }}</td>
+          <td class="text-end small">
+            {% if r.fund_persen is not none %}
+            <span class="{% if r.fund_persen >= 100 %}text-success{% elif r.fund_persen >= 60 %}text-primary{% else %}text-danger{% endif %}">{{ r.fund_persen }}%</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-end small text-danger">{{ r.pent_real|rupiah }}</td>
+          <td class="text-center small">{{ r.pent_kegiatan }}</td>
+          <td class="text-end small text-muted">{{ r.pent_target|rupiah if r.pent_target else '—' }}</td>
+          <td class="text-end small">
+            {% if r.pent_persen is not none %}
+            <span class="{% if r.pent_persen >= 100 %}text-success{% elif r.pent_persen >= 60 %}text-primary{% else %}text-danger{% endif %}">{{ r.pent_persen }}%</span>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>Total {{ tahun }}</td>
+          <td class="text-end small text-success">{{ (trend | sum(attribute='fund_real'))|rupiah }}</td>
+          <td></td><td></td>
+          <td class="text-end small text-danger">{{ (trend | sum(attribute='pent_real'))|rupiah }}</td>
+          <td class="text-center small">{{ trend | sum(attribute='pent_kegiatan') }}</td>
+          <td></td><td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}
