@@ -194,6 +194,41 @@ def migrate(conn):
         c.execute("UPDATE program_bidang_laz SET asnaf=? WHERE bidang=? AND (asnaf IS NULL OR asnaf='')",
                   (asnaf, bidang))
 
+    # Akun Kas/Bank -- dimensi KEDUA yg independen dr "Jenis Dana" (Zakat/Infaq/dll,
+    # jawab "uang ini punya siapa"). Akun ini jawab "uang ini fisiknya di mana"
+    # (kas tunai / simpanan BMT / rekening bank / e-wallet), spy bisa dicocokkan ke
+    # buku tabungan/rekening koran riil -- sebelumnya sistem sama sekali tak
+    # mencatat ini. Diminta pengguna 2026-09-11.
+    c.execute('''CREATE TABLE IF NOT EXISTS akun_kas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT NOT NULL UNIQUE,
+        jenis TEXT NOT NULL CHECK(jenis IN ('tunai','simpanan_bmt','bank','ewallet')),
+        keterangan TEXT,
+        urutan INTEGER DEFAULT 0,
+        aktif INTEGER DEFAULT 1
+    )''')
+    AKUN_KAS_SEED = [
+        ('Kas Tunai', 'tunai', None, 1),
+        ('Simpanan di BMT', 'simpanan_bmt', None, 2),
+        ('Bank BSI', 'bank', '7227625133 a/n ULAZ MKU AMAL MUSLIM', 3),
+        ('E-Wallet', 'ewallet', None, 4),
+    ]
+    c.executemany("INSERT OR IGNORE INTO akun_kas (nama, jenis, keterangan, urutan) VALUES (?,?,?,?)",
+                  AKUN_KAS_SEED)
+
+    trx_cols2 = {r[1] for r in c.execute("PRAGMA table_info(transaksi)")}
+    if 'akun_kas_id' not in trx_cols2:
+        c.execute("ALTER TABLE transaksi ADD COLUMN akun_kas_id INTEGER REFERENCES akun_kas(id)")
+    # Transaksi lama (sblm field ini ada) dianggap semua Kas Tunai sesuai arahan
+    # pengguna 2026-09-11 -- admin koreksi manual yg ternyata lewat bank/e-wallet
+    # lewat quick-edit di halaman Transaksi. Idempoten: cuma isi yg msh NULL.
+    # Baris Jurnal Non-Tunai (jurnal_id terisi) sengaja DIKECUALIKAN -- itu transfer
+    # antar dana internal, bukan pergerakan uang fisik, jd akun_kas_id tetap NULL.
+    kas_tunai_id = c.execute("SELECT id FROM akun_kas WHERE nama='Kas Tunai'").fetchone()
+    if kas_tunai_id:
+        c.execute("UPDATE transaksi SET akun_kas_id=? WHERE akun_kas_id IS NULL AND jurnal_id IS NULL",
+                  (kas_tunai_id[0],))
+
     conn.commit()
 
 def init():

@@ -105,6 +105,18 @@
     </div>
   </div>
 
+  {# ── Akun Kas/Bank — uangnya masuk/keluar dari mana ──── #}
+  <div class="mb-3">
+    <label class="form-label fw-semibold small">Akun Kas/Bank</label>
+    <select name="akun_kas_id" id="selAkunKas"
+            style="border-radius:10px;font-size:.9rem"
+            class="form-select">
+      {% for a in akun_kas_list %}
+      <option value="{{ a.id }}" {% if a.jenis == 'tunai' %}selected{% endif %}>{{ a.nama }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
   {# ── Keterangan ──────────────────────────────────────── #}
   <div class="mb-3">
     <label class="form-label fw-semibold small">
@@ -376,7 +388,8 @@ form.addEventListener('submit', function(e) {
     client_uuid: fd.get('client_uuid') || null,
     nama_kegiatan: fd.get('nama_kegiatan') || null,
     lokasi: fd.get('lokasi') || null,
-    jumlah_mustahik: fd.get('jumlah_mustahik') || null
+    jumlah_mustahik: fd.get('jumlah_mustahik') || null,
+    akun_kas_id: fd.get('akun_kas_id') || null
   };
 
   fetch('/api/marketing/transaksi', {

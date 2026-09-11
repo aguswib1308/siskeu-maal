@@ -33,12 +33,22 @@ def parse_jumlah(raw):
         return None
     return val if val > 0 else None
 
+def _default_akun_kas_id(conn):
+    """Fallback Akun Kas/Bank (Kas Tunai) dipakai kalau jalur input blm py selektor
+    akun kas sendiri -- spy transaksi baru gak pernah NULL diam2 spt sblm fitur ini
+    ada. Lihat init_db.py utk seed & rasional dimensi ini."""
+    row = conn.execute("SELECT id FROM akun_kas WHERE nama='Kas Tunai'").fetchone()
+    return row['id'] if row else None
+
+
 def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
                      jumlah, keterangan, user_id, client_uuid=None,
-                     nama_kegiatan=None, lokasi=None, jumlah_mustahik=None):
+                     nama_kegiatan=None, lokasi=None, jumlah_mustahik=None, akun_kas_id=None):
     """Insert transaksi dengan guard idempotensi client_uuid (anti double-submit).
     nama_kegiatan/lokasi/jumlah_mustahik opsional, dipakai utk penyaluran (keluar)
-    spy bisa direkap di Laporan Kegiatan Penyaluran. Return (trx_id, duplikat)."""
+    spy bisa direkap di Laporan Kegiatan Penyaluran. akun_kas_id = di akun fisik mana
+    uangnya (Kas Tunai/Simpanan BMT/Bank/E-Wallet) -- default Kas Tunai kalau caller
+    blm kirim. Return (trx_id, duplikat)."""
     if client_uuid:
         existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
                                 (client_uuid,)).fetchone()
@@ -48,14 +58,16 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
     if coa_id:
         row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
         if row: jenis_dana = row['jenis_dana']
+    if not akun_kas_id:
+        akun_kas_id = _default_akun_kas_id(conn)
     try:
         cur = conn.execute('''INSERT INTO transaksi
             (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id,client_uuid,
-             nama_kegiatan,lokasi,jumlah_mustahik)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+             nama_kegiatan,lokasi,jumlah_mustahik,akun_kas_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (tanggal, jenis, jenis_dana, coa_id, donatur_id or None, penerima_id or None,
              jumlah, keterangan, user_id, client_uuid or None,
-             nama_kegiatan or None, lokasi or None, jumlah_mustahik or None))
+             nama_kegiatan or None, lokasi or None, jumlah_mustahik or None, akun_kas_id))
     except sqlite3.IntegrityError:
         if client_uuid:
             existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
@@ -302,14 +314,15 @@ def get_saldo_awal(conn):
     return {r['jenis_dana']: r['jumlah'] for r in rows}
 
 def auto_transaksi_koleksi(conn, koleksi_id, donatur_id, bulan, sumber, jumlah, tanggal, user_id):
-    """Buat transaksi otomatis saat koleksi terkumpul."""
+    """Buat transaksi otomatis saat koleksi terkumpul. Akun kas selalu Kas Tunai --
+    koleksi kencleng/kotak/tunai berarti dijemput fisik, tdk ada jalur lain."""
     coa = conn.execute("SELECT id, jenis_dana FROM chart_of_accounts WHERE kode='4.2.2'").fetchone()
     keterangan = f"Koleksi {LABEL_SUMBER.get(sumber, sumber)} – {bulan}"
     cur = conn.execute("""
-        INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,donatur_id,jumlah,keterangan,user_id)
-        VALUES (?,?,?,?,?,?,?,?)
+        INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,donatur_id,jumlah,keterangan,user_id,akun_kas_id)
+        VALUES (?,?,?,?,?,?,?,?,?)
     """, (tanggal, 'masuk', coa['jenis_dana'] if coa else None, coa['id'] if coa else None,
-          donatur_id, jumlah, keterangan, user_id))
+          donatur_id, jumlah, keterangan, user_id, _default_akun_kas_id(conn)))
     trx_id = cur.lastrowid
     conn.execute("UPDATE koleksi_bulanan SET transaksi_id=? WHERE id=?", (trx_id, koleksi_id))
     kirim_notifikasi_donasi(conn, trx_id)
@@ -385,12 +398,14 @@ def admin_transaksi():
     perlu_lengkap = request.args.get('perlu_lengkap', '')
     query = '''
         SELECT t.*, c.nama as coa_nama, c.kode as coa_kode, c.jenis_dana,
-               d.nama as donatur_nama, p.nama as penerima_nama, u.nama as petugas
+               d.nama as donatur_nama, p.nama as penerima_nama, u.nama as petugas,
+               ak.nama as akun_kas_nama
         FROM transaksi t
         LEFT JOIN chart_of_accounts c ON t.coa_id=c.id
         LEFT JOIN donatur d ON t.donatur_id=d.id
         LEFT JOIN penerima_manfaat p ON t.penerima_id=p.id
         LEFT JOIN users u ON t.user_id=u.id
+        LEFT JOIN akun_kas ak ON t.akun_kas_id=ak.id
         WHERE strftime('%Y-%m',t.tanggal)=?'''
     params = [bulan]
     if jenis in ('masuk','keluar'):
@@ -413,8 +428,10 @@ def admin_transaksi():
     ).fetchall()
     donatur_list= conn.execute("SELECT * FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list=conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
+    akun_kas_list = conn.execute("SELECT * FROM akun_kas WHERE aktif=1 ORDER BY urutan, nama").fetchall()
     conn.close()
     return render_template('admin/transaksi.html', transaksi=transaksi, coa_list=coa_list,
+        akun_kas_list=akun_kas_list,
         coa_parents=coa_parents, donatur_list=donatur_list, penerima_list=penerima_list,
         bulan=bulan, jenis=jenis, jenis_dana=jenis_dana, perlu_lengkap=perlu_lengkap,
         tebakan_mustahik=tebakan_mustahik)
@@ -445,6 +462,31 @@ def set_jumlah_mustahik(id):
     flash('Jumlah mustahik disimpan.', 'success')
     return redirect(request.referrer or url_for('admin_transaksi'))
 
+@app.route('/admin/transaksi/<int:id>/akun-kas', methods=['POST'])
+@admin_required
+def set_akun_kas(id):
+    """Perbaiki Akun Kas/Bank pada transaksi yg sudah ada -- dipakai koreksi manual
+    transaksi lama yg dibackfill Kas Tunai tp ternyata lewat bank/e-wallet, atau
+    salah pilih saat input. Sengaja dibatasi hanya kolom ini (bukan edit transaksi
+    umum), sama spt set_jumlah_mustahik()."""
+    conn = get_db()
+    row = conn.execute("SELECT id FROM transaksi WHERE id=?", (id,)).fetchone()
+    if not row:
+        conn.close()
+        flash('Transaksi tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_transaksi'))
+    akun_kas_id = request.form.get('akun_kas_id') or None
+    if akun_kas_id:
+        valid = conn.execute("SELECT id FROM akun_kas WHERE id=?", (akun_kas_id,)).fetchone()
+        if not valid:
+            conn.close()
+            flash('Akun Kas/Bank tidak valid.', 'danger')
+            return redirect(request.referrer or url_for('admin_transaksi'))
+    conn.execute("UPDATE transaksi SET akun_kas_id=? WHERE id=?", (akun_kas_id, id))
+    conn.commit(); conn.close()
+    flash('Akun Kas/Bank diperbarui.', 'success')
+    return redirect(request.referrer or url_for('admin_transaksi'))
+
 @app.route('/admin/transaksi/tambah', methods=['POST'])
 @admin_required
 def tambah_transaksi():
@@ -467,7 +509,8 @@ def tambah_transaksi():
         data.get('keterangan',''), session['user_id'], data.get('client_uuid'),
         nama_kegiatan=data.get('nama_kegiatan') or None,
         lokasi=data.get('lokasi') or None,
-        jumlah_mustahik=jumlah_mustahik)
+        jumlah_mustahik=jumlah_mustahik,
+        akun_kas_id=data.get('akun_kas_id') or None)
     conn.commit(); conn.close()
     if dup:
         flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
@@ -569,10 +612,34 @@ def laporan_neraca():
     dana_types = DANA_TYPES
     kas = {d: kas_trans.get(d, 0) + saldo_manual.get(d, 0) for d in dana_types}
     total_aset = sum(kas.get(d, 0) for d in dana_types)
+
+    # ── Saldo per Akun Kas/Bank — dimensi fisik (di mana uangnya), terpisah dr
+    # saldo per jenis dana di atas (punyanya siapa/utk apa). Lihat init_db.py &
+    # insert_transaksi() utk rasionalnya. Saldo awal manual (sblm akun_kas_id ada)
+    # ditaruh semua di Kas Tunai, konsisten dgn backfill data lama di migrate().
+    akun_kas_list = conn.execute("SELECT * FROM akun_kas WHERE aktif=1 ORDER BY urutan, nama").fetchall()
+    akun_kas_rows = conn.execute("""
+        SELECT akun_kas_id, COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo
+        FROM transaksi WHERE tanggal <= ? AND akun_kas_id IS NOT NULL
+        GROUP BY akun_kas_id
+    """, (ld,)).fetchall()
+    akun_kas_saldo = {r['akun_kas_id']: r['saldo'] for r in akun_kas_rows}
+    total_saldo_manual = sum(saldo_manual.values())
+    akun_kas_data = []
+    for a in akun_kas_list:
+        s = akun_kas_saldo.get(a['id'], 0)
+        if a['jenis'] == 'tunai':
+            s += total_saldo_manual
+        akun_kas_data.append({'nama': a['nama'], 'jenis': a['jenis'], 'saldo': s})
+    total_akun_kas = sum(d['saldo'] for d in akun_kas_data)
+    belum_diklasifikasi = total_aset - total_akun_kas
+
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_neraca.html',
         kas=kas, dana_types=dana_types, total_aset=total_aset,
+        akun_kas_data=akun_kas_data, total_akun_kas=total_akun_kas,
+        belum_diklasifikasi=belum_diklasifikasi,
         bulan=bulan, last_day=ld, inst=inst)
 
 
@@ -2629,6 +2696,75 @@ def master_area_hapus(id):
     conn.close()
     return redirect(url_for('master_area'))
 
+# ── Master: Akun Kas/Bank ───────────────────────────────────────────────────────
+# Dimensi KEDUA yg independen dr Jenis Dana (Zakat/Infaq/dll) -- lihat catatan di
+# init_db.py & insert_transaksi(). Ini jawab "uangnya fisiknya di mana", dipakai
+# spy saldo per akun bisa dicocokkan ke buku tabungan/rekening koran riil.
+
+AKUN_KAS_JENIS_LABEL = {'tunai': 'Kas Tunai', 'simpanan_bmt': 'Simpanan di BMT',
+                         'bank': 'Bank', 'ewallet': 'E-Wallet'}
+
+@app.route('/admin/master/akun-kas')
+@admin_required
+def master_akun_kas():
+    conn = get_db()
+    akun_list = conn.execute("""
+        SELECT a.*, (SELECT COUNT(*) FROM transaksi t WHERE t.akun_kas_id=a.id) AS jml_transaksi
+        FROM akun_kas a ORDER BY a.urutan, a.nama
+    """).fetchall()
+    conn.close()
+    return render_template('admin/master/akun_kas.html', akun_list=akun_list,
+                            jenis_label=AKUN_KAS_JENIS_LABEL)
+
+@app.route('/admin/master/akun-kas/tambah', methods=['POST'])
+@admin_required
+def master_akun_kas_tambah():
+    nama = request.form.get('nama', '').strip()
+    jenis = request.form.get('jenis', '')
+    if not nama or jenis not in AKUN_KAS_JENIS_LABEL:
+        flash('Nama & jenis akun wajib diisi dengan benar.', 'danger')
+        return redirect(url_for('master_akun_kas'))
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM akun_kas WHERE nama=?", (nama,)).fetchone()
+    if existing:
+        flash('Akun dengan nama itu sudah ada.', 'warning')
+    else:
+        urutan = conn.execute("SELECT COALESCE(MAX(urutan),0)+1 FROM akun_kas").fetchone()[0]
+        conn.execute("INSERT INTO akun_kas (nama, jenis, keterangan, urutan) VALUES (?,?,?,?)",
+                     (nama, jenis, request.form.get('keterangan', '').strip() or None, urutan))
+        conn.commit()
+        flash(f'Akun "{nama}" ditambahkan.', 'success')
+    conn.close()
+    return redirect(url_for('master_akun_kas'))
+
+@app.route('/admin/master/akun-kas/edit/<int:id>', methods=['POST'])
+@admin_required
+def master_akun_kas_edit(id):
+    nama = request.form.get('nama', '').strip()
+    jenis = request.form.get('jenis', '')
+    if not nama or jenis not in AKUN_KAS_JENIS_LABEL:
+        flash('Nama & jenis akun wajib diisi dengan benar.', 'danger')
+        return redirect(url_for('master_akun_kas'))
+    conn = get_db()
+    dup = conn.execute("SELECT id FROM akun_kas WHERE nama=? AND id!=?", (nama, id)).fetchone()
+    if dup:
+        flash('Nama akun sudah dipakai.', 'warning')
+    else:
+        conn.execute("UPDATE akun_kas SET nama=?, jenis=?, keterangan=? WHERE id=?",
+                     (nama, jenis, request.form.get('keterangan', '').strip() or None, id))
+        conn.commit()
+        flash(f'Akun "{nama}" diperbarui.', 'success')
+    conn.close()
+    return redirect(url_for('master_akun_kas'))
+
+@app.route('/admin/master/akun-kas/toggle/<int:id>', methods=['POST'])
+@admin_required
+def master_akun_kas_toggle(id):
+    conn = get_db()
+    conn.execute("UPDATE akun_kas SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return redirect(url_for('master_akun_kas'))
+
 # ── Master: Instansi ─────────────────────────────────────────────────────────
 
 @app.route('/admin/master/instansi')
@@ -3673,7 +3809,8 @@ def marketing_catat():
             data.get('keterangan',''), session['user_id'], data.get('client_uuid'),
             nama_kegiatan=data.get('nama_kegiatan') or None,
             lokasi=data.get('lokasi') or None,
-            jumlah_mustahik=jumlah_mustahik)
+            jumlah_mustahik=jumlah_mustahik,
+            akun_kas_id=data.get('akun_kas_id') or None)
         conn.commit(); conn.close()
         if dup:
             flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
@@ -3686,9 +3823,10 @@ def marketing_catat():
     coa_parents   = conn.execute("SELECT kode, nama FROM chart_of_accounts WHERE parent_kode IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
     donatur_list  = conn.execute("SELECT id, nama, area FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list = conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
+    akun_kas_list = conn.execute("SELECT * FROM akun_kas WHERE aktif=1 ORDER BY urutan, nama").fetchall()
     conn.close()
     return render_template('marketing/catat.html', coa_list=coa_list,
-        coa_parents=coa_parents,
+        coa_parents=coa_parents, akun_kas_list=akun_kas_list,
         donatur_list=donatur_list, penerima_list=penerima_list,
         hari_ini=date.today().isoformat())
 
@@ -3901,7 +4039,8 @@ def api_marketing_transaksi():
         data.get('client_uuid'),
         nama_kegiatan=data.get('nama_kegiatan') or None,
         lokasi=data.get('lokasi') or None,
-        jumlah_mustahik=jumlah_mustahik)
+        jumlah_mustahik=jumlah_mustahik,
+        akun_kas_id=data.get('akun_kas_id') or None)
     conn.commit(); conn.close()
     msg = ('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.'
            if dup else 'Transaksi berhasil dicatat.')
@@ -3949,7 +4088,8 @@ def api_marketing_sync():
                     body.get('client_uuid'),
                     nama_kegiatan=body.get('nama_kegiatan') or None,
                     lokasi=body.get('lokasi') or None,
-                    jumlah_mustahik=jumlah_mustahik)
+                    jumlah_mustahik=jumlah_mustahik,
+                    akun_kas_id=body.get('akun_kas_id') or None)
                 conn.commit(); conn.close()
                 results.append({'id': item.get('id'), 'status': 'ok',
                                 'transaksi_id': trx_id, 'duplicate': dup})

@@ -105,6 +105,42 @@
     </div>
   </div>
 
+  <div class="px-4 pb-4">
+    <div class="report-panel" style="--panel-accent:#0e7490">
+      <div class="report-panel-head">
+        <span class="report-panel-title">SALDO PER AKUN KAS/BANK</span>
+      </div>
+      <div class="text-muted small px-3 pt-2">
+        Sama-sama aset di atas, tapi dilihat dari sisi fisiknya — di mana uangnya benar-benar berada —
+        supaya bisa dicocokkan ke buku tabungan/rekening koran riil. Berbeda dari "Kas &amp; Setara Kas per
+        Dana" di sebelah kiri yang menunjukkan punyanya siapa/untuk apa. Atur akunnya di
+        <a href="{{ url_for('master_akun_kas') }}">Master Akun Kas/Bank</a>.
+      </div>
+      <table class="table table-sm report-table mb-0">
+        <tbody>
+          {% for a in akun_kas_data %}
+          <tr>
+            <td class="ps-3 report-item">{{ a.nama }}</td>
+            <td class="text-end pe-3 report-amount {% if a.saldo < 0 %}text-danger{% endif %}">{{ a.saldo|rupiah }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="report-subtotal">
+            <td class="ps-3">Total Akun Kas/Bank</td>
+            <td class="text-end pe-3">{{ total_akun_kas|rupiah }}</td>
+          </tr>
+          {% if belum_diklasifikasi %}
+          <tr>
+            <td class="ps-3 text-muted small fst-italic">Belum terklasifikasi (jurnal internal)</td>
+            <td class="text-end pe-3 report-amount text-muted small">{{ belum_diklasifikasi|rupiah }}</td>
+          </tr>
+          {% endif %}
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
   {% if inst.ketua or inst.bendahara %}
   <div class="report-sign">
     <div class="row">

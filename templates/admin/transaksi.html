@@ -46,7 +46,7 @@
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
-        <tr><th>Tanggal</th><th>Jenis</th><th>Dana</th><th>Akun (CoA)</th><th>Donatur / Penerima</th><th>Keterangan</th>{% if perlu_lengkap %}<th>Mustahik</th>{% endif %}<th>Petugas</th><th class="text-end">Jumlah</th><th></th></tr>
+        <tr><th>Tanggal</th><th>Jenis</th><th>Dana</th><th>Akun (CoA)</th><th>Akun Kas/Bank</th><th>Donatur / Penerima</th><th>Keterangan</th>{% if perlu_lengkap %}<th>Mustahik</th>{% endif %}<th>Petugas</th><th class="text-end">Jumlah</th><th></th></tr>
       </thead>
       <tbody>
         {% for t in transaksi %}
@@ -63,6 +63,19 @@
           <td class="small">
             {% if t.coa_kode %}<code class="me-1" style="font-size:.75rem">{{ t.coa_kode }}</code>{% endif %}
             {{ t.coa_nama or '—' }}
+          </td>
+          <td class="small">
+            {% if t.jurnal_id %}
+            <span class="text-muted fst-italic" style="font-size:.72rem">Jurnal (internal)</span>
+            {% else %}
+            <form method="POST" action="/admin/transaksi/{{ t.id }}/akun-kas" class="akun-kas-form">
+              <select name="akun_kas_id" class="form-select form-select-sm" style="font-size:.75rem;min-width:110px" onchange="this.form.submit()">
+                {% for a in akun_kas_list %}
+                <option value="{{ a.id }}" {% if t.akun_kas_id == a.id %}selected{% endif %}>{{ a.nama }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            {% endif %}
           </td>
           <td class="small">{{ t.donatur_nama or t.penerima_nama or '—' }}</td>
           <td class="small text-muted">{{ t.keterangan or '—' }}</td>
@@ -87,7 +100,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="{{ 10 if perlu_lengkap else 9 }}" class="text-center text-muted py-4">Belum ada transaksi</td></tr>
+        <tr><td colspan="{{ 11 if perlu_lengkap else 10 }}" class="text-center text-muted py-4">Belum ada transaksi</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -151,6 +164,14 @@
           <label class="form-label fw-semibold">Jumlah (Rp)</label>
           <input type="text" name="jumlah" class="form-control" placeholder="contoh: 500.000" required
                  inputmode="numeric" oninput="formatRibuan(this)">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Akun Kas/Bank</label>
+          <select name="akun_kas_id" class="form-select">
+            {% for a in akun_kas_list %}
+            <option value="{{ a.id }}" {% if a.jenis == 'tunai' %}selected{% endif %}>{{ a.nama }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold">Keterangan</label>
