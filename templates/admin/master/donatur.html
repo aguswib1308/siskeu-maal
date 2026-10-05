@@ -523,6 +523,14 @@ document.querySelector('tbody').addEventListener('click', async function(e) {
     badge.textContent = j.aktif ? 'Aktif' : 'Nonaktif';
     btn.className = 'btn btn-sm btn-outline-' + (j.aktif ? 'warning' : 'success') + ' py-0 btn-toggle-aktif';
     btn.textContent = j.aktif ? 'Off' : 'On';
+    if (j.info) {   // kabari kalau jadwal koleksi ikut dibersihkan / dibuat ulang
+      const t = document.createElement('div');
+      t.className = 'alert alert-info py-1 px-2 small position-fixed shadow';
+      t.style.cssText = 'top:12px; right:12px; z-index:2000';
+      t.textContent = j.info;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
   } finally {
     btn.disabled = false;
   }

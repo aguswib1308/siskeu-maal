@@ -124,6 +124,12 @@
         <div class="stat-label">− Penyaluran</div>
         <div class="stat-value text-danger">{{ d.total_keluar|rupiah }}</div>
       </div>
+      {% if d.transfer_net %}
+      <div class="stat-cell">
+        <div class="stat-label">{{ '+' if d.transfer_net > 0 else '−' }} Transfer Antar-Dana</div>
+        <div class="stat-value text-muted">{{ (d.transfer_net if d.transfer_net > 0 else -d.transfer_net)|rupiah }}</div>
+      </div>
+      {% endif %}
       <div class="stat-cell">
         <div class="stat-label">= Saldo Akhir</div>
         <div class="stat-value {{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.95rem">{{ d.saldo_akhir|rupiah }}</div>
