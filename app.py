@@ -518,6 +518,32 @@ def tambah_transaksi():
         flash('Transaksi berhasil dicatat.', 'success')
     return redirect(url_for('admin_transaksi'))
 
+@app.route('/admin/transaksi/<int:id>/kirim-notif', methods=['POST'])
+@admin_required
+def admin_transaksi_kirim_notif(id):
+    """Kirim ulang notifikasi WA utk 1 transaksi masuk -- dipakai tombol
+    'kirim ulang' di daftar Transaksi (mis. waktu gateway WA sempat mati)."""
+    conn = get_db()
+    trx = conn.execute("SELECT id, jenis, tanggal FROM transaksi WHERE id=?", (id,)).fetchone()
+    if trx is None:
+        conn.close()
+        flash('Transaksi tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_transaksi'))
+    bulan = (trx['tanggal'] or '')[:7]
+    if trx['jenis'] != 'masuk':
+        conn.close()
+        flash('Notifikasi WA hanya untuk transaksi masuk (donasi).', 'warning')
+        return redirect(url_for('admin_transaksi', bulan=bulan))
+    kirim_notifikasi_donasi(conn, id)
+    conn.commit()
+    row = conn.execute("SELECT wa_status, wa_error FROM transaksi WHERE id=?", (id,)).fetchone()
+    conn.close()
+    if row and row['wa_status'] == 'terkirim':
+        flash('Notifikasi WA terkirim.', 'success')
+    else:
+        flash('Notifikasi WA gagal: %s' % (((row['wa_error'] if row else None) or 'tidak diketahui')), 'danger')
+    return redirect(url_for('admin_transaksi', bulan=bulan))
+
 @app.route('/admin/transaksi/hapus/<int:id>', methods=['POST'])
 @admin_required
 def hapus_transaksi(id):
