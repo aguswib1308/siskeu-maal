@@ -78,7 +78,68 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
     trx_id = cur.lastrowid
     if jenis == 'masuk':
         kirim_notifikasi_donasi(conn, trx_id)
+        # Tandai jadwal koleksi bulan itu sebagai TERKUMPUL supaya menu Fundraising
+        # bulan ini, riwayat, dan peta ikut ter-update. Kegagalan sync tidak boleh
+        # membatalkan pencatatan transaksi.
+        try:
+            sync_koleksi_dari_transaksi(conn, donatur_id, tanggal, trx_id)
+        except Exception as e:
+            try:
+                app.logger.warning('sync koleksi gagal (donatur %s, tgl %s): %s',
+                                   donatur_id, tanggal, e)
+            except Exception:
+                pass
     return trx_id, False
+
+
+def sync_koleksi_dari_transaksi(conn, donatur_id, tanggal, trx_id=None):
+    """Tandai jadwal koleksi bulan `tanggal` sebagai 'terkumpul' berdasarkan SEMUA
+    transaksi masuk donatur itu pada bulan tersebut.
+
+    Idempoten: `jumlah` selalu dihitung ulang dengan SUM dari tabel transaksi,
+    jadi transaksi yang sama tidak terhitung dobel walau fungsi dipanggil
+    berkali-kali (mis. transaksi diedit / disimpan ulang). Baris koleksi dibuat
+    kalau donatur belum punya jadwal di bulan itu.
+
+    Return True kalau ada baris koleksi yang dibuat/diperbarui.
+    """
+    if not donatur_id or not tanggal:
+        return False
+    bulan = str(tanggal)[:7]
+    agg = conn.execute("""
+        SELECT COUNT(*) AS n, COALESCE(SUM(jumlah), 0) AS total, MAX(tanggal) AS tgl_akhir
+        FROM transaksi
+        WHERE jenis='masuk' AND donatur_id=? AND substr(tanggal,1,7)=?
+    """, (donatur_id, bulan)).fetchone()
+    if not agg or not agg['n']:
+        return False
+    akhir = conn.execute("""
+        SELECT id, user_id FROM transaksi
+        WHERE jenis='masuk' AND donatur_id=? AND substr(tanggal,1,7)=?
+        ORDER BY tanggal DESC, id DESC LIMIT 1
+    """, (donatur_id, bulan)).fetchone()
+    tgl_akhir = agg['tgl_akhir'] or str(tanggal)
+    id_akhir = akhir['id'] if akhir else trx_id
+    user_akhir = akhir['user_id'] if akhir else None
+
+    baris = conn.execute(
+        "SELECT id FROM koleksi_bulanan WHERE donatur_id=? AND bulan=?",
+        (donatur_id, bulan)).fetchone()
+    if baris:
+        conn.execute("""
+            UPDATE koleksi_bulanan
+               SET status='terkumpul', jumlah=?, tanggal_koleksi=?, transaksi_id=?,
+                   marketing_id=COALESCE(marketing_id, ?)
+             WHERE id=?
+        """, (agg['total'], tgl_akhir, id_akhir, user_akhir, baris['id']))
+    else:
+        conn.execute("""
+            INSERT INTO koleksi_bulanan
+                (donatur_id, bulan, status, marketing_id, tanggal_koleksi, jumlah,
+                 transaksi_id, keterangan)
+            VALUES (?, ?, 'terkumpul', ?, ?, ?, ?, 'otomatis dari transaksi')
+        """, (donatur_id, bulan, user_akhir, tgl_akhir, agg['total'], id_akhir))
+    return True
 
 DEFAULT_TEMPLATE_DONASI = (
     "Assalamu'alaikum {nama}, jazakumullahu khairan atas donasi Anda sebesar "
@@ -255,16 +316,46 @@ app.jinja_env.globals.update(LABEL_DANA=LABEL_DANA, LABEL_ASNAF=LABEL_ASNAF,
                               BULAN_IND=BULAN_IND)
 
 def parse_gmaps_url(url):
-    """Ekstrak (lat, lng) dari berbagai format URL Google Maps."""
+    """Ekstrak (lat, lng) dari URL/teks Google Maps.
+
+    Mendukung: link panjang (@lat,lng atau ?q=/ll=/center=/destination=),
+    format place (!3d..!4d..), teks biasa "lat, lng", dan link pendek
+    (goo.gl/maps, maps.app.goo.gl, g.co/kgs) yang diikuti redirect-nya.
+    Return (None, None) kalau tidak ada koordinat yang bisa diambil.
+    """
+    if not url:
+        return None, None
+    s = str(url).strip()
     patterns = [
+        r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)',
         r'@(-?\d+\.\d+),(-?\d+\.\d+)',
-        r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)',
-        r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)',
+        r'[?&](?:q|ll|sll|center|destination|daddr|query)=(-?\d+\.\d+),\s*(-?\d+\.\d+)',
+        r'^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$',
     ]
-    for p in patterns:
-        m = re.search(p, url)
-        if m:
-            return float(m.group(1)), float(m.group(2))
+
+    def _cari(teks):
+        for p in patterns:
+            m = re.search(p, teks or '', re.I)
+            if m:
+                try:
+                    lat, lng = float(m.group(1)), float(m.group(2))
+                except (TypeError, ValueError):
+                    continue
+                if -90 <= lat <= 90 and -180 <= lng <= 180:
+                    return lat, lng
+        return None, None
+
+    lat, lng = _cari(s)
+    if lat is not None:
+        return lat, lng
+    # Link pendek dari aplikasi Google Maps di HP -> ikuti redirect lalu baca URL akhir.
+    if re.search(r'(goo\.gl/maps|maps\.app\.goo\.gl|g\.co/kgs)', s, re.I):
+        try:
+            r = requests.get(s, timeout=6, allow_redirects=True,
+                             headers={'User-Agent': 'Mozilla/5.0 (Linux; Android 10)'})
+            return _cari(r.url or '')
+        except Exception:
+            return None, None
     return None, None
 
 def buka_periode(bulan, user_id):
@@ -2178,6 +2269,9 @@ def master_donatur_tambah():
     auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
     flash('Donatur berhasil ditambahkan.', 'success')
+    if lat is None or lng is None:
+        flash('Catatan: koordinat lokasi belum ada — titik donatur ini belum akan muncul di peta. '
+              'Isi lewat tombol "Gunakan Lokasi Saya" / peta, atau tempel link Google Maps.', 'warning')
     return redirect(url_for('master_donatur'))
 
 @app.route('/admin/master/donatur/edit/<int:id>', methods=['POST'])
@@ -3762,11 +3856,15 @@ def marketing_donatur_detail(id):
 def marketing_peta():
     conn = get_db()
     bulan = date.today().strftime('%Y-%m')
-    titik = conn.execute('''
-        SELECT kb.id, kb.status, kb.jumlah_kunjungan,
+    # Default: peta TARGET (yang belum dikoleksi). ?semua=1 menampilkan juga yang
+    # sudah terkumpul (hijau) supaya riwayat kunjungan bulan ini kelihatan.
+    semua = request.args.get('semua') == '1'
+    syarat = '' if semua else " AND kb.status != 'terkumpul'"
+    titik = conn.execute(f'''
+        SELECT kb.id, kb.status, kb.jumlah, kb.tanggal_koleksi, kb.jumlah_kunjungan,
                d.nama, d.sumber_infaq, d.area, d.lokasi_nama, d.lat, d.lng
         FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id=d.id
-        WHERE kb.bulan=? AND kb.status != 'terkumpul' AND d.aktif=1
+        WHERE kb.bulan=? {syarat} AND d.aktif=1
               AND d.lat IS NOT NULL AND d.lng IS NOT NULL
         ORDER BY d.area, d.nama
     ''', (bulan,)).fetchall()
@@ -3779,7 +3877,7 @@ def marketing_peta():
     desa_json = json.dumps([dict(d) for d in desa_points])
     conn.close()
     return render_template('marketing/peta.html', titik_json=titik_json,
-                           desa_json=desa_json, bulan=bulan)
+                           desa_json=desa_json, bulan=bulan, semua=semua)
 
 # ── Marketing Donatur ─────────────────────────────────────────────────────────
 
@@ -3830,6 +3928,10 @@ def marketing_donatur_tambah():
     auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
     flash(f'Donatur "{nama}" berhasil ditambahkan.', 'success')
+    if lat is None or lng is None:
+        flash('Catatan: koordinat lokasi belum ada — titik donatur ini belum akan muncul di peta. '
+              'Buka detail donatur lalu tekan "Gunakan Lokasi Saya" (GPS) / tandai di peta, '
+              'atau tempel link Google Maps.', 'warning')
     return redirect(url_for('marketing_donatur_list'))
 
 @app.route('/marketing/donatur/edit/<int:id>', methods=['POST'])

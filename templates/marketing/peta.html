@@ -6,10 +6,15 @@
   <div class="fw-bold fs-5">Peta Fundraising</div>
   <div class="small text-muted">{{ bulan }}</div>
 </div>
-<div class="d-flex gap-2 mb-2 small align-items-center">
+<div class="d-flex gap-2 mb-2 small align-items-center flex-wrap">
   <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3498db;border:2px solid #fff"></span> Belum</span>
   <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e67e22;border:2px solid #fff"></span> Tidak Ada</span>
+  <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#27ae60;border:2px solid #fff"></span> Sudah dikoleksi</span>
   <label class="ms-auto d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
+    <input type="checkbox" id="tgSemua" {% if semua %}checked{% endif %}
+           onchange="location.href='/marketing/peta' + (this.checked ? '?semua=1' : '')"> Tampilkan yang sudah dikoleksi
+  </label>
+  <label class="d-flex align-items-center gap-1 mb-0" style="cursor:pointer">
     <input type="checkbox" id="tgHull" checked> Cakupan desa
   </label>
 </div>
@@ -66,10 +71,19 @@ function makeIcon(color) {
 }
 
 titik.forEach(t => {
-  const color = t.status === 'tidak_ada' ? '#e67e22' : '#3498db';
+  const color = t.status === 'terkumpul' ? '#27ae60'
+              : (t.status === 'tidak_ada' ? '#e67e22' : '#3498db');
   const label = t.sumber_infaq === 'kencleng' ? '🏠 Kencleng' : '🕌 Kotak';
   const kunjungan = t.jumlah_kunjungan > 0
     ? `<div style="font-size:.75rem;color:#e67e22">⚠ ${t.jumlah_kunjungan}x tidak ada</div>` : '';
+  const nominal = t.status === 'terkumpul'
+    ? `<div style="font-size:.8rem;color:#27ae60;font-weight:600">Terkumpul: Rp ${Number(t.jumlah||0).toLocaleString('id-ID')}` +
+      `${t.tanggal_koleksi ? ' · ' + t.tanggal_koleksi : ''}</div>` : '';
+  const aksi = t.status === 'terkumpul' ? ''
+    : `<a href="/marketing/koleksi/${t.id}"
+          style="display:block;margin-top:8px;background:#2980b9;color:#fff;
+                 padding:4px 8px;border-radius:6px;text-align:center;
+                 font-size:.8rem;text-decoration:none">Catat Fundraising</a>`;
   L.marker([t.lat, t.lng], {icon: makeIcon(color)})
    .bindPopup(`
      <div style="min-width:160px">
@@ -77,11 +91,9 @@ titik.forEach(t => {
        <div style="font-size:.8rem;color:#666">${t.lokasi_nama||''}</div>
        <div style="font-size:.8rem;color:#888;margin-bottom:4px">${t.area||''}</div>
        <div style="font-size:.8rem">${label}</div>
+       ${nominal}
        ${kunjungan}
-       <a href="/marketing/koleksi/${t.id}"
-          style="display:block;margin-top:8px;background:#2980b9;color:#fff;
-                 padding:4px 8px;border-radius:6px;text-align:center;
-                 font-size:.8rem;text-decoration:none">Catat Fundraising</a>
+       ${aksi}
      </div>
    `).addTo(map);
 });
