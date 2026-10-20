@@ -2059,18 +2059,57 @@ def master_coa():
     conn.close()
     return render_template('admin/master/coa.html', coa=coa)
 
+def _normalisasi_parent_coa(conn, kode, parent):
+    """Tentukan kode induk (parent_kode) yang aman untuk CoA.
+
+    Aturan:
+    - induk otomatis = kode tanpa segmen terakhir (4.2.1.20 -> 4.2.1);
+    - induk diabaikan (pakai otomatis) kalau kosong, ATAU sama dengan kode sendiri
+      (penyebab akun "mengaku" header -> tidak muncul di dropdown Tambah Transaksi),
+      ATAU kode induknya tidak ada di CoA.
+    Return string kode induk atau None (akun level teratas).
+    """
+    kode = (kode or '').strip()
+    parent = (parent or '').strip()
+    if '.' not in kode:
+        return None
+
+    def _ada(k):
+        return bool(k) and conn.execute(
+            'SELECT 1 FROM chart_of_accounts WHERE kode=?', (k,)).fetchone() is not None
+
+    otomatis = kode.rsplit('.', 1)[0]
+    if not parent or parent == kode:
+        parent = otomatis
+    if not _ada(parent):
+        parent = otomatis if _ada(otomatis) else None
+    return parent
+
+
 @app.route('/admin/master/coa/tambah', methods=['POST'])
 @admin_required
 def master_coa_tambah():
     data = request.form
     conn = get_db()
+    kode = (data.get('kode') or '').strip()
+    parent = _normalisasi_parent_coa(conn, kode, data.get('parent_kode'))
     try:
         conn.execute('''INSERT INTO chart_of_accounts
             (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)''',
-            (data['kode'].strip(), data['nama'].strip(), data['kelompok'],
-             data.get('jenis_dana') or None, data.get('parent_kode') or None,
+            (kode, (data.get('nama') or '').strip(), data['kelompok'],
+             data.get('jenis_dana') or None, parent,
              data.get('jenis_transaksi') or None))
-        conn.commit(); flash('Akun berhasil ditambahkan.', 'success')
+        conn.commit()
+        flash('Akun berhasil ditambahkan.', 'success')
+        # Peringatan: kalau induknya akun transaksi, induk itu akan hilang dari
+        # pilihan transaksi karena sekarang punya sub-akun.
+        if parent and (data.get('jenis_transaksi') or None):
+            p = conn.execute('SELECT jenis_transaksi FROM chart_of_accounts WHERE kode=?',
+                             (parent,)).fetchone()
+            if p and p['jenis_transaksi']:
+                flash('Catatan: akun induk %s sudah dipakai transaksi, jadi akun itu tidak lagi '
+                      'muncul di pilihan Tambah Transaksi (karena kini punya sub-akun).' % parent,
+                      'warning')
     except sqlite3.IntegrityError:
         flash('Kode akun sudah ada.', 'danger')
     conn.close()
