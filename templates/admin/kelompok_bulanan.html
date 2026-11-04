@@ -7,8 +7,20 @@
   <i class="bi bi-arrow-left"></i> Kembali ke {{ kelompok.nama }}
 </a>
 
-<form method="POST" action="{{ url_for('kelompok_bulanan_simpan', id=kelompok.id, bulan=bulan) }}">
+<form method="POST" action="{{ url_for('kelompok_bulanan_simpan', id=kelompok.id, bulan=bulan) }}"
+      onsubmit="return confirm('Simpan DAN kirim notifikasi WA ke semua penerima bulan {{ bulan }}?\n\nPastikan nominal sudah benar dan token prepaid sudah terisi — pesan WA langsung terkirim begitu tombol ini ditekan.')">
 <div class="card p-3">
+  {% set ns = namespace(terkirim=0, gagal=0, belum=0) %}
+  {% for b in baris %}{% if b.wa_status=='terkirim' %}{% set ns.terkirim = ns.terkirim + 1 %}{% elif b.wa_status=='gagal' %}{% set ns.gagal = ns.gagal + 1 %}{% else %}{% set ns.belum = ns.belum + 1 %}{% endif %}{% endfor %}
+  <div id="waRingkas" class="mb-2" style="font-size:.85rem">
+    Status WA:
+    <span class="badge bg-success" id="waTerkirim">{{ ns.terkirim }}</span> terkirim ·
+    <span class="badge bg-danger" id="waGagal">{{ ns.gagal }}</span> gagal ·
+    <span class="badge bg-secondary" id="waBelum">{{ ns.belum }}</span> belum
+    <span id="waProses" class="text-muted ms-2" style="display:none">
+      <span class="spinner-border spinner-border-sm"></span> mengirim…
+    </span>
+  </div>
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle">
       <thead class="table-light">
@@ -47,7 +59,7 @@
               {% if b.status=='tersalur' %}Tersalur{% else %}Draft{% endif %}
             </span>
           </td>
-          <td class="small">
+          <td class="small" id="wa-{{ b.id }}">
             {% if b.wa_status=='terkirim' %}
               <span class="badge bg-success">Terkirim</span>
             {% elif b.wa_status=='gagal' %}
@@ -75,4 +87,51 @@
   {% endif %}
 </div>
 </form>
+
+{% if baris %}
+<form method="POST" action="{{ url_for('kelompok_bulanan_kirim_ulang_gagal', id=kelompok.id, bulan=bulan) }}" class="mt-2"
+      onsubmit="return confirm('Kirim ulang notifikasi WA ke SEMUA penerima yang belum terkirim/gagal?')">
+  <button type="submit" class="btn btn-sm btn-outline-primary" id="btnKirimUlang">
+    <i class="bi bi-arrow-repeat"></i> Kirim ulang yang belum terkirim (<span id="btnJumlah">{{ ns.gagal + ns.belum }}</span>)
+  </button>
+  <span class="text-muted small ms-2">Dikirim di latar belakang — boleh ditinggal, status ter-update sendiri.</span>
+</form>
+
+<script>
+(function () {
+  const URL_STATUS = {{ url_for('kelompok_bulanan_status', id=kelompok.id, bulan=bulan)|tojson }};
+  const elT = document.getElementById('waTerkirim');
+  const elG = document.getElementById('waGagal');
+  const elB = document.getElementById('waBelum');
+  const elP = document.getElementById('waProses');
+  const elJ = document.getElementById('btnJumlah');
+  let timer = null;
+
+  function badge(st, err) {
+    if (st === 'terkirim') return '<span class="badge bg-success">Terkirim</span>';
+    if (st === 'gagal') return '<span class="badge bg-danger" title="' + (err || '') + '">Gagal</span>';
+    return '<span class="text-muted">\u2014</span>';
+  }
+  async function poll() {
+    try {
+      const r = await fetch(URL_STATUS, { headers: { 'Accept': 'application/json' } });
+      const d = await r.json();
+      elT.textContent = d.terkirim; elG.textContent = d.gagal; elB.textContent = d.belum;
+      if (elJ) elJ.textContent = d.gagal + d.belum;
+      (d.rows || []).forEach(function (x) {
+        const cell = document.getElementById('wa-' + x.id);
+        if (cell) cell.innerHTML = badge(x.wa_status, x.wa_error);
+      });
+      elP.style.display = (d.belum > 0) ? '' : 'none';
+      if (d.belum === 0 && timer) { clearInterval(timer); timer = null; }
+    } catch (e) { /* diamkan, coba lagi di tick berikutnya */ }
+  }
+  if (parseInt(elB.textContent, 10) > 0) {
+    elP.style.display = '';
+    timer = setInterval(poll, 4000);
+    poll();
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

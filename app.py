@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
-import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time
+import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time, threading
 import uuid as uuid_mod
 from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
@@ -2652,6 +2652,44 @@ def kirim_notifikasi_penyaluran(conn, bulanan_id):
         conn.execute("UPDATE kelompok_penyaluran_bulanan SET wa_status='gagal', wa_error=? WHERE id=?",
                      (error, bulanan_id))
 
+def _kirim_kelompok_bg(ids, jeda=1.5):
+    """Kirim notifikasi WA kelompok di LATAR BELAKANG (thread daemon).
+
+    Sejak 4 Nov 2026: sebelumnya loop sinkron 36 penerima x ~2,5 detik = ~90 detik
+    menabrak proxy_read_timeout nginx (60 detik) -> browser dapat 504 "timeout"
+    padahal pesan tetap terkirim. Sekarang request langsung balik, pesan dikirim
+    bertahap; tiap pesan di-commit sendiri supaya status di tabel cepat terlihat
+    (halaman detail polling status.json).
+    """
+    def _kerja():
+        try:
+            conn = get_db()
+        except Exception:
+            return
+        try:
+            for bid in ids:
+                try:
+                    kirim_notifikasi_penyaluran(conn, bid)
+                    conn.commit()
+                except Exception as e:
+                    try:
+                        conn.execute("UPDATE kelompok_penyaluran_bulanan "
+                                     "SET wa_status='gagal', wa_error=? WHERE id=?",
+                                     (str(e)[:200], bid))
+                        conn.commit()
+                    except Exception:
+                        pass
+                time.sleep(jeda)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    t = threading.Thread(target=_kerja, daemon=True, name='kirim-wa-kelompok')
+    t.start()
+    return t
+
+
 @app.route('/admin/kelompok/<int:id>/<bulan>/simpan', methods=['POST'])
 @admin_required
 def kelompok_bulanan_simpan(id, bulan):
@@ -2700,18 +2738,15 @@ def kelompok_bulanan_simpan(id, bulan):
         if b['wa_status'] != 'terkirim':
             perlu_kirim.append(b['id'])
     conn.commit()
-    # ponytail: kirim WA setelah transaksi ter-commit, satu commit per baris --
-    # supaya gateway yg macet tidak menahan lock DB / menggagalkan seluruh batch
-    # keuangan yg sudah tersimpan. Sinkron dalam request (blocking ~1-2 detik x
-    # jumlah anggota) aman utk skala saat ini (~40 anggota/bulan, sekali sebulan).
-    # Kalau kelompok makin besar, pindah ke background job sebelum ini menabrak
-    # timeout gunicorn (timeout dinaikkan ke 180s sbg jaring pengaman, bukan solusi permanen).
-    for bid in perlu_kirim:
-        kirim_notifikasi_penyaluran(conn, bid)
-        conn.commit()
-        time.sleep(2)
+    # Kirim WA di LATAR BELAKANG (thread) — lihat _kirim_kelompok_bg().
+    kirim_ids = list(perlu_kirim)
     conn.close()
-    flash(f'{disimpan} penyaluran disimpan.', 'success')
+    if kirim_ids:
+        _kirim_kelompok_bg(kirim_ids)
+    flash(f'{disimpan} penyaluran disimpan.' + (
+        f' WA untuk {len(kirim_ids)} penerima sedang dikirim di latar belakang — '
+        'status di tabel diperbarui otomatis (halaman ini bisa ditinggal).'
+        if kirim_ids else ''), 'success')
     return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
 
 @app.route('/admin/kelompok/bulanan/<int:bulanan_id>/kirim-ulang', methods=['POST'])
@@ -2730,6 +2765,50 @@ def kelompok_bulanan_kirim_ulang(bulanan_id):
     kirim_notifikasi_penyaluran(conn, bulanan_id)
     conn.commit(); conn.close()
     return redirect(url_for('kelompok_bulanan_detail', id=row['kelompok_id'], bulan=row['bulan']))
+
+
+@app.route('/admin/kelompok/<int:id>/<bulan>/kirim-ulang-gagal', methods=['POST'])
+@admin_required
+def kelompok_bulanan_kirim_ulang_gagal(id, bulan):
+    """Kirim ulang SEMUA penerima yang belum terkirim/gagal di bulan itu (background)."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT b.id FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE a.kelompok_id=? AND b.bulan=? AND coalesce(b.wa_status,'belum')!='terkirim'
+        ORDER BY b.id
+    """, (id, bulan)).fetchall()
+    ids = [r['id'] for r in rows]
+    conn.close()
+    if ids:
+        _kirim_kelompok_bg(ids)
+        flash(f'{len(ids)} notifikasi dimasukkan ke antrian kirim (latar belakang).', 'success')
+    else:
+        flash('Semua penerima sudah terkirim.', 'warning')
+    return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
+
+
+@app.route('/admin/kelompok/<int:id>/<bulan>/status.json')
+@admin_required
+def kelompok_bulanan_status(id, bulan):
+    """Status kirim WA per baris — dipakai polling halaman detail (tanpa reload)."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT b.id, b.status, coalesce(b.wa_status,'belum') AS wa_status, b.wa_error
+        FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE a.kelompok_id=? AND b.bulan=?
+        ORDER BY b.id
+    """, (id, bulan)).fetchall()
+    conn.close()
+    data = [dict(r) for r in rows]
+    return jsonify({
+        'rows': data,
+        'total': len(data),
+        'terkirim': sum(1 for r in data if r['wa_status'] == 'terkirim'),
+        'gagal': sum(1 for r in data if r['wa_status'] == 'gagal'),
+        'belum': sum(1 for r in data if r['wa_status'] not in ('terkirim', 'gagal')),
+    })
 
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
