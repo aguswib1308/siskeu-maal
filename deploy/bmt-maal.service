@@ -11,10 +11,27 @@ Environment="SECRET_KEY=MaalBmt@2026!"
 # Ganti nilainya dengan token acak yang sama di /etc/bmt-sync.env (MAAL_API_KEY) di VPS billing.
 # Contoh generate: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 Environment="LAPORAN_API_KEY=GANTI_DENGAN_TOKEN_ACAK"
+# WA_GATEWAY_URL / WA_GATEWAY_TOKEN: gateway WA Baitul Maal (folder wa-gateway/,
+# Baileys) yang mengirim notifikasi penyaluran kelompok -- konfirmasi nominal +
+# token listrik masjid. Gateway listen di 127.0.0.1:3004 (lihat wa-gateway/.env).
+# WAJIB diisi: app Python tidak memakai dotenv, jadi wa-gateway/.env TIDAK terbaca
+# oleh app.py. Tanpa dua baris ini kirim_wa() di wa.py berhenti di cek pertama
+# ('WA_GATEWAY_URL belum diset') -- transaksi penyaluran tetap tersimpan tapi WA
+# tidak pernah keluar, dan tiap baris tercatat wa_status='gagal'.
+# Nilai token HARUS persis sama dengan WA_GATEWAY_TOKEN di wa-gateway/.env.
+Environment="WA_GATEWAY_URL=http://127.0.0.1:3004"
+Environment="WA_GATEWAY_TOKEN=GANTI_DENGAN_TOKEN_SAMA_SEPERTI_WA_GATEWAY_ENV"
+# --timeout 180 (bukan 60): blast notifikasi WA penyaluran jalan sinkron di dalam
+# request, dgn jeda 2 detik per anggota (app.py: kelompok_bulanan_simpan).
+# ~40 anggota = ~2-3 menit, jadi 60s membunuh worker di tengah batch -- transaksi
+# sudah ter-commit tapi anggota urutan bawah tidak pernah dapat WA. Ini jaring
+# pengaman, bukan solusi permanen: kalau kelompok makin besar, pindahkan
+# pengiriman ke background job.
+# (systemd tidak mendukung komentar di dalam baris lanjutan '\', jangan taruh di bawah)
 ExecStart=/var/www/bmt-maal/venv/bin/gunicorn \
     --workers 2 \
     --bind 127.0.0.1:5001 \
-    --timeout 60 \
+    --timeout 180 \
     --access-logfile /var/log/bmt-maal/access.log \
     --error-logfile /var/log/bmt-maal/error.log \
     app:app
