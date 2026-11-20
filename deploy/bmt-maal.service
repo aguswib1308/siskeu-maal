@@ -11,10 +11,31 @@ Environment="SECRET_KEY=MaalBmt@2026!"
 # Ganti nilainya dengan token acak yang sama di /etc/bmt-sync.env (MAAL_API_KEY) di VPS billing.
 # Contoh generate: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 Environment="LAPORAN_API_KEY=GANTI_DENGAN_TOKEN_ACAK"
+# WA_GATEWAY_URL / WA_GATEWAY_TOKEN: gateway WA Baitul Maal (folder wa-gateway/,
+# Baileys) yang mengirim notifikasi penyaluran kelompok -- konfirmasi nominal +
+# token listrik masjid. Gateway listen di 127.0.0.1:3004 (lihat wa-gateway/.env).
+# Unit di VPS sudah punya keduanya; yg di repo ini belum, jadi instalasi baru
+# lewat setup_vps.sh akan kehilangan notifikasi WA tanpa jejak yg jelas:
+# app Python tidak memakai dotenv, jadi wa-gateway/.env TIDAK terbaca oleh app.py,
+# dan kirim_wa() berhenti di cek pertama ('WA_GATEWAY_URL belum diset') --
+# transaksi penyaluran tetap tersimpan tapi WA tidak pernah keluar.
+# Nilai token HARUS persis sama dengan WA_GATEWAY_TOKEN di wa-gateway/.env.
+# JANGAN commit nilai aslinya: repo ini publik. Biarkan placeholder.
+Environment="WA_GATEWAY_URL=http://127.0.0.1:3004"
+Environment="WA_GATEWAY_TOKEN=GANTI_DENGAN_TOKEN_SAMA_SEPERTI_WA_GATEWAY_ENV"
+# Nilai di bawah disamakan dgn unit yg benar-benar jalan di VPS (per Nov 2026):
+# port 5002 (bukan 5001) dan --timeout 180 (bukan 60). File ini sebelumnya tidak
+# pernah ikut diperbarui saat unit di server diubah manual, jadi setup_vps.sh
+# akan memasang konfigurasi yg salah di instalasi baru.
+# --timeout 180: warisan dari masa blast WA jalan sinkron di dalam request.
+# Sejak a0ee9ca pengiriman pindah ke thread latar belakang (_kirim_kelompok_bg)
+# dan request balik cepat, jadi 180 sekarang cuma jaring pengaman -- dibiarkan
+# supaya sama dgn server, bukan karena masih dibutuhkan.
+# (systemd tidak mendukung komentar di dalam baris lanjutan '\', jangan taruh di bawah)
 ExecStart=/var/www/bmt-maal/venv/bin/gunicorn \
     --workers 2 \
-    --bind 127.0.0.1:5001 \
-    --timeout 60 \
+    --bind 127.0.0.1:5002 \
+    --timeout 180 \
     --access-logfile /var/log/bmt-maal/access.log \
     --error-logfile /var/log/bmt-maal/error.log \
     app:app
