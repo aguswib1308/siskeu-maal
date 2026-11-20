@@ -39,10 +39,16 @@ const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const express = require('express');
 const pino = require('pino');
+const fs = require('fs');
 
 const PORT = parseInt(process.env.WA_GATEWAY_PORT || '3004', 10);
 const BOT_TOKEN = process.env.WA_GATEWAY_TOKEN || '';
 const AUTH_DIR = './auth_info_baileys';
+// Arsip isi pesan yang sudah dikirim, dipakai menjawab retry receipt (lihat
+// getMessage di bawah). Harus bertahan lintas restart: retry bisa datang
+// berjam-jam setelah pesan dikirim.
+let SENT_STORE = process.env.WA_SENT_STORE || './sent_messages.json';
+const SENT_TTL_MS = 30 * 24 * 60 * 60 * 1000;  // 30 hari, sepadan dgn retensi WA
 
 const app = express();
 app.use(express.json());
@@ -56,6 +62,61 @@ const logger = pino({ level: 'silent' });
 function log(msg) {
     const ts = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
     console.log(`[${ts}] ${msg}`);
+}
+
+// ============================================================
+// Arsip pesan terkirim (untuk menjawab retry receipt)
+// ============================================================
+// Kenapa ini ada: kalau sesi Signal antara nomor gateway dan penerima rusak --
+// paling sering karena QR di-scan ulang setelah sesi mati, yang membuat
+// identitas kriptografis baru -- perangkat penerima tidak bisa mendekripsi
+// pesan dan menampilkan "Menunggu pesan ini. Ini mungkin membutuhkan waktu
+// beberapa saat." Perangkat itu lalu mengirim retry receipt, dan Baileys
+// menjawabnya dengan memanggil getMessage() untuk mengirim ulang isi aslinya.
+// Tanpa arsip ini getMessage tidak punya apa-apa untuk dikembalikan, retry
+// tidak pernah terpenuhi, dan pesan menggantung berhari-hari/berbulan sampai
+// sesi pulih lewat jalan lain -- walau status di bmt-maal sudah 'terkirim'.
+
+let sentStore = {};
+
+function loadSentStore() {
+    try {
+        sentStore = JSON.parse(fs.readFileSync(SENT_STORE, 'utf8')) || {};
+    } catch {
+        sentStore = {};  // belum ada / rusak -- mulai kosong, jangan bikin gateway gagal start
+    }
+    const dibuang = pruneSentStore();
+    log(`Arsip pesan terkirim: ${Object.keys(sentStore).length} entri${dibuang ? `, ${dibuang} kedaluwarsa dibuang` : ''}`);
+}
+
+function pruneSentStore() {
+    const batas = Date.now() - SENT_TTL_MS;
+    let n = 0;
+    for (const [id, v] of Object.entries(sentStore)) {
+        if (!v || typeof v.ts !== 'number' || v.ts < batas) { delete sentStore[id]; n++; }
+    }
+    return n;
+}
+
+function saveSentStore() {
+    // Tulis ke file sementara lalu rename: rename itu atomik, jadi arsip tidak
+    // pernah tertinggal separuh tertulis kalau proses mati di tengah.
+    try {
+        const tmp = SENT_STORE + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(sentStore));
+        fs.renameSync(tmp, SENT_STORE);
+    } catch (e) {
+        log(`Gagal menyimpan arsip pesan: ${e.message}`);  // jangan gagalkan pengiriman
+    }
+}
+
+/** Simpan isi pesan yang baru terkirim, supaya retry receipt bisa dijawab. */
+function simpanPesanTerkirim(hasilKirim) {
+    const id = hasilKirim && hasilKirim.key && hasilKirim.key.id;
+    if (!id || !hasilKirim.message) return;
+    sentStore[id] = { message: hasilKirim.message, ts: Date.now() };
+    pruneSentStore();
+    saveSentStore();
 }
 
 /** Normalisasi nomor HP Indonesia ke digit E.164 tanpa '+' (mis. 628123456789).
@@ -110,6 +171,20 @@ async function startBot() {
         printQRInTerminal: false,
         syncFullHistory: false,
         markOnlineOnConnect: false,
+        // Dipanggil Baileys saat penerima mengirim retry receipt karena gagal
+        // mendekripsi. Mengembalikan isi asli = pesan dikirim ulang dan
+        // "Menunggu pesan ini..." di HP penerima berubah jadi isi sebenarnya
+        // dalam hitungan detik. Kembalikan undefined kalau tidak ketemu --
+        // Baileys menanganinya, tidak boleh throw.
+        getMessage: async (key) => {
+            const simpan = key && key.id ? sentStore[key.id] : null;
+            if (!simpan) {
+                log(`Retry receipt utk pesan ${key && key.id} tidak ada di arsip (mungkin sudah kedaluwarsa)`);
+                return undefined;
+            }
+            log(`Menjawab retry receipt utk pesan ${key.id}`);
+            return simpan.message;
+        },
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -205,7 +280,8 @@ app.post('/send', async (req, res) => {
     // JID-nya bukan <nomor>@s.whatsapp.net tetap kena.
     const jid = info.jid || toJid(nomor);
     try {
-        await sock.sendMessage(jid, { text: message });
+        const hasilKirim = await sock.sendMessage(jid, { text: message });
+        simpanPesanTerkirim(hasilKirim);
         log(`Pesan terkirim ke ${jid}`);
         res.json({ status: true });
     } catch (e) {
@@ -236,12 +312,47 @@ if (process.argv.includes('--self-check')) {
         ['628', null],                          // 62 tanpa nomor lokal
     ];
     let gagal = 0;
+    const cek = (syarat, label) => { if (!syarat) { console.error(`GAGAL: ${label}`); gagal++; } };
+
     for (const [input, harap] of kasus) {
         const hasil = normalizeNomor(input);
         if (hasil !== harap) {
             console.error(`GAGAL: normalizeNomor(${JSON.stringify(input)}) = ${JSON.stringify(hasil)}, harap ${JSON.stringify(harap)}`);
             gagal++;
         }
+    }
+
+    // Arsip pesan terkirim: pakai file sementara, jangan sentuh arsip sungguhan.
+    SENT_STORE = require('path').join(require('os').tmpdir(), `wa-selfcheck-${process.pid}.json`);
+    try {
+        sentStore = {};
+        simpanPesanTerkirim({ key: { id: 'ABC123' }, message: { conversation: 'halo' } });
+        cek(sentStore['ABC123'] !== undefined, 'pesan terkirim harus masuk arsip');
+
+        // Tanpa id atau tanpa isi: diabaikan, tidak boleh melempar error
+        simpanPesanTerkirim({ key: {}, message: { conversation: 'x' } });
+        simpanPesanTerkirim({ key: { id: 'X' } });
+        simpanPesanTerkirim(null);
+        cek(Object.keys(sentStore).length === 1, 'entri tanpa id/isi harus diabaikan');
+
+        // Bertahan lintas restart -- ini inti kenapa arsipnya ditulis ke disk
+        sentStore = {};
+        loadSentStore();
+        cek(sentStore['ABC123'] && sentStore['ABC123'].message.conversation === 'halo',
+            'arsip harus terbaca kembali setelah restart');
+
+        // Entri kedaluwarsa dibuang
+        sentStore['LAMA'] = { message: { conversation: 'basi' }, ts: Date.now() - SENT_TTL_MS - 1000 };
+        cek(pruneSentStore() === 1, 'entri lewat 30 hari harus dibuang');
+        cek(sentStore['ABC123'] !== undefined, 'entri yang masih berlaku harus bertahan');
+
+        // Arsip rusak tidak boleh menggagalkan start
+        fs.writeFileSync(SENT_STORE, '{bukan json');
+        sentStore = { sisa: 1 };
+        loadSentStore();
+        cek(Object.keys(sentStore).length === 0, 'arsip rusak harus jadi arsip kosong, bukan error');
+    } finally {
+        try { fs.unlinkSync(SENT_STORE); } catch {}
     }
     if (gagal) {
         console.error(`${gagal} kasus gagal.`);
@@ -258,6 +369,8 @@ app.listen(PORT, '127.0.0.1', () => {
     log(`HTTP API listening di 127.0.0.1:${PORT}`);
     log('Endpoint: POST /send | GET /status | GET /qr');
 });
+
+loadSentStore();
 
 startBot().catch(e => {
     log(`Gagal start gateway: ${e.message}`);
