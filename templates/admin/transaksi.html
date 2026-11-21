@@ -2,7 +2,6 @@
 {% block title %}Transaksi{% endblock %}
 {% block page_title %}<i class="bi bi-arrow-left-right"></i> Transaksi{% endblock %}
 
-{% set dana_warna = {'zakat':'#166534','infak_tidak_terikat':'#1B3B5A','infak_terikat':'#0e7490','amil':'#6b21a8','wakaf':'#9a3412'} %}
 
 {% block content %}
 <div class="row mb-3 align-items-center">
@@ -22,7 +21,11 @@
       </select>
       <div class="form-check d-flex align-items-center gap-1 ms-1">
         <input type="checkbox" class="form-check-input" id="perluLengkap" name="perlu_lengkap" value="1" {% if perlu_lengkap %}checked{% endif %}>
-        <label class="form-check-label small" for="perluLengkap">Perlu dilengkapi jumlah mustahik</label>
+        <label class="form-check-label small" for="perluLengkap">Belum ada jumlah mustahik</label>
+      </div>
+      <div class="form-check d-flex align-items-center gap-1 ms-1">
+        <input type="checkbox" class="form-check-input" id="perluKegiatan" name="perlu_kegiatan" value="1" {% if perlu_kegiatan %}checked{% endif %}>
+        <label class="form-check-label small" for="perluKegiatan">Belum ada info kegiatan</label>
       </div>
       <button class="btn btn-sm btn-primary">Filter</button>
     </form>
@@ -55,7 +58,7 @@
           <td><span class="badge {% if t.jenis=='masuk' %}badge-masuk{% else %}badge-keluar{% endif %}">{{ t.jenis }}</span></td>
           <td>
             {% if t.jenis_dana %}
-            <span class="badge rounded-pill" style="background:{{ dana_warna.get(t.jenis_dana,'#aaa') }}; font-size:.65rem">
+            <span class="badge badge-dana rounded-pill d-{{ t.jenis_dana or 'umum' }}">
               {{ LABEL_DANA.get(t.jenis_dana,'') }}
             </span>
             {% endif %}
@@ -65,7 +68,31 @@
             {{ t.coa_nama or '—' }}
           </td>
           <td class="small">{{ t.donatur_nama or t.penerima_nama or '—' }}</td>
-          <td class="small text-muted">{{ t.keterangan or '—' }}</td>
+          <td class="small text-muted">
+            {{ t.keterangan or '—' }}
+            {% if t.jenis == 'keluar' and not t.jurnal_id %}
+              {% if t.nama_kegiatan %}
+              <div class="kegiatan-chip" role="group">
+                <i class="bi bi-calendar-event"></i>
+                <span class="fw-semibold text-body">{{ t.nama_kegiatan }}</span>
+                {% if t.lokasi %}<span>· {{ t.lokasi }}</span>{% endif %}
+                {% if t.jumlah_mustahik %}<span>· {{ t.jumlah_mustahik }} mustahik</span>{% endif %}
+                <button type="button" class="btn btn-link p-0 ms-1 align-baseline btn-kegiatan"
+                        data-id="{{ t.id }}" data-nama="{{ t.nama_kegiatan }}"
+                        data-lokasi="{{ t.lokasi or '' }}" data-mustahik="{{ t.jumlah_mustahik or '' }}"
+                        title="Ubah info kegiatan">
+                  <i class="bi bi-pencil"></i>
+                </button>
+              </div>
+              {% else %}
+              <button type="button" class="btn btn-link p-0 d-block btn-kegiatan kegiatan-kosong"
+                      data-id="{{ t.id }}" data-nama="" data-lokasi=""
+                      data-mustahik="{{ t.jumlah_mustahik or '' }}">
+                <i class="bi bi-plus-circle"></i> Isi info kegiatan
+              </button>
+              {% endif %}
+            {% endif %}
+          </td>
           {% if perlu_lengkap %}
           <td>
             <form method="POST" action="/admin/transaksi/{{ t.id }}/mustahik" class="d-flex gap-1">
@@ -92,6 +119,49 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<!-- Modal Info Kegiatan: melengkapi transaksi penyaluran yang sudah tercatat -->
+<div class="modal fade" id="modalKegiatan" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="POST" id="formKegiatan">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-calendar-event"></i> Info Kegiatan Penyaluran
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">
+          Transaksi penyaluran baru muncul di <strong>Laporan Kegiatan Penyaluran</strong>
+          setelah <em>Nama Kegiatan</em> terisi. Tanggal, akun, dan jumlah tidak bisa diubah
+          di sini karena jurnalnya sudah terbentuk.
+        </p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">Nama Kegiatan</label>
+          <input type="text" name="nama_kegiatan" id="kegNama" class="form-control form-control-sm"
+                 placeholder="cth: Santunan Dhuafa Ramadhan">
+          <div class="form-text" style="font-size:.74rem">
+            Kosongkan untuk mengeluarkan transaksi ini dari Laporan Kegiatan Penyaluran.
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">Lokasi</label>
+          <input type="text" name="lokasi" id="kegLokasi" class="form-control form-control-sm"
+                 placeholder="cth: Masjid Al-Ikhlas, Desa Sendang">
+        </div>
+        <div>
+          <label class="form-label fw-semibold small">Jumlah Mustahik</label>
+          <input type="number" name="jumlah_mustahik" id="kegMustahik" min="0"
+                 class="form-control form-control-sm" style="max-width:140px" placeholder="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success btn-sm">Simpan</button>
+      </div>
+    </form>
+  </div></div>
 </div>
 
 <!-- Modal Tambah -->
@@ -186,6 +256,18 @@
   </div></div>
 </div>
 {% endblock %}
+
+<style>
+/* Info kegiatan penyaluran di kolom Keterangan */
+.kegiatan-chip {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem;
+  font-size: .74rem; margin-top: .25rem; color: var(--text-muted);
+}
+.kegiatan-chip > i { color: var(--dana-infak_terikat); }
+.btn-kegiatan { font-size: .74rem; text-decoration: none; }
+.kegiatan-kosong { margin-top: .25rem; color: var(--text-muted) !important; opacity: .75; }
+.kegiatan-kosong:hover { color: var(--accent) !important; opacity: 1; }
+</style>
 
 {% block scripts %}
 <script>
@@ -308,6 +390,17 @@ function updateJenisLabel(jenis) {
   else                      { el.className='badge bg-secondary fs-6 py-2 px-3'; el.textContent='— Pilih akun —'; }
   document.getElementById('kegiatanFields').style.display = (jenis === 'keluar') ? '' : 'none';
 }
+
+/* ── Modal Info Kegiatan: isi dari data-* baris yang diklik ── */
+document.querySelectorAll('.btn-kegiatan').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('formKegiatan').action = '/admin/transaksi/' + btn.dataset.id + '/mustahik';
+    document.getElementById('kegNama').value     = btn.dataset.nama || '';
+    document.getElementById('kegLokasi').value   = btn.dataset.lokasi || '';
+    document.getElementById('kegMustahik').value = btn.dataset.mustahik || '';
+    new bootstrap.Modal(document.getElementById('modalKegiatan')).show();
+  });
+});
 
 function formatRibuan(el) {
   let raw = el.value.replace(/\D/g, '');

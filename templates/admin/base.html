@@ -30,6 +30,19 @@
     --border: #E4E8EE;
     --text-main: #1a2635;
     --text-muted: #64748b;
+
+    /* Palet jenis dana — SATU sumber warna untuk seluruh aplikasi
+       (laporan, daftar transaksi, dashboard). Jangan tulis #hex per halaman. */
+    --dana-zakat:               #15803D;
+    --dana-infak_tidak_terikat: #1B3B5A;
+    --dana-infak_terikat:       #0E7490;
+    --dana-amil:                #6D28D9;
+    --dana-wakaf:               #B45309;
+    --dana-umum:                #64748B;
+
+    /* Semantik nilai uang */
+    --rp-masuk:  #15803D;
+    --rp-keluar: #B91C1C;
   }
   [data-bs-theme="dark"] {
     --primary: #0A131B;
@@ -40,7 +53,34 @@
     --border: #26343F;
     --text-main: #E6EBF0;
     --text-muted: #8DA0B0;
+
+    --dana-zakat:               #4ADE80;
+    --dana-infak_tidak_terikat: #7DB0E0;
+    --dana-infak_terikat:       #38BDF8;
+    --dana-amil:                #A78BFA;
+    --dana-wakaf:               #FBBF24;
+    --dana-umum:                #94A3B8;
+
+    --rp-masuk:  #4ADE80;
+    --rp-keluar: #F87171;
   }
+  /* Pasang salah satu kelas ini untuk mewarnai elemen sesuai jenis dana.
+     Dipakai badge dana, panel laporan, baris kelompok. */
+  .d-zakat               { --panel-accent: var(--dana-zakat); }
+  .d-infak_tidak_terikat { --panel-accent: var(--dana-infak_tidak_terikat); }
+  .d-infak_terikat       { --panel-accent: var(--dana-infak_terikat); }
+  .d-amil                { --panel-accent: var(--dana-amil); }
+  .d-wakaf               { --panel-accent: var(--dana-wakaf); }
+  .d-umum                { --panel-accent: var(--dana-umum); }
+  .d-masuk               { --panel-accent: var(--rp-masuk); }
+  .d-keluar              { --panel-accent: var(--rp-keluar); }
+
+  .badge-dana {
+    background: var(--panel-accent, var(--dana-umum));
+    color: #fff; font-size: .65rem; font-weight: 600;
+  }
+  [data-bs-theme="dark"] .badge-dana { color: #0E1B26; }
+
   body {
     background: var(--bg);
     font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;

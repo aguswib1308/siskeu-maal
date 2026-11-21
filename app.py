@@ -326,6 +326,7 @@ def admin_transaksi():
     jenis = request.args.get('jenis', '')
     jenis_dana = request.args.get('jenis_dana', '')
     perlu_lengkap = request.args.get('perlu_lengkap', '')
+    perlu_kegiatan = request.args.get('perlu_kegiatan', '')
     query = '''
         SELECT t.*, c.nama as coa_nama, c.kode as coa_kode, c.jenis_dana,
                d.nama as donatur_nama, p.nama as penerima_nama, u.nama as petugas
@@ -342,6 +343,10 @@ def admin_transaksi():
         query += ' AND t.jenis_dana=?'; params.append(jenis_dana)
     if perlu_lengkap:
         query += " AND t.jenis='keluar' AND t.jumlah_mustahik IS NULL AND t.jurnal_id IS NULL"
+    if perlu_kegiatan:
+        # Penyaluran yg belum punya nama kegiatan — inilah yg absen dari
+        # Laporan Kegiatan Penyaluran. Jurnal umum (transfer antar dana) dikecualikan.
+        query += " AND t.jenis='keluar' AND t.nama_kegiatan IS NULL AND t.jurnal_id IS NULL"
     query += ' ORDER BY t.tanggal DESC, t.created_at DESC'
     transaksi   = conn.execute(query, params).fetchall()
     tebakan_mustahik = {}
@@ -360,33 +365,58 @@ def admin_transaksi():
     return render_template('admin/transaksi.html', transaksi=transaksi, coa_list=coa_list,
         coa_parents=coa_parents, donatur_list=donatur_list, penerima_list=penerima_list,
         bulan=bulan, jenis=jenis, jenis_dana=jenis_dana, perlu_lengkap=perlu_lengkap,
-        tebakan_mustahik=tebakan_mustahik)
+        perlu_kegiatan=perlu_kegiatan, tebakan_mustahik=tebakan_mustahik)
 
 @app.route('/admin/transaksi/<int:id>/mustahik', methods=['POST'])
 @admin_required
-def set_jumlah_mustahik(id):
-    """Isi/perbaiki jumlah_mustahik pada transaksi keluar yang sudah ada — dipakai utk
-    backfill data lama yg dicatat sebelum field ini ada. Sengaja dibatasi hanya kolom ini
-    (bukan edit transaksi umum) krn belum ada fitur edit transaksi sama sekali di sistem."""
+def set_info_kegiatan(id):
+    """Isi/perbaiki Info Kegiatan (nama_kegiatan, lokasi, jumlah_mustahik) pada transaksi
+    keluar yang SUDAH tercatat — satu-satunya jalan melengkapi data lama, termasuk yg
+    dicatat sebelum ketiga kolom ini ada. Tanpa ini, Laporan Kegiatan Penyaluran selalu
+    kosong utk transaksi lama krn laporan itu menyaring `nama_kegiatan IS NOT NULL`.
+
+    Sengaja dibatasi tiga kolom ini saja (bukan edit transaksi umum) krn mengubah
+    tanggal/akun/jumlah akan merusak jurnal yg sudah terbentuk.
+
+    Hanya kolom yang benar-benar dikirim form yang diubah, supaya form ringkas
+    'jumlah mustahik' di daftar transaksi tidak menghapus nama kegiatan & lokasi.
+    """
     conn = get_db()
     row = conn.execute("SELECT jenis FROM transaksi WHERE id=?", (id,)).fetchone()
     if not row or row['jenis'] != 'keluar':
         conn.close()
         flash('Transaksi tidak ditemukan atau bukan penyaluran.', 'danger')
         return redirect(url_for('admin_transaksi'))
-    raw = request.form.get('jumlah_mustahik', '').strip()
-    nilai = None
-    if raw:
-        try:
-            nilai = max(0, int(raw))
-        except ValueError:
-            flash('Jumlah mustahik harus angka.', 'danger')
-            conn.close()
-            return redirect(request.referrer or url_for('admin_transaksi'))
-    conn.execute("UPDATE transaksi SET jumlah_mustahik=? WHERE id=?", (nilai, id))
+
+    kembali = request.referrer or url_for('admin_transaksi')
+    kolom, nilai = [], []
+
+    if 'jumlah_mustahik' in request.form:
+        raw = (request.form.get('jumlah_mustahik') or '').strip()
+        n = None
+        if raw:
+            try:
+                n = max(0, int(raw))
+            except ValueError:
+                conn.close()
+                flash('Jumlah mustahik harus angka.', 'danger')
+                return redirect(kembali)
+        kolom.append('jumlah_mustahik=?'); nilai.append(n)
+
+    for f in ('nama_kegiatan', 'lokasi'):
+        if f in request.form:
+            teks = (request.form.get(f) or '').strip()
+            kolom.append(f'{f}=?'); nilai.append(teks or None)
+
+    if not kolom:
+        conn.close()
+        flash('Tidak ada data yang diubah.', 'warning')
+        return redirect(kembali)
+
+    conn.execute(f"UPDATE transaksi SET {', '.join(kolom)} WHERE id=?", (*nilai, id))
     conn.commit(); conn.close()
-    flash('Jumlah mustahik disimpan.', 'success')
-    return redirect(request.referrer or url_for('admin_transaksi'))
+    flash('Info kegiatan penyaluran disimpan.', 'success')
+    return redirect(kembali)
 
 @app.route('/admin/transaksi/tambah', methods=['POST'])
 @admin_required
@@ -914,17 +944,47 @@ def laporan_rekap_infaq_terikat():
     )
 
 
-def _rekap_donasi_donatur(conn, tahun):
+# Pilihan urutan utk Rekap Donasi per Donatur. Kunci = nilai ?sort= di URL.
+REKAP_DONATUR_SORT = {
+    'total':       lambda e: (-e['total'], e['nama'].lower()),
+    'total_asc':   lambda e: (e['total'], e['nama'].lower()),
+    'nama':        lambda e: e['nama'].lower(),
+    'nama_desc':   lambda e: _StrDesc(e['nama'].lower()),
+    'bulan_aktif': lambda e: (-e['bulan_aktif'], -e['total']),
+    'rata2':       lambda e: (-e['rata2'], e['nama'].lower()),
+}
+
+
+class _StrDesc(str):
+    """Pembanding string terbalik — supaya sort nama Z→A bisa pakai satu key function."""
+    def __lt__(self, other): return str.__gt__(self, other)
+    def __gt__(self, other): return str.__lt__(self, other)
+
+
+def _rekap_donasi_donatur(conn, tahun, q=None, sort='total'):
     """Rekap tahunan penerimaan per donatur (baris) x per bulan (kolom) + statistik --
     bahan evaluasi akhir tahun. Hanya donatur dgn min. 1 transaksi masuk di tahun tsb
-    yg ditampilkan (dari 1000+ donatur, kebanyakan tak aktif tiap bulan)."""
-    rows = conn.execute("""
+    yg ditampilkan (dari 1000+ donatur, kebanyakan tak aktif tiap bulan).
+
+    `q`    : cari nama donatur (substring, tdk peduli huruf besar/kecil). Totalnya
+             ikut tersaring supaya baris & footer tetap konsisten.
+    `sort` : salah satu kunci REKAP_DONATUR_SORT; default total terbesar.
+    """
+    sql = """
         SELECT d.id, d.nama, d.sumber_infaq, d.aktif,
                strftime('%m', t.tanggal) as bln, SUM(t.jumlah) as total
         FROM transaksi t JOIN donatur d ON t.donatur_id = d.id
         WHERE t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
-        GROUP BY d.id, bln
-    """, (tahun,)).fetchall()
+    """
+    params = [tahun]
+    if q:
+        # LIKE di SQLite sudah tdk peduli huruf besar/kecil utk ASCII. Wildcard yg
+        # diketik user (% dan _) di-escape supaya dicari apa adanya.
+        pola = q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        sql += " AND d.nama LIKE ? ESCAPE '\\'"
+        params.append(f"%{pola}%")
+    sql += " GROUP BY d.id, bln"
+    rows = conn.execute(sql, params).fetchall()
 
     donatur_map = {}
     for r in rows:
@@ -939,7 +999,7 @@ def _rekap_donasi_donatur(conn, tahun):
     tabel = list(donatur_map.values())
     for e in tabel:
         e['rata2'] = e['total'] / e['bulan_aktif'] if e['bulan_aktif'] else 0
-    tabel.sort(key=lambda e: -e['total'])
+    tabel.sort(key=REKAP_DONATUR_SORT.get(sort, REKAP_DONATUR_SORT['total']))
 
     total_per_bulan = {f"{i:02d}": 0 for i in range(1, 13)}
     grand_total = 0
@@ -957,8 +1017,12 @@ def laporan_rekap_donasi_donatur():
     """Rekap tahunan penerimaan per donatur x bulan + statistik (bln aktif, rata-rata) --
     bahan evaluasi akhir tahun (donatur konsisten vs jarang/berhenti)."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
+    q     = (request.args.get('q') or '').strip()
+    sort  = request.args.get('sort', 'total')
+    if sort not in REKAP_DONATUR_SORT:
+        sort = 'total'
     conn = get_db()
-    tabel, total_per_bulan, grand_total = _rekap_donasi_donatur(conn, tahun)
+    tabel, total_per_bulan, grand_total = _rekap_donasi_donatur(conn, tahun, q, sort)
 
     if request.args.get('download'):
         wb = Workbook()
@@ -1003,7 +1067,7 @@ def laporan_rekap_donasi_donatur():
     conn.close()
     return render_template('admin/laporan_rekap_donasi_donatur.html',
         tabel=tabel, total_per_bulan=total_per_bulan, grand_total=grand_total,
-        tahun=tahun, inst=inst, BULAN_IND=BULAN_IND)
+        tahun=tahun, inst=inst, BULAN_IND=BULAN_IND, q=q, sort=sort)
 
 
 @app.route('/admin/laporan/donatur-mustahik')

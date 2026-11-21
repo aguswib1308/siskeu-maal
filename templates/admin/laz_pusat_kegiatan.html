@@ -1,0 +1,126 @@
+{% extends 'admin/base.html' %}
+{% block title %}Program Kegiatan Pentasharufan{% endblock %}
+{% block page_title %}<i class="bi bi-list-check"></i> Program Kegiatan Pentasharufan{% endblock %}
+
+{% block content %}
+<div class="report-toolbar no-print">
+  <form>
+    <a href="{{ url_for('laporan_laz_pusat') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <span class="toolbar-label">Tahun</span>
+    <select name="tahun" class="form-select form-select-sm" style="width:105px" onchange="this.form.submit()">
+      {% for y in range(tahun - 2, tahun + 2) %}
+      <option value="{{ y }}" {% if y == tahun %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <div class="toolbar-actions align-items-center">
+    <div class="form-check form-switch mb-0 me-2">
+      <input class="form-check-input" type="checkbox" id="toggleKosong" checked onchange="toggleBulanKosong()">
+      <label class="form-check-label" for="toggleKosong" style="font-size:.8rem">Sembunyikan bulan kosong</label>
+    </div>
+    <a href="{{ url_for('laz_pusat_kelompok') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-diagram-3"></i> Atur Kelompok Program
+    </a>
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak
+    </button>
+  </div>
+</div>
+
+<div class="card report-card mb-3">
+  {% set report_tag = 'LAZ Pusat' %}
+  {% set report_title = 'Laporan Program Kegiatan Pentasharufan' %}
+  {% set report_period = 'Tahun ' ~ tahun %}
+  {% include 'admin/_report_head.html' %}
+
+  <details class="report-note" style="margin-bottom:1.1rem">
+    <summary><i class="bi bi-info-circle"></i> Cara pakai laporan ini</summary>
+    <div class="note-body">
+      <p>Rincian per kegiatan &mdash; satu baris sama dengan satu transaksi penyaluran &mdash;
+         dikelompokkan ke 6 bidang LAZ MKU Pusat, untuk disalin manual ke sheet
+         &ldquo;Program Kegiatan&rdquo; di file Excel resmi.</p>
+      <p>Kolom <strong>Tujuan</strong> dan <strong>Asnaf</strong> diambil dari
+         <a href="{{ url_for('laz_pusat_kelompok') }}">Atur Kelompok Program</a>.
+         Kolom <strong>Jumlah</strong> yang kosong atau nol berarti transaksinya belum diisi
+         jumlah mustahik.</p>
+    </div>
+  </details>
+</div>
+
+{% for b in LAZ_BIDANG_LIST %}
+<section class="card report-card mb-3">
+  <div class="report-panel-head" style="border-bottom:1px solid var(--border);border-radius:0">
+    <span class="report-panel-title" style="color:var(--text-main)">
+      Program {{ LAZ_BIDANG_LABEL[b] }}
+    </span>
+    <span class="report-panel-meta">Total setahun <strong>{{ total_bidang[b]|rupiah }}</strong></span>
+  </div>
+  <div class="table-responsive">
+    <table class="table report-table mb-0">
+      <thead class="report-thead">
+        <tr>
+          <th style="width:44px">No</th>
+          <th style="min-width:160px">Nama Kegiatan</th>
+          <th style="min-width:180px">Tujuan</th>
+          <th style="width:96px">Tanggal</th>
+          <th>Lokasi</th>
+          <th style="width:110px">Asnaf</th>
+          <th class="text-end" style="width:90px">Jumlah</th>
+          <th class="text-end" style="width:150px">Nominal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in range(1,13) %}
+        {% set items = kegiatan_data[b][m] %}
+        {% set bulan_total = items | map(attribute='nominal') | sum %}
+        {% set kosong = '' if items else 'bulan-kosong' %}
+        <tr class="report-group {{ kosong }}">
+          <td colspan="8">{{ BULAN_IND[m] }}</td>
+        </tr>
+        {% for item in items %}
+        <tr>
+          <td class="report-kode">{{ item.no }}</td>
+          <td class="report-item fw-semibold">{{ item.nama_kegiatan }}</td>
+          <td class="report-item text-muted">{{ item.tujuan or '—' }}</td>
+          <td class="report-kode">{{ item.tanggal }}</td>
+          <td class="report-item">{{ item.lokasi }}</td>
+          <td class="report-item">{{ item.asnaf or '—' }}</td>
+          <td class="report-amount {{ 'nol' if not item.jumlah }}">{{ item.jumlah or '—' }}</td>
+          <td class="report-amount keluar">{{ item.nominal|rupiah }}</td>
+        </tr>
+        {% else %}
+        <tr class="bulan-kosong">
+          <td colspan="8" class="text-center text-muted small fst-italic py-2">Belum ada kegiatan</td>
+        </tr>
+        {% endfor %}
+        <tr class="report-subtotal {{ kosong }}">
+          <td colspan="7">Total Pentasharufan {{ BULAN_IND[m] }}</td>
+          <td class="report-amount">{{ bulan_total|rupiah }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="report-total">
+          <td colspan="7">Total {{ LAZ_BIDANG_LABEL[b] }} {{ tahun }}</td>
+          <td class="report-amount">{{ total_bidang[b]|rupiah }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
+{% endfor %}
+
+{% include 'admin/_report_style.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleBulanKosong() {
+  var hide = document.getElementById('toggleKosong').checked;
+  document.querySelectorAll('.bulan-kosong').forEach(function (tr) { tr.hidden = hide; });
+}
+document.addEventListener('DOMContentLoaded', toggleBulanKosong);
+</script>
+{% endblock %}

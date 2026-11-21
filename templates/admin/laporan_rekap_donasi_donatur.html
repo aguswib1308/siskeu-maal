@@ -3,16 +3,55 @@
 {% block page_title %}<i class="bi bi-cash-coin"></i> Rekap Donasi per Donatur{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 no-print flex-wrap gap-2">
-  <form class="d-flex gap-2 align-items-center">
-    <label class="form-label mb-0 small text-muted">Tahun</label>
-    <input type="number" name="tahun" value="{{ tahun }}" min="2020" max="2100"
-           class="form-control form-control-sm" style="width:100px">
+{#- Satu tempat untuk menyusun query string, dipakai tombol unduh & header sortir -#}
+{%- macro qs(sort_baru=None) -%}
+?tahun={{ tahun }}{% if q %}&q={{ q | urlencode }}{% endif %}{% if sort_baru %}&sort={{ sort_baru }}{% elif sort != 'total' %}&sort={{ sort }}{% endif %}
+{%- endmacro -%}
+
+{#- Header kolom yang bisa diklik untuk mengurutkan. `naik`/`turun` = nilai ?sort= -#}
+{%- macro th_sort(label, naik, turun, kelas='') -%}
+{% set aktif = sort in (naik, turun) %}
+{% set berikut = turun if sort == naik else naik %}
+<th class="{{ kelas }} th-sort {{ 'th-sort-aktif' if aktif }}">
+  <a href="{{ qs(berikut) | trim }}">
+    {{ label }}
+    <i class="bi {% if sort == naik %}bi-sort-down-alt{% elif sort == turun %}bi-sort-down{% else %}bi-filter{% endif %}"></i>
+  </a>
+</th>
+{%- endmacro -%}
+
+<div class="report-toolbar no-print">
+  <form>
+    <span class="toolbar-field">
+      <span class="toolbar-label">Tahun</span>
+      <input type="number" name="tahun" value="{{ tahun }}" min="2020" max="2100"
+             class="form-control form-control-sm" style="width:95px">
+    </span>
+    <span class="toolbar-field">
+      <span class="toolbar-label">Cari donatur</span>
+      <input type="search" name="q" value="{{ q }}" placeholder="Nama donatur&hellip;"
+             class="form-control form-control-sm" style="width:200px">
+    </span>
+    <span class="toolbar-field">
+      <span class="toolbar-label">Urut</span>
+      <select name="sort" class="form-select form-select-sm" style="width:180px">
+      <option value="total"       {% if sort=='total' %}selected{% endif %}>Total terbesar</option>
+      <option value="total_asc"   {% if sort=='total_asc' %}selected{% endif %}>Total terkecil</option>
+      <option value="nama"        {% if sort=='nama' %}selected{% endif %}>Nama A &rarr; Z</option>
+      <option value="nama_desc"   {% if sort=='nama_desc' %}selected{% endif %}>Nama Z &rarr; A</option>
+      <option value="bulan_aktif" {% if sort=='bulan_aktif' %}selected{% endif %}>Paling rutin</option>
+      <option value="rata2"       {% if sort=='rata2' %}selected{% endif %}>Rata-rata terbesar</option>
+      </select>
+    </span>
     <button class="btn btn-sm btn-primary">Tampilkan</button>
+    {% if q %}
+    <a href="?tahun={{ tahun }}{% if sort != 'total' %}&sort={{ sort }}{% endif %}"
+       class="btn btn-sm btn-outline-secondary">Hapus filter</a>
+    {% endif %}
   </form>
-  <div class="d-flex gap-2">
-    <a href="?tahun={{ tahun }}&download=1" class="btn btn-sm btn-outline-success">
-      <i class="bi bi-file-earmark-excel"></i> Download Excel
+  <div class="toolbar-actions">
+    <a href="{{ qs() | trim }}&download=1" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-file-earmark-excel"></i> Unduh Excel
     </a>
     <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-printer"></i> Cetak
@@ -21,82 +60,105 @@
 </div>
 
 <div class="card report-card">
-  <div class="report-header">
-    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
-    {% if inst.nama_lembaga %}
-    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
-    {% endif %}
-    <div class="report-line"></div>
-    <div class="report-title">REKAP DONASI PER DONATUR</div>
-    <div class="report-period">Tahun {{ tahun }}</div>
-    <div class="text-muted small mt-1">
-      Penerimaan tiap donatur per bulan selama setahun — bahan evaluasi akhir tahun.
-      Hanya donatur dengan minimal 1 transaksi di tahun ini yang ditampilkan, diurutkan dari total terbesar.
+  {% set report_title = 'Rekap Donasi per Donatur' %}
+  {% set report_period = 'Tahun ' ~ tahun ~ (' · pencarian: "' ~ q ~ '"' if q else '') %}
+  {% include 'admin/_report_head.html' %}
+
+  <details class="report-note">
+    <summary><i class="bi bi-info-circle"></i> Keterangan laporan</summary>
+    <div class="note-body">
+      <p>Penerimaan tiap donatur per bulan selama setahun, sebagai bahan evaluasi akhir tahun.
+         Hanya donatur dengan minimal satu transaksi pada tahun ini yang ditampilkan.
+         Baris yang diredupkan berarti donatur sudah nonaktif.</p>
+      <p>Header kolom Donatur, Total Setahun, Bln Aktif, dan Rata2/Bln bisa diklik untuk
+         mengurutkan. Klik ulang kolom Donatur atau Total Setahun untuk membalik arahnya.</p>
+      {% if q %}
+      <p><strong>Catatan:</strong> karena sedang disaring dengan kata kunci
+         &ldquo;{{ q }}&rdquo;, baris total di bawah hanya menjumlahkan donatur yang tampil &mdash;
+         bukan seluruh penerimaan tahun {{ tahun }}. Unduhan Excel juga mengikuti filter ini.</p>
+      {% endif %}
     </div>
-  </div>
+  </details>
 
   <div class="report-summary">
     <div class="row g-3">
       <div class="col-6 col-md-4">
-        <div class="sum-label">Donatur Berkontribusi</div>
-        <div class="sum-value" style="font-size:1.4rem">{{ tabel|length }}</div>
+        <div class="sum-cell">
+          <div class="sum-label">Donatur Berkontribusi</div>
+          <div class="sum-value big">{{ tabel|length }}</div>
+        </div>
       </div>
       <div class="col-6 col-md-4">
-        <div class="sum-label">Total Penerimaan {{ tahun }}</div>
-        <div class="sum-value text-success" style="font-size:1.4rem">{{ grand_total|rupiah }}</div>
+        <div class="sum-cell">
+          <div class="sum-label">Total Penerimaan {{ tahun }}</div>
+          <div class="sum-value big" style="color:var(--rp-masuk)">{{ grand_total|rupiah }}</div>
+        </div>
       </div>
-      <div class="col-6 col-md-4">
-        <div class="sum-label">Rata-rata per Donatur</div>
-        <div class="sum-value" style="font-size:1.4rem">{{ ((grand_total / tabel|length) if tabel else 0)|rupiah }}</div>
+      <div class="col-12 col-md-4">
+        <div class="sum-cell">
+          <div class="sum-label">Rata-rata per Donatur</div>
+          <div class="sum-value big">{{ ((grand_total / tabel|length) if tabel else 0)|round|int|rupiah }}</div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="p-4">
     <div class="table-responsive">
-      <table class="table table-sm report-table">
-        <thead>
-          <tr class="report-thead">
-            <th class="ps-3" style="white-space:nowrap">Donatur</th>
-            <th style="white-space:nowrap">Kategori</th>
+      <table class="table report-table report-sticky report-stickycol">
+        <thead class="report-thead">
+          <tr>
+            {{ th_sort('Donatur', 'nama', 'nama_desc') }}
+            <th>Kategori</th>
             {% for i in range(1, 13) %}
-            <th class="text-end" style="white-space:nowrap">{{ BULAN_IND[i][:3] }}</th>
+            <th class="text-end">{{ BULAN_IND[i][:3] }}</th>
             {% endfor %}
-            <th class="text-end" style="white-space:nowrap">Total Setahun</th>
-            <th class="text-end" style="white-space:nowrap">Bln Aktif</th>
-            <th class="text-end pe-3" style="white-space:nowrap">Rata2/Bln</th>
+            {{ th_sort('Total Setahun', 'total', 'total_asc', 'text-end') }}
+            {{ th_sort('Bln Aktif', 'bulan_aktif', 'bulan_aktif', 'text-end') }}
+            {{ th_sort('Rata2/Bln', 'rata2', 'rata2', 'text-end') }}
           </tr>
         </thead>
         <tbody>
           {% for e in tabel %}
-          <tr class="{% if not e.aktif %}table-secondary text-muted{% endif %}">
-            <td class="ps-3 report-item" style="white-space:nowrap">{{ e.nama }}</td>
-            <td class="small text-muted" style="white-space:nowrap">{{ e.sumber_infaq.replace('_',' ')|title }}</td>
+          <tr {% if not e.aktif %}class="baris-nonaktif"{% endif %}>
+            <td class="report-item fw-semibold" style="white-space:nowrap">{{ e.nama }}</td>
+            <td class="report-item text-muted" style="white-space:nowrap">
+              {{ (e.sumber_infaq or '').replace('_',' ')|title or '—' }}
+            </td>
             {% for i in range(1, 13) %}
             {% set bm = '%02d'|format(i) %}
-            <td class="text-end report-amount">
-              {% if e.per_bulan.get(bm) %}{{ e.per_bulan[bm]|rupiah }}{% else %}<span class="text-muted">—</span>{% endif %}
+            <td class="report-amount {{ 'nol' if not e.per_bulan.get(bm) }}">
+              {% if e.per_bulan.get(bm) %}{{ e.per_bulan[bm]|rupiah }}{% else %}&mdash;{% endif %}
             </td>
             {% endfor %}
-            <td class="text-end fw-semibold report-amount">{{ e.total|rupiah }}</td>
-            <td class="text-end report-amount">{{ e.bulan_aktif }}/12</td>
-            <td class="text-end pe-3 report-amount">{{ e.rata2|round|int|rupiah }}</td>
+            <td class="report-amount fw-semibold">{{ e.total|rupiah }}</td>
+            <td class="report-amount">{{ e.bulan_aktif }}/12</td>
+            <td class="report-amount">{{ e.rata2|round|int|rupiah }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="17" class="text-center text-muted py-4 fst-italic">
-            Belum ada donasi tercatat utk tahun {{ tahun }}
+          <tr><td colspan="17" class="report-empty">
+            {% if q %}
+            <i class="bi bi-search"></i>
+            Tidak ada donatur bernama &ldquo;{{ q }}&rdquo; yang berdonasi pada tahun {{ tahun }}
+            <div class="hint">
+              <a href="?tahun={{ tahun }}">Tampilkan semua donatur {{ tahun }} &rarr;</a>
+            </div>
+            {% else %}
+            <i class="bi bi-inbox"></i>
+            Belum ada donasi tercatat untuk tahun {{ tahun }}
+            {% endif %}
           </td></tr>
           {% endfor %}
         </tbody>
         {% if tabel %}
         <tfoot>
           <tr class="report-total">
-            <td class="ps-3" colspan="2" style="white-space:nowrap">TOTAL {{ tahun }}</td>
+            <td colspan="2">Total {{ tahun }}</td>
             {% for i in range(1, 13) %}
             {% set bm = '%02d'|format(i) %}
-            <td class="text-end">{{ total_per_bulan.get(bm, 0)|rupiah }}</td>
+            <td class="report-amount">{{ total_per_bulan.get(bm, 0)|rupiah }}</td>
             {% endfor %}
-            <td class="text-end">{{ grand_total|rupiah }}</td>
+            <td class="report-amount">{{ grand_total|rupiah }}</td>
             <td colspan="2"></td>
           </tr>
         </tfoot>
@@ -104,6 +166,8 @@
       </table>
     </div>
   </div>
+
+  {% include 'admin/_report_sign.html' %}
 </div>
 
 {% include 'admin/_report_style.html' %}
