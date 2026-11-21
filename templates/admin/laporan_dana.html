@@ -69,9 +69,7 @@
     <div class="report-panel-head">
       <span class="report-panel-title">Dana {{ LABEL_DANA.get(dana, dana) }}</span>
       <span class="report-panel-meta">
-        Saldo Awal <strong>{{ d.saldo_awal|rupiah }}</strong>
-        &nbsp;&rarr;&nbsp;
-        Saldo Akhir <strong>{{ d.saldo_akhir|rupiah }}</strong>
+        {{ d.total_donatur }} donatur &middot; {{ d.total_mustahik }} penerima manfaat
       </span>
     </div>
 
@@ -89,14 +87,22 @@
           {% for r in d.masuk %}
           <tr>
             <td class="report-kode">{{ r.kode }}</td>
-            <td class="report-item">{{ r.nama }}</td>
+            <td class="report-item">
+              {{ r.nama }}
+              {% if r.n_donatur %}
+              <div class="report-count"><i class="bi bi-people"></i> {{ r.n_donatur }} donatur</div>
+              {% endif %}
+            </td>
             <td class="report-amount masuk">{{ r.total|rupiah }}</td>
           </tr>
           {% else %}
           <tr><td colspan="3" class="text-muted small fst-italic">Tidak ada penerimaan pada periode ini</td></tr>
           {% endfor %}
           <tr class="report-subtotal">
-            <td colspan="2">Jumlah Penerimaan</td>
+            <td colspan="2">
+              Jumlah Penerimaan
+              <span class="report-count">({{ d.total_donatur }} donatur)</span>
+            </td>
             <td class="report-amount masuk">{{ d.total_masuk|rupiah }}</td>
           </tr>
 
@@ -104,14 +110,22 @@
           {% for r in d.keluar %}
           <tr>
             <td class="report-kode">{{ r.kode }}</td>
-            <td class="report-item">{{ r.nama }}</td>
+            <td class="report-item">
+              {{ r.nama }}
+              {% if r.n_mustahik %}
+              <div class="report-count"><i class="bi bi-people"></i> {{ r.n_mustahik }} penerima manfaat</div>
+              {% endif %}
+            </td>
             <td class="report-amount keluar">{{ r.total|rupiah }}</td>
           </tr>
           {% else %}
           <tr><td colspan="3" class="text-muted small fst-italic">Tidak ada penyaluran pada periode ini</td></tr>
           {% endfor %}
           <tr class="report-subtotal">
-            <td colspan="2">Jumlah Penyaluran</td>
+            <td colspan="2">
+              Jumlah Penyaluran
+              <span class="report-count">({{ d.total_mustahik }} penerima manfaat)</span>
+            </td>
             <td class="report-amount keluar">{{ d.total_keluar|rupiah }}</td>
           </tr>
         </tbody>
@@ -124,11 +138,25 @@
       </table>
     </div>
 
-    <div class="report-panel-foot">
-      <span class="text-muted">Saldo Awal <strong class="val">{{ d.saldo_awal|rupiah }}</strong></span>
-      <span class="text-muted">+ Penerimaan <strong class="val" style="color:var(--rp-masuk)">{{ d.total_masuk|rupiah }}</strong></span>
-      <span class="text-muted">&minus; Penyaluran <strong class="val" style="color:var(--rp-keluar)">{{ d.total_keluar|rupiah }}</strong></span>
-      <span class="final">= {{ d.saldo_akhir|rupiah }}</span>
+    {# Kaki panel 4 sel — dari origin/master, menggantikan baris teks rata kanan #}
+    <div class="report-panel-stats">
+      <div class="stat-cell">
+        <div class="stat-label">Saldo Awal</div>
+        <div class="stat-value">{{ d.saldo_awal|rupiah }}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">+ Penerimaan</div>
+        <div class="stat-value masuk">{{ d.total_masuk|rupiah }}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">&minus; Penyaluran</div>
+        <div class="stat-value keluar">{{ d.total_keluar|rupiah }}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">= Saldo Akhir</div>
+        <div class="stat-value {{ 'keluar' if d.saldo_akhir < 0 }}">{{ d.saldo_akhir|rupiah }}</div>
+      </div>
+    </div>
     </div>
   </section>
 

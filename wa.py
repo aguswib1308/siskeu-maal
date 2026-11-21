@@ -33,13 +33,15 @@ def kirim_wa(no_hp, message):
 
 
 def render_pesan(template, **kwargs):
-    """Ganti placeholder {nama}/{bulan}/{nominal}/{token} di template pesan.
-    Placeholder yang tidak dikirim di kwargs dibiarkan apa adanya (bukan
-    error) — supaya template hasil edit admin tidak pernah bikin pengiriman
-    gagal total gara-gara typo placeholder."""
+    """Ganti placeholder {nama}/{bulan}/{nominal}/{token} ATAU (nama)/(bulan)/dst
+    (kurung biasa -- gaya yg dipakai template WA lama admin, di-copy-paste apa
+    adanya) di template pesan. Placeholder yang tidak dikirim di kwargs dibiarkan
+    apa adanya (bukan error) — supaya template hasil edit admin tidak pernah bikin
+    pengiriman gagal total gara-gara typo placeholder."""
     hasil = template or ''
     for key, val in kwargs.items():
         hasil = hasil.replace('{' + key + '}', str(val))
+        hasil = hasil.replace('(' + key + ')', str(val))
     return hasil
 
 
@@ -64,6 +66,7 @@ if __name__ == '__main__':
     assert ok is False and err == 'WA_GATEWAY_URL belum diset'
 
     assert render_pesan('Halo {nama}', nama='Budi') == 'Halo Budi'
+    assert render_pesan('Halo (nama)', nama='Budi') == 'Halo Budi'
     assert render_pesan('Halo {nama}, {tidak_ada}', nama='Budi') == 'Halo Budi, {tidak_ada}'
     assert render_pesan(None) == ''
 

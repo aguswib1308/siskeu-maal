@@ -62,6 +62,50 @@ def _match_prefix(kode, prefix):
     return kode == prefix or kode.startswith(prefix + '.')
 
 
+def hibah_leg_ids(conn):
+    """Id transaksi yg merupakan LEG dari transfer ANTAR-DANA (hibah ke dana lain,
+    akun 5.2.8). Leg 'masuk'-nya BUKAN donasi/penghimpunan, leg 'keluar'-nya BUKAN
+    pentasyarufan program -- hanya pemindahan dana internal. Dikeluarkan dari
+    laporan supaya angka riil (laporan Agustus 2026 sempat menggelembung
+    Rp 8,1 jt krn leg ini dihitung sbg penghimpunan).
+
+    Ini IMPLEMENTASI KANONIK (dipakai juga oleh app.py). Tiga pola data (per 2026-09):
+      1. Leg jurnal yg mengkredit 5.2.8.
+      2. Baris langsung ber-akun 5.2.8 (impor koreksi audit, tanpa jurnal_id).
+      3. Pasangan 'masuk' historis: tanggal & jumlah sama dgn baris 'keluar' 5.2.8
+         non-jurnal, hanya bila kandidatnya UNIK (tak ambigu).
+    """
+    ids = set()
+    for r in conn.execute("""
+        SELECT t.id FROM transaksi t JOIN jurnal j ON j.id=t.jurnal_id
+        JOIN chart_of_accounts kc ON kc.id=j.kredit_coa_id
+        WHERE kc.kode LIKE '5.2.8%'"""):
+        ids.add(r['id'])
+    for r in conn.execute("""
+        SELECT t.id FROM transaksi t JOIN chart_of_accounts c ON c.id=t.coa_id
+        WHERE c.kode LIKE '5.2.8%'"""):
+        ids.add(r['id'])
+    for r in conn.execute("""
+        SELECT t.tanggal, t.jumlah FROM transaksi t
+        JOIN chart_of_accounts c ON c.id=t.coa_id
+        WHERE c.kode LIKE '5.2.8%' AND t.jurnal_id IS NULL"""):
+        m = conn.execute("""SELECT id FROM transaksi
+            WHERE tanggal=? AND jumlah=? AND jenis='masuk'""",
+            (r['tanggal'], r['jumlah'])).fetchall()
+        if len(m) == 1:
+            ids.add(m[0]['id'])
+    return ids
+
+
+def sql_tanpa_hibah(conn, alias='t'):
+    """Klausa 'AND <alias>.id NOT IN (...)' utk membuang leg hibah antar-dana.
+    Return '' bila tak ada leg -> aman disisipkan ke WHERE mana pun."""
+    ids = hibah_leg_ids(conn)
+    if not ids:
+        return ''
+    return " AND %s.id NOT IN (%s)" % (alias, ",".join(str(i) for i in sorted(ids)))
+
+
 def bidang_dari_kode(kode):
     if not kode or kode in EXCLUDE_DARI_BIDANG:
         return None
@@ -89,7 +133,7 @@ def data_penghimpunan(conn, tahun):
     rows = conn.execute("""
         SELECT t.tanggal, t.jumlah, c.kode, c.jenis_dana
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id = c.id
-        WHERE t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        WHERE t.jenis='masuk' AND strftime('%Y', t.tanggal)=?""" + sql_tanpa_hibah(conn) + """
     """, (str(tahun),)).fetchall()
     for r in rows:
         bucket = _bucket_penghimpunan(r['kode'], r['jenis_dana'])
@@ -124,7 +168,7 @@ def jumlah_donatur(conn, tahun):
     rows = conn.execute("""
         SELECT t.tanggal, c.kode, c.jenis_dana
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id = c.id
-        WHERE t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        WHERE t.jenis='masuk' AND strftime('%Y', t.tanggal)=?""" + sql_tanpa_hibah(conn) + """
     """, (str(tahun),)).fetchall()
     for r in rows:
         bucket = _bucket_penghimpunan(r['kode'], r['jenis_dana'])
@@ -143,7 +187,7 @@ def pentasyarufan(conn, tahun):
     rows = conn.execute("""
         SELECT t.tanggal, t.jumlah, t.keterangan, c.kode, c.jenis_dana
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id = c.id
-        WHERE t.jenis='keluar' AND strftime('%Y', t.tanggal)=?
+        WHERE t.jenis='keluar' AND strftime('%Y', t.tanggal)=?""" + sql_tanpa_hibah(conn) + """
     """, (str(tahun),)).fetchall()
 
     for r in rows:
@@ -168,6 +212,9 @@ def pentasyarufan(conn, tahun):
         if kode == '5.5.7.01':  # Tebar Qurban [TQUR]
             qurban[b]['dana'] += jumlah
 
+    # SENGAJA TANPA filter hibah: baris leg 'masuk' dana amil memang justru
+    # SUBSTANSI kolom G "Penyaluran Infaq untuk Amil" (infaq yg dipakai utk amil),
+    # bukan penghimpunan. Kalau difilter, kolom G jadi 0 & laporan salah.
     amil_masuk = conn.execute("""
         SELECT strftime('%m', tanggal) bln, SUM(jumlah) total
         FROM transaksi WHERE jenis='masuk' AND jenis_dana='amil' AND strftime('%Y', tanggal)=?

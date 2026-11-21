@@ -273,7 +273,41 @@
 .report-panel-foot .val { font-variant-numeric: tabular-nums; }
 .report-panel-foot .final { font-size: .9rem; font-weight: 700; }
 
-/* Pemisah vertikal untuk tabel 2 sisi (penerimaan | penyaluran) */
+/* Angka pendamping di bawah nominal (mis. "12 donatur") — ditambahkan di
+   origin/master utk kolom Jumlah Orang pada Saldo per Program & Buku Besar. */
+.report-count {
+  font-size: .68rem; color: var(--text-muted); font-weight: 400; margin-top: 1px;
+  white-space: nowrap; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.report-count i { font-size: .66rem; }
+
+/* Baris statistik 4 sel di kaki panel (LSPD) — dari origin/master, lebih terbaca
+   daripada baris teks rata kanan. Menggantikan .report-panel-foot di laporan dana. */
+.report-panel-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--bg); border-top: 1px solid var(--border);
+}
+.report-panel-stats .stat-cell {
+  padding: .55rem .5rem; text-align: center; border-left: 1px solid var(--border);
+}
+.report-panel-stats .stat-cell:first-child { border-left: none; }
+.report-panel-stats .stat-label {
+  font-size: .66rem; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .06em; font-weight: 600;
+}
+.report-panel-stats .stat-value {
+  font-weight: 700; font-size: .86rem; margin-top: 2px;
+  font-variant-numeric: tabular-nums; color: var(--text-main);
+}
+.report-panel-stats .stat-value.masuk  { color: var(--rp-masuk); }
+.report-panel-stats .stat-value.keluar { color: var(--rp-keluar); }
+@media (max-width: 575.98px) {
+  .report-panel-stats { grid-template-columns: repeat(2, 1fr); }
+  .report-panel-stats .stat-cell:nth-child(3) { border-left: none; }
+  .report-panel-stats .stat-cell:nth-child(n+3) { border-top: 1px solid var(--border); }
+}
+
+/* ── Pemisah vertikal untuk tabel 2 sisi ────────────────────────────────── */
 .report-table .split { border-left: 1px solid var(--border) !important; }
 
 /* ── Bar/meter (statistik donatur, renstra) ─────────────────────────────── */
@@ -370,7 +404,9 @@
   .report-amount.keluar { color: #7f1d1d !important; }
   .report-summary { background: #f8f8f8 !important; border-color: #ccc !important; padding: .6rem 0 !important; }
   .report-panel { border-color: #ccc !important; break-inside: avoid; }
-  .report-panel-head, .report-panel-foot { background: #f6f6f6 !important; }
+  .report-panel-head, .report-panel-foot, .report-panel-stats { background: #f6f6f6 !important; }
+  .report-panel-stats .stat-cell { border-color: #ddd !important; }
+  .report-count { color: #666 !important; }
   .report-panel-head { border-bottom-color: #999 !important; }
   .report-panel-title { color: #111 !important; }
   .report-meter { background: #e2e2e2 !important; }

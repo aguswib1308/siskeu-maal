@@ -81,7 +81,12 @@
                   {% endif %}
                   <tr>
                     <td class="report-kode">{{ r.kode }}</td>
-                    <td class="report-item">{{ r.nama }}</td>
+                    <td class="report-item">
+                      {{ r.nama }}
+                      {% if r.n_donatur %}
+                      <div class="report-count"><i class="bi bi-people"></i> {{ r.n_donatur }} donatur</div>
+                      {% endif %}
+                    </td>
                     <td class="report-amount masuk">{{ r.total|rupiah }}</td>
                   </tr>
                 {% else %}
@@ -127,7 +132,12 @@
                   {% endif %}
                   <tr>
                     <td class="report-kode">{{ r.kode }}</td>
-                    <td class="report-item">{{ r.nama }}</td>
+                    <td class="report-item">
+                      {{ r.nama }}
+                      {% if r.n_mustahik %}
+                      <div class="report-count"><i class="bi bi-people"></i> {{ r.n_mustahik }} penerima manfaat</div>
+                      {% endif %}
+                    </td>
                     <td class="report-amount keluar">{{ r.total|rupiah }}</td>
                   </tr>
                 {% else %}

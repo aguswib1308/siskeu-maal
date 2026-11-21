@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
-import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time
+import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time, threading
 import uuid as uuid_mod
 from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
@@ -33,12 +33,22 @@ def parse_jumlah(raw):
         return None
     return val if val > 0 else None
 
+def _default_akun_kas_id(conn):
+    """Fallback Akun Kas/Bank (Kas Tunai) dipakai kalau jalur input blm py selektor
+    akun kas sendiri -- spy transaksi baru gak pernah NULL diam2 spt sblm fitur ini
+    ada. Lihat init_db.py utk seed & rasional dimensi ini."""
+    row = conn.execute("SELECT id FROM akun_kas WHERE nama='Kas Tunai'").fetchone()
+    return row['id'] if row else None
+
+
 def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
                      jumlah, keterangan, user_id, client_uuid=None,
-                     nama_kegiatan=None, lokasi=None, jumlah_mustahik=None):
+                     nama_kegiatan=None, lokasi=None, jumlah_mustahik=None, akun_kas_id=None):
     """Insert transaksi dengan guard idempotensi client_uuid (anti double-submit).
     nama_kegiatan/lokasi/jumlah_mustahik opsional, dipakai utk penyaluran (keluar)
-    spy bisa direkap di Laporan Kegiatan Penyaluran. Return (trx_id, duplikat)."""
+    spy bisa direkap di Laporan Kegiatan Penyaluran. akun_kas_id = di akun fisik mana
+    uangnya (Kas Tunai/Simpanan BMT/Bank/E-Wallet) -- default Kas Tunai kalau caller
+    blm kirim. Return (trx_id, duplikat)."""
     if client_uuid:
         existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
                                 (client_uuid,)).fetchone()
@@ -48,14 +58,16 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
     if coa_id:
         row = conn.execute("SELECT jenis_dana FROM chart_of_accounts WHERE id=?", (coa_id,)).fetchone()
         if row: jenis_dana = row['jenis_dana']
+    if not akun_kas_id:
+        akun_kas_id = _default_akun_kas_id(conn)
     try:
         cur = conn.execute('''INSERT INTO transaksi
             (tanggal,jenis,jenis_dana,coa_id,donatur_id,penerima_id,jumlah,keterangan,user_id,client_uuid,
-             nama_kegiatan,lokasi,jumlah_mustahik)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+             nama_kegiatan,lokasi,jumlah_mustahik,akun_kas_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (tanggal, jenis, jenis_dana, coa_id, donatur_id or None, penerima_id or None,
              jumlah, keterangan, user_id, client_uuid or None,
-             nama_kegiatan or None, lokasi or None, jumlah_mustahik or None))
+             nama_kegiatan or None, lokasi or None, jumlah_mustahik or None, akun_kas_id))
     except sqlite3.IntegrityError:
         if client_uuid:
             existing = conn.execute("SELECT id FROM transaksi WHERE client_uuid=?",
@@ -63,7 +75,113 @@ def insert_transaksi(conn, tanggal, jenis, coa_id, donatur_id, penerima_id,
             if existing:
                 return existing['id'], True
         raise
-    return cur.lastrowid, False
+    trx_id = cur.lastrowid
+    if jenis == 'masuk':
+        kirim_notifikasi_donasi(conn, trx_id)
+        # Tandai jadwal koleksi bulan itu sebagai TERKUMPUL supaya menu Fundraising
+        # bulan ini, riwayat, dan peta ikut ter-update. Kegagalan sync tidak boleh
+        # membatalkan pencatatan transaksi.
+        try:
+            sync_koleksi_dari_transaksi(conn, donatur_id, tanggal, trx_id)
+        except Exception as e:
+            try:
+                app.logger.warning('sync koleksi gagal (donatur %s, tgl %s): %s',
+                                   donatur_id, tanggal, e)
+            except Exception:
+                pass
+    return trx_id, False
+
+
+def sync_koleksi_dari_transaksi(conn, donatur_id, tanggal, trx_id=None):
+    """Tandai jadwal koleksi bulan `tanggal` sebagai 'terkumpul' berdasarkan SEMUA
+    transaksi masuk donatur itu pada bulan tersebut.
+
+    Idempoten: `jumlah` selalu dihitung ulang dengan SUM dari tabel transaksi,
+    jadi transaksi yang sama tidak terhitung dobel walau fungsi dipanggil
+    berkali-kali (mis. transaksi diedit / disimpan ulang). Baris koleksi dibuat
+    kalau donatur belum punya jadwal di bulan itu.
+
+    Return True kalau ada baris koleksi yang dibuat/diperbarui.
+    """
+    if not donatur_id or not tanggal:
+        return False
+    bulan = str(tanggal)[:7]
+    agg = conn.execute("""
+        SELECT COUNT(*) AS n, COALESCE(SUM(jumlah), 0) AS total, MAX(tanggal) AS tgl_akhir
+        FROM transaksi
+        WHERE jenis='masuk' AND donatur_id=? AND substr(tanggal,1,7)=?
+    """, (donatur_id, bulan)).fetchone()
+    if not agg or not agg['n']:
+        return False
+    akhir = conn.execute("""
+        SELECT id, user_id FROM transaksi
+        WHERE jenis='masuk' AND donatur_id=? AND substr(tanggal,1,7)=?
+        ORDER BY tanggal DESC, id DESC LIMIT 1
+    """, (donatur_id, bulan)).fetchone()
+    tgl_akhir = agg['tgl_akhir'] or str(tanggal)
+    id_akhir = akhir['id'] if akhir else trx_id
+    user_akhir = akhir['user_id'] if akhir else None
+
+    baris = conn.execute(
+        "SELECT id FROM koleksi_bulanan WHERE donatur_id=? AND bulan=?",
+        (donatur_id, bulan)).fetchone()
+    if baris:
+        conn.execute("""
+            UPDATE koleksi_bulanan
+               SET status='terkumpul', jumlah=?, tanggal_koleksi=?, transaksi_id=?,
+                   marketing_id=COALESCE(marketing_id, ?)
+             WHERE id=?
+        """, (agg['total'], tgl_akhir, id_akhir, user_akhir, baris['id']))
+    else:
+        conn.execute("""
+            INSERT INTO koleksi_bulanan
+                (donatur_id, bulan, status, marketing_id, tanggal_koleksi, jumlah,
+                 transaksi_id, keterangan)
+            VALUES (?, ?, 'terkumpul', ?, ?, ?, ?, 'otomatis dari transaksi')
+        """, (donatur_id, bulan, user_akhir, tgl_akhir, agg['total'], id_akhir))
+    return True
+
+DEFAULT_TEMPLATE_DONASI = (
+    "Assalamu'alaikum {nama}, jazakumullahu khairan atas donasi Anda sebesar "
+    "{nominal} untuk {program} pada {tanggal}. Semoga menjadi amal jariyah yang "
+    "berkah.\n- Baitul Maal BMT Amal Muslim\n{alamat}"
+)
+
+def kirim_notifikasi_donasi(conn, trx_id):
+    """Kirim WA ucapan terima kasih ke donatur stlh transaksi 'masuk' tersimpan
+    (dipanggil dr insert_transaksi(), jg dr auto_transaksi_koleksi()). Tidak commit
+    -- caller yg commit. Diamkan (tanpa jejak status) kalau fitur blm diaktifkan atau
+    transaksi ini memang bkn donasi ber-donatur (mis. setoran kotak/kencleng anonim)
+    -- itu bkn kegagalan, cuma tak relevan. Tapi kalau donatur-nya ADA tapi no_hp
+    kosong, tetap dicatat wa_status='gagal' spy admin py jejak audit (sama spt
+    kirim_notifikasi_penyaluran())."""
+    inst = get_instansi(conn)
+    if not inst.get('notif_donasi_aktif'):
+        return
+    row = conn.execute("""
+        SELECT t.jenis, t.jumlah, t.tanggal, t.donatur_id, d.nama AS donatur_nama, d.no_hp, c.nama AS coa_nama
+        FROM transaksi t
+        LEFT JOIN donatur d ON t.donatur_id = d.id
+        LEFT JOIN chart_of_accounts c ON t.coa_id = c.id
+        WHERE t.id=?
+    """, (trx_id,)).fetchone()
+    if not row or row['jenis'] != 'masuk' or not row['donatur_id']:
+        return
+    if not row['no_hp']:
+        conn.execute("UPDATE transaksi SET wa_status='gagal', wa_error=? WHERE id=?",
+                     ('Nomor HP donatur kosong', trx_id))
+        return
+    template = inst.get('template_pesan_donasi') or DEFAULT_TEMPLATE_DONASI
+    pesan = render_pesan(template, nama=row['donatur_nama'] or 'Bapak/Ibu',
+                          nominal=format_rupiah(row['jumlah']), program=row['coa_nama'] or '-',
+                          tanggal=row['tanggal'], alamat=inst.get('alamat') or '')
+    ok, error = kirim_wa(row['no_hp'], pesan)
+    if ok:
+        conn.execute("""UPDATE transaksi
+            SET wa_status='terkirim', wa_error=NULL, wa_sent_at=datetime('now','localtime') WHERE id=?""",
+            (trx_id,))
+    else:
+        conn.execute("UPDATE transaksi SET wa_status='gagal', wa_error=? WHERE id=?", (error, trx_id))
 
 app.jinja_env.globals['new_form_uuid'] = lambda: uuid_mod.uuid4().hex
 
@@ -173,6 +291,17 @@ LABEL_SUMBER = {'tunai':'Tunai','kencleng':'Kencleng','kotak_infaq':'Kotak Infaq
 BULAN_IND   = {1:'Januari',2:'Februari',3:'Maret',4:'April',5:'Mei',6:'Juni',
                7:'Juli',8:'Agustus',9:'September',10:'Oktober',11:'November',12:'Desember'}
 
+# 6 bidang laporan penyaluran ke LAZ MKU Pusat -- pengelompokan KHUSUS laporan ini
+# (beda dr bidang_dari_kode() di laz_pusat_report.py yg ngisi cell Excel resmi),
+# diatur manual per program lewat tabel program_bidang_laz & halaman Atur Kelompok
+# Program. Kode akun zakat-asnaf, beban Hak Amil, wakaf, & hibah antar-dana sengaja
+# di luar cakupan (bkn "program penyaluran" dlm arti ini).
+LAZ_BIDANG_LIST = ['pendidikan', 'kesehatan', 'sosial', 'ekonomi', 'dakwah', 'qurban']
+LAZ_BIDANG_LABEL = {'pendidikan': 'Pendidikan', 'kesehatan': 'Kesehatan',
+                     'sosial': 'Sosial/Kemanusiaan', 'ekonomi': 'Ekonomi',
+                     'dakwah': 'Dakwah/Advokasi', 'qurban': 'Qurban'}
+LAZ_KODE_DIKECUALIKAN_PREFIX = ('5.1.', '5.3.', '5.4.', '5.2.8')  # asnaf zakat, beban amil, wakaf, hibah antar-dana
+
 def format_bulan(b):
     try:
         y, m = b.split('-')
@@ -187,16 +316,46 @@ app.jinja_env.globals.update(LABEL_DANA=LABEL_DANA, LABEL_ASNAF=LABEL_ASNAF,
                               BULAN_IND=BULAN_IND)
 
 def parse_gmaps_url(url):
-    """Ekstrak (lat, lng) dari berbagai format URL Google Maps."""
+    """Ekstrak (lat, lng) dari URL/teks Google Maps.
+
+    Mendukung: link panjang (@lat,lng atau ?q=/ll=/center=/destination=),
+    format place (!3d..!4d..), teks biasa "lat, lng", dan link pendek
+    (goo.gl/maps, maps.app.goo.gl, g.co/kgs) yang diikuti redirect-nya.
+    Return (None, None) kalau tidak ada koordinat yang bisa diambil.
+    """
+    if not url:
+        return None, None
+    s = str(url).strip()
     patterns = [
+        r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)',
         r'@(-?\d+\.\d+),(-?\d+\.\d+)',
-        r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)',
-        r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)',
+        r'[?&](?:q|ll|sll|center|destination|daddr|query)=(-?\d+\.\d+),\s*(-?\d+\.\d+)',
+        r'^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$',
     ]
-    for p in patterns:
-        m = re.search(p, url)
-        if m:
-            return float(m.group(1)), float(m.group(2))
+
+    def _cari(teks):
+        for p in patterns:
+            m = re.search(p, teks or '', re.I)
+            if m:
+                try:
+                    lat, lng = float(m.group(1)), float(m.group(2))
+                except (TypeError, ValueError):
+                    continue
+                if -90 <= lat <= 90 and -180 <= lng <= 180:
+                    return lat, lng
+        return None, None
+
+    lat, lng = _cari(s)
+    if lat is not None:
+        return lat, lng
+    # Link pendek dari aplikasi Google Maps di HP -> ikuti redirect lalu baca URL akhir.
+    if re.search(r'(goo\.gl/maps|maps\.app\.goo\.gl|g\.co/kgs)', s, re.I):
+        try:
+            r = requests.get(s, timeout=6, allow_redirects=True,
+                             headers={'User-Agent': 'Mozilla/5.0 (Linux; Android 10)'})
+            return _cari(r.url or '')
+        except Exception:
+            return None, None
     return None, None
 
 def buka_periode(bulan, user_id):
@@ -238,7 +397,7 @@ def get_instansi(conn=None):
         return dict(row)
     return {'nama': 'BAITUL MAAL BMT', 'nama_lembaga': '', 'alamat': '', 'telepon': '',
             'email': '', 'website': '', 'ketua': '', 'bendahara': '', 'sekretaris': '',
-            'no_izin': ''}
+            'no_izin': '', 'notif_donasi_aktif': 0, 'template_pesan_donasi': ''}
 
 def get_saldo_awal(conn):
     """Saldo awal manual per jenis dana (sebelum transaksi pertama tercatat di sistem)."""
@@ -246,16 +405,18 @@ def get_saldo_awal(conn):
     return {r['jenis_dana']: r['jumlah'] for r in rows}
 
 def auto_transaksi_koleksi(conn, koleksi_id, donatur_id, bulan, sumber, jumlah, tanggal, user_id):
-    """Buat transaksi otomatis saat koleksi terkumpul."""
+    """Buat transaksi otomatis saat koleksi terkumpul. Akun kas selalu Kas Tunai --
+    koleksi kencleng/kotak/tunai berarti dijemput fisik, tdk ada jalur lain."""
     coa = conn.execute("SELECT id, jenis_dana FROM chart_of_accounts WHERE kode='4.2.2'").fetchone()
     keterangan = f"Koleksi {LABEL_SUMBER.get(sumber, sumber)} – {bulan}"
     cur = conn.execute("""
-        INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,donatur_id,jumlah,keterangan,user_id)
-        VALUES (?,?,?,?,?,?,?,?)
+        INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,donatur_id,jumlah,keterangan,user_id,akun_kas_id)
+        VALUES (?,?,?,?,?,?,?,?,?)
     """, (tanggal, 'masuk', coa['jenis_dana'] if coa else None, coa['id'] if coa else None,
-          donatur_id, jumlah, keterangan, user_id))
+          donatur_id, jumlah, keterangan, user_id, _default_akun_kas_id(conn)))
     trx_id = cur.lastrowid
     conn.execute("UPDATE koleksi_bulanan SET transaksi_id=? WHERE id=?", (trx_id, koleksi_id))
+    kirim_notifikasi_donasi(conn, trx_id)
     return trx_id
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -293,8 +454,8 @@ def logout():
 def admin_dashboard():
     conn = get_db()
     bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
-    total_masuk  = conn.execute("SELECT COALESCE(SUM(jumlah),0) FROM transaksi WHERE jenis='masuk' AND strftime('%Y-%m',tanggal)=?", (bulan,)).fetchone()[0]
-    total_keluar = conn.execute("SELECT COALESCE(SUM(jumlah),0) FROM transaksi WHERE jenis='keluar' AND strftime('%Y-%m',tanggal)=?", (bulan,)).fetchone()[0]
+    total_masuk  = conn.execute("SELECT COALESCE(SUM(jumlah),0) FROM transaksi t WHERE jenis='masuk' AND strftime('%Y-%m',tanggal)=?" + _not_hibah_sql(conn), (bulan,)).fetchone()[0]
+    total_keluar = conn.execute("SELECT COALESCE(SUM(jumlah),0) FROM transaksi t WHERE jenis='keluar' AND strftime('%Y-%m',tanggal)=?" + _not_hibah_sql(conn), (bulan,)).fetchone()[0]
     saldo = conn.execute("SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) FROM transaksi").fetchone()[0]
     transaksi_terakhir = conn.execute('''
         SELECT t.*, c.nama as coa_nama, c.jenis_dana, d.nama as donatur_nama, u.nama as petugas
@@ -329,12 +490,14 @@ def admin_transaksi():
     perlu_kegiatan = request.args.get('perlu_kegiatan', '')
     query = '''
         SELECT t.*, c.nama as coa_nama, c.kode as coa_kode, c.jenis_dana,
-               d.nama as donatur_nama, p.nama as penerima_nama, u.nama as petugas
+               d.nama as donatur_nama, p.nama as penerima_nama, u.nama as petugas,
+               ak.nama as akun_kas_nama
         FROM transaksi t
         LEFT JOIN chart_of_accounts c ON t.coa_id=c.id
         LEFT JOIN donatur d ON t.donatur_id=d.id
         LEFT JOIN penerima_manfaat p ON t.penerima_id=p.id
         LEFT JOIN users u ON t.user_id=u.id
+        LEFT JOIN akun_kas ak ON t.akun_kas_id=ak.id
         WHERE strftime('%Y-%m',t.tanggal)=?'''
     params = [bulan]
     if jenis in ('masuk','keluar'):
@@ -361,8 +524,10 @@ def admin_transaksi():
     ).fetchall()
     donatur_list= conn.execute("SELECT * FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list=conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
+    akun_kas_list = conn.execute("SELECT * FROM akun_kas WHERE aktif=1 ORDER BY urutan, nama").fetchall()
     conn.close()
     return render_template('admin/transaksi.html', transaksi=transaksi, coa_list=coa_list,
+        akun_kas_list=akun_kas_list,
         coa_parents=coa_parents, donatur_list=donatur_list, penerima_list=penerima_list,
         bulan=bulan, jenis=jenis, jenis_dana=jenis_dana, perlu_lengkap=perlu_lengkap,
         perlu_kegiatan=perlu_kegiatan, tebakan_mustahik=tebakan_mustahik)
@@ -418,6 +583,31 @@ def set_info_kegiatan(id):
     flash('Info kegiatan penyaluran disimpan.', 'success')
     return redirect(kembali)
 
+@app.route('/admin/transaksi/<int:id>/akun-kas', methods=['POST'])
+@admin_required
+def set_akun_kas(id):
+    """Perbaiki Akun Kas/Bank pada transaksi yg sudah ada -- dipakai koreksi manual
+    transaksi lama yg dibackfill Kas Tunai tp ternyata lewat bank/e-wallet, atau
+    salah pilih saat input. Sengaja dibatasi hanya kolom ini (bukan edit transaksi
+    umum), sama spt set_info_kegiatan()."""
+    conn = get_db()
+    row = conn.execute("SELECT id FROM transaksi WHERE id=?", (id,)).fetchone()
+    if not row:
+        conn.close()
+        flash('Transaksi tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_transaksi'))
+    akun_kas_id = request.form.get('akun_kas_id') or None
+    if akun_kas_id:
+        valid = conn.execute("SELECT id FROM akun_kas WHERE id=?", (akun_kas_id,)).fetchone()
+        if not valid:
+            conn.close()
+            flash('Akun Kas/Bank tidak valid.', 'danger')
+            return redirect(request.referrer or url_for('admin_transaksi'))
+    conn.execute("UPDATE transaksi SET akun_kas_id=? WHERE id=?", (akun_kas_id, id))
+    conn.commit(); conn.close()
+    flash('Akun Kas/Bank diperbarui.', 'success')
+    return redirect(request.referrer or url_for('admin_transaksi'))
+
 @app.route('/admin/transaksi/tambah', methods=['POST'])
 @admin_required
 def tambah_transaksi():
@@ -440,13 +630,40 @@ def tambah_transaksi():
         data.get('keterangan',''), session['user_id'], data.get('client_uuid'),
         nama_kegiatan=data.get('nama_kegiatan') or None,
         lokasi=data.get('lokasi') or None,
-        jumlah_mustahik=jumlah_mustahik)
+        jumlah_mustahik=jumlah_mustahik,
+        akun_kas_id=data.get('akun_kas_id') or None)
     conn.commit(); conn.close()
     if dup:
         flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
     else:
         flash('Transaksi berhasil dicatat.', 'success')
     return redirect(url_for('admin_transaksi'))
+
+@app.route('/admin/transaksi/<int:id>/kirim-notif', methods=['POST'])
+@admin_required
+def admin_transaksi_kirim_notif(id):
+    """Kirim ulang notifikasi WA utk 1 transaksi masuk -- dipakai tombol
+    'kirim ulang' di daftar Transaksi (mis. waktu gateway WA sempat mati)."""
+    conn = get_db()
+    trx = conn.execute("SELECT id, jenis, tanggal FROM transaksi WHERE id=?", (id,)).fetchone()
+    if trx is None:
+        conn.close()
+        flash('Transaksi tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_transaksi'))
+    bulan = (trx['tanggal'] or '')[:7]
+    if trx['jenis'] != 'masuk':
+        conn.close()
+        flash('Notifikasi WA hanya untuk transaksi masuk (donasi).', 'warning')
+        return redirect(url_for('admin_transaksi', bulan=bulan))
+    kirim_notifikasi_donasi(conn, id)
+    conn.commit()
+    row = conn.execute("SELECT wa_status, wa_error FROM transaksi WHERE id=?", (id,)).fetchone()
+    conn.close()
+    if row and row['wa_status'] == 'terkirim':
+        flash('Notifikasi WA terkirim.', 'success')
+    else:
+        flash('Notifikasi WA gagal: %s' % (((row['wa_error'] if row else None) or 'tidak diketahui')), 'danger')
+    return redirect(url_for('admin_transaksi', bulan=bulan))
 
 @app.route('/admin/transaksi/hapus/<int:id>', methods=['POST'])
 @admin_required
@@ -475,8 +692,35 @@ def _prev_last_day(bulan):
     else:      py, pm = y,   m-1
     return f"{py}-{pm:02d}-{cal_mod.monthrange(py, pm)[1]:02d}"
 
+def _hibah_leg_ids(conn):
+    """Id transaksi yg merupakan LEG dari transfer ANTAR-DANA (hibah ke dana lain).
+
+    Leg ini BUKAN donasi (leg 'masuk') dan BUKAN penyaluran program (leg
+    'keluar') -- hanya pemindahan dana internal antar jenis dana. Dikeluarkan
+    dari laporan penerimaan/penyaluran supaya angkanya riil (Agustus 2026 sempat
+    menggelembung Rp 8,1 jt krn leg ini ikut dihitung).
+    Implementasi kanonik ada di laz_pusat_report.hibah_leg_ids() -- dipakai
+    bersama agar laporan Excel LAZ Pusat & halaman web tidak beda angka.
+    """
+    return laz_pusat_report.hibah_leg_ids(conn)
+
+
+def _not_hibah_sql(conn, alias='t'):
+    """Klausa SQL 'AND <alias>.id NOT IN (...)' utk membuang leg hibah antar-dana.
+    Return '' bila tak ada leg, jadi aman disisipkan ke WHERE mana pun."""
+    ids = _hibah_leg_ids(conn)
+    if not ids:
+        return ''
+    return " AND %s.id NOT IN (%s)" % (alias, ",".join(str(i) for i in sorted(ids)))
+
+
 def _dana_summary(conn, bulan):
-    """Hitung saldo awal, penerimaan, penyaluran, saldo akhir per jenis dana."""
+    """Hitung saldo awal, penerimaan, penyaluran, saldo akhir per jenis dana.
+
+    Penerimaan/penyaluran yang DITAMPILKAN sudah bersih dari leg transfer
+    antar-dana (lihat _hibah_leg_ids); SALDO tetap memakai semua transaksi sebab
+    perpindahan dana itu nyata. Kolom 'transfer_net' menjembatani selisihnya.
+    """
     dana_types = DANA_TYPES
     saldo_manual = get_saldo_awal(conn)
 
@@ -490,31 +734,64 @@ def _dana_summary(conn, bulan):
     for dana in dana_types:
         saldo_awal.setdefault(dana, saldo_manual.get(dana, 0))
 
+    # Leg transfer antar-dana DIBUANG dari PENERIMAAN & PENYALURAN supaya riil
+    # (lihat _hibah_leg_ids). SALDO tetap memakai SEMUA transaksi, karena
+    # perpindahan dana itu nyata & harus tercermin di saldo tiap jenis dana;
+    # kolom 'transfer_net' menjembatani selisih supaya panel tetap rekonsiliasi:
+    #   saldo_awal + total_masuk − total_keluar + transfer_net = saldo_akhir
+    NOT_HIBAH = _not_hibah_sql(conn)
+
     masuk_rows = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total,
+               COUNT(*) as n_donatur
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
-        WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?
+        WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?""" + NOT_HIBAH + """
         GROUP BY c.id ORDER BY c.kode
     """, (bulan,)).fetchall()
 
     keluar_rows = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total,
+               COALESCE(SUM(t.jumlah_mustahik),0) as n_mustahik
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
-        WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?
+        WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?""" + NOT_HIBAH + """
         GROUP BY c.id ORDER BY c.kode
     """, (bulan,)).fetchall()
+
+    # Pergerakan SALDO per jenis dana -> SEMUA transaksi (termasuk leg hibah),
+    # sebab memindahkan dana antar program memang mengubah saldo masing-masing.
+    saldo_rows = conn.execute("""
+        SELECT c.jenis_dana,
+               COALESCE(SUM(CASE WHEN t.jenis='masuk'  THEN t.jumlah ELSE 0 END),0) as mi,
+               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END),0) as mo
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE strftime('%Y-%m',t.tanggal)=?
+        GROUP BY c.jenis_dana
+    """, (bulan,)).fetchall()
+    saldo_map = {r['jenis_dana']: r for r in saldo_rows}
 
     data = {}
     for dana in dana_types:
         masuk  = [r for r in masuk_rows  if r['jenis_dana'] == dana]
         keluar = [r for r in keluar_rows if r['jenis_dana'] == dana]
-        tm = sum(r['total'] for r in masuk)
-        tk = sum(r['total'] for r in keluar)
+        tm = sum(r['total'] for r in masuk)     # penerimaan RIIL (tanpa hibah)
+        tk = sum(r['total'] for r in keluar)    # penyaluran  RIIL (tanpa hibah)
+        sr = saldo_map.get(dana)
+        mi = sr['mi'] if sr else 0              # semua leg (termasuk hibah)
+        mo = sr['mo'] if sr else 0
         sa = saldo_awal.get(dana, 0)
         data[dana] = {
             'masuk': masuk, 'keluar': keluar,
+            # rincian = penerimaan/penyaluran riil (tanpa leg transfer antar-dana)
+            'total_masuk_rinci': tm,
+            'total_keluar_rinci': tk,
+            'n_donatur_rinci': sum(r['n_donatur'] for r in masuk),
+            # angka yg DITAMPILKAN sebagai Penerimaan / Penyaluran
             'total_masuk': tm, 'total_keluar': tk,
-            'saldo_awal': sa, 'saldo_akhir': sa + tm - tk,
+            # selisih krn transfer antar-dana -> penjembatan ke saldo akhir
+            'transfer_net': (mi - tm) - (mo - tk),
+            'total_donatur': sum(r['n_donatur'] for r in masuk),
+            'total_mustahik': sum(r['n_mustahik'] for r in keluar),
+            'saldo_awal': sa, 'saldo_akhir': sa + mi - mo,
         }
     return data
 
@@ -538,10 +815,34 @@ def laporan_neraca():
     dana_types = DANA_TYPES
     kas = {d: kas_trans.get(d, 0) + saldo_manual.get(d, 0) for d in dana_types}
     total_aset = sum(kas.get(d, 0) for d in dana_types)
+
+    # ── Saldo per Akun Kas/Bank — dimensi fisik (di mana uangnya), terpisah dr
+    # saldo per jenis dana di atas (punyanya siapa/utk apa). Lihat init_db.py &
+    # insert_transaksi() utk rasionalnya. Saldo awal manual (sblm akun_kas_id ada)
+    # ditaruh semua di Kas Tunai, konsisten dgn backfill data lama di migrate().
+    akun_kas_list = conn.execute("SELECT * FROM akun_kas WHERE aktif=1 ORDER BY urutan, nama").fetchall()
+    akun_kas_rows = conn.execute("""
+        SELECT akun_kas_id, COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0) as saldo
+        FROM transaksi WHERE tanggal <= ? AND akun_kas_id IS NOT NULL
+        GROUP BY akun_kas_id
+    """, (ld,)).fetchall()
+    akun_kas_saldo = {r['akun_kas_id']: r['saldo'] for r in akun_kas_rows}
+    total_saldo_manual = sum(saldo_manual.values())
+    akun_kas_data = []
+    for a in akun_kas_list:
+        s = akun_kas_saldo.get(a['id'], 0)
+        if a['jenis'] == 'tunai':
+            s += total_saldo_manual
+        akun_kas_data.append({'nama': a['nama'], 'jenis': a['jenis'], 'saldo': s})
+    total_akun_kas = sum(d['saldo'] for d in akun_kas_data)
+    belum_diklasifikasi = total_aset - total_akun_kas
+
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_neraca.html',
         kas=kas, dana_types=dana_types, total_aset=total_aset,
+        akun_kas_data=akun_kas_data, total_akun_kas=total_akun_kas,
+        belum_diklasifikasi=belum_diklasifikasi,
         bulan=bulan, last_day=ld, inst=inst)
 
 
@@ -588,7 +889,9 @@ def _hitung_saldo_program(conn, bulan):
     period_rows = conn.execute("""
         SELECT c.id as coa_id,
                COALESCE(SUM(CASE WHEN t.jenis='masuk' THEN t.jumlah ELSE 0 END),0) as masuk,
-               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END),0) as keluar
+               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah ELSE 0 END),0) as keluar,
+               COALESCE(SUM(CASE WHEN t.jenis='masuk' THEN 1 ELSE 0 END),0) as n_donatur,
+               COALESCE(SUM(CASE WHEN t.jenis='keluar' THEN t.jumlah_mustahik ELSE 0 END),0) as n_mustahik
         FROM chart_of_accounts c
         LEFT JOIN transaksi t ON t.coa_id=c.id AND t.tanggal BETWEEN ? AND ?
         WHERE c.jenis_transaksi IS NOT NULL AND c.aktif=1
@@ -605,13 +908,15 @@ def _hitung_saldo_program(conn, bulan):
         if key not in groups:
             label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
             groups[key] = {'label': label, 'code': code, 'jenis_dana': r['jenis_dana'],
-                            'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+                            'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'n_donatur': 0, 'n_mustahik': 0}
         g = groups[key]
         g['saldo_awal'] += r['saldo']
         p = period_map.get(r['coa_id'])
         if p:
             g['masuk']  += p['masuk']
             g['keluar'] += p['keluar']
+            g['n_donatur']  += p['n_donatur']
+            g['n_mustahik'] += p['n_mustahik']
         # program gabungan bisa punya jenis_dana beda di sisi penerimaan vs penyaluran
         # (mis. akun penyaluran lama masih tertandai tidak-terikat) -> pakai jenis_dana sisi penerimaan
         if r['kelompok'] == 'penerimaan':
@@ -648,12 +953,15 @@ def _hitung_saldo_program(conn, bulan):
     # di penerimaan; Kafalah Guru TPQ, Safari Masjid, Sembako Dhuafa, Hibah ke Dana
     # Lain, dll di penyaluran) — bukan program per-akun, jadi digabung jadi 1 baris.
     tidak_terikat = {'label': 'Infaq Tidak Terikat (gabungan)', 'code': None,
-                      'jenis_dana': 'infak_tidak_terikat', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+                      'jenis_dana': 'infak_tidak_terikat', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0,
+                      'n_donatur': 0, 'n_mustahik': 0}
     for g in groups.values():
         if g['jenis_dana'] == 'infak_tidak_terikat':
             tidak_terikat['saldo_awal'] += g['saldo_awal']
             tidak_terikat['masuk']      += g['masuk']
             tidak_terikat['keluar']     += g['keluar']
+            tidak_terikat['n_donatur']  += g['n_donatur']
+            tidak_terikat['n_mustahik'] += g['n_mustahik']
     tidak_terikat['saldo_akhir'] = tidak_terikat['saldo_awal'] + tidak_terikat['masuk'] - tidak_terikat['keluar']
 
     return groups, tidak_terikat, coa_key
@@ -667,7 +975,8 @@ def _saldo_program_list(groups, tidak_terikat):
     Urut per jenis dana lalu saldo akhir terbesar."""
     data = []
     amil = {'label': 'Dana Amil (gabungan)', 'code': None,
-            'jenis_dana': 'amil', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0}
+            'jenis_dana': 'amil', 'saldo_awal': 0, 'masuk': 0, 'keluar': 0,
+            'n_donatur': 0, 'n_mustahik': 0}
     for g in groups.values():
         if g['jenis_dana'] == 'infak_tidak_terikat':
             continue
@@ -675,6 +984,8 @@ def _saldo_program_list(groups, tidak_terikat):
             amil['saldo_awal'] += g['saldo_awal']
             amil['masuk']      += g['masuk']
             amil['keluar']     += g['keluar']
+            amil['n_donatur']  += g['n_donatur']
+            amil['n_mustahik'] += g['n_mustahik']
             continue
         if g['saldo_awal'] or g['masuk'] or g['keluar']:
             data.append(g)
@@ -696,10 +1007,21 @@ def laporan_saldo_program():
     groups, tidak_terikat, _ = _hitung_saldo_program(conn, bulan)
     data = _saldo_program_list(groups, tidak_terikat)
 
+    subtotal_per_dana = {}
+    for g in data:
+        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0,
+                                                             'saldo_akhir': 0, 'n_donatur': 0, 'n_mustahik': 0})
+        s['saldo_awal']  += g['saldo_awal']
+        s['masuk']       += g['masuk']
+        s['keluar']      += g['keluar']
+        s['saldo_akhir'] += g['saldo_akhir']
+        s['n_donatur']   += g['n_donatur']
+        s['n_mustahik']  += g['n_mustahik']
+
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_saldo_program.html',
-        data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES)
+        data=data, bulan=bulan, inst=inst, dana_types=DANA_TYPES, subtotal_per_dana=subtotal_per_dana)
 
 
 @app.route('/api/coa/<int:coa_id>/saldo')
@@ -790,7 +1112,9 @@ def laporan_buku_besar():
         ).fetchone()[0]
         agg = conn.execute(
             f"SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE 0 END),0) as masuk, "
-            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END),0) as keluar "
+            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah ELSE 0 END),0) as keluar, "
+            f"COALESCE(SUM(CASE WHEN jenis='masuk' THEN 1 ELSE 0 END),0) as n_donatur, "
+            f"COALESCE(SUM(CASE WHEN jenis='keluar' THEN jumlah_mustahik ELSE 0 END),0) as n_mustahik "
             f"FROM transaksi WHERE coa_id IN ({ph}) AND tanggal BETWEEN ? AND ?",
             (*p['coa_ids'], fd, ld)
         ).fetchone()
@@ -798,16 +1122,19 @@ def laporan_buku_besar():
         if saldo_awal or agg['masuk'] or agg['keluar']:
             ringkasan.append({'key': key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
                                'saldo_awal': saldo_awal, 'masuk': agg['masuk'], 'keluar': agg['keluar'],
-                               'saldo_akhir': saldo_akhir})
+                               'saldo_akhir': saldo_akhir, 'n_donatur': agg['n_donatur'], 'n_mustahik': agg['n_mustahik']})
     ringkasan.sort(key=lambda g: (DANA_TYPES.index(g['jenis_dana']) if g['jenis_dana'] in DANA_TYPES else 99, -g['saldo_akhir']))
 
     subtotal_per_dana = {}
     for g in ringkasan:
-        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'saldo_akhir': 0})
+        s = subtotal_per_dana.setdefault(g['jenis_dana'], {'saldo_awal': 0, 'masuk': 0, 'keluar': 0, 'saldo_akhir': 0,
+                                                             'n_donatur': 0, 'n_mustahik': 0})
         s['saldo_awal']  += g['saldo_awal']
         s['masuk']       += g['masuk']
         s['keluar']      += g['keluar']
         s['saldo_akhir'] += g['saldo_akhir']
+        s['n_donatur']   += g['n_donatur']
+        s['n_mustahik']  += g['n_mustahik']
 
     detail = None
     if program_key and program_key in programs:
@@ -819,7 +1146,7 @@ def laporan_buku_besar():
             (*p['coa_ids'], fd)
         ).fetchone()[0]
         rows = conn.execute(
-            f"SELECT t.id, t.tanggal, t.jenis, t.jumlah, t.keterangan, c.kode as coa_kode, c.nama as coa_nama, "
+            f"SELECT t.id, t.tanggal, t.jenis, t.jumlah, t.jumlah_mustahik, t.keterangan, c.kode as coa_kode, c.nama as coa_nama, "
             f"d.nama as donatur_nama, pm.nama as penerima_nama "
             f"FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id "
             f"LEFT JOIN donatur d ON t.donatur_id=d.id "
@@ -830,15 +1157,16 @@ def laporan_buku_besar():
         ).fetchall()
         baris = []
         running = saldo_awal
-        total_masuk = total_keluar = 0
+        total_masuk = total_keluar = total_donatur = total_mustahik = 0
         for r in rows:
             if r['jenis'] == 'masuk':
-                running += r['jumlah']; total_masuk += r['jumlah']
+                running += r['jumlah']; total_masuk += r['jumlah']; total_donatur += 1
             else:
-                running -= r['jumlah']; total_keluar += r['jumlah']
+                running -= r['jumlah']; total_keluar += r['jumlah']; total_mustahik += r['jumlah_mustahik'] or 0
             baris.append({**dict(r), 'saldo': running})
         detail = {'key': program_key, 'label': p['label'], 'code': p['code'], 'jenis_dana': p['jenis_dana'],
                    'saldo_awal': saldo_awal, 'baris': baris, 'total_masuk': total_masuk,
+                   'total_donatur': total_donatur, 'total_mustahik': total_mustahik,
                    'total_keluar': total_keluar, 'saldo_akhir': running}
 
     inst = get_instansi(conn)
@@ -868,24 +1196,35 @@ def _rekap_penerimaan_tahunan(conn, parent_kode, tahun):
     for r in rows:
         per_bulan.setdefault(r['bln'], {})[r['coa_id']] = r['total']
 
+    count_rows = conn.execute("""
+        SELECT strftime('%m', t.tanggal) as bln, COUNT(*) as n
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
+        WHERE c.parent_kode=? AND t.jenis='masuk' AND strftime('%Y', t.tanggal)=?
+        GROUP BY bln
+    """, (parent_kode, tahun)).fetchall()
+    count_map = {r['bln']: r['n'] for r in count_rows}
+
     bulan_urut = [f"{i:02d}" for i in range(1, 13)]
     tabel = []
     total_per_sumber = {c['id']: 0 for c in sumber_coa}
     grand_total = 0
+    grand_total_donatur = 0
     for bm in bulan_urut:
         vals = per_bulan.get(bm, {})
         if not vals:
             continue
-        baris = {'bulan': bm, 'label': BULAN_IND[int(bm)], 'per_sumber': {}, 'total': 0}
+        baris = {'bulan': bm, 'label': BULAN_IND[int(bm)], 'per_sumber': {}, 'total': 0,
+                 'n_donatur': count_map.get(bm, 0)}
         for c in sumber_coa:
             v = vals.get(c['id'], 0)
             baris['per_sumber'][c['id']] = v
             baris['total'] += v
             total_per_sumber[c['id']] += v
         grand_total += baris['total']
+        grand_total_donatur += baris['n_donatur']
         tabel.append(baris)
 
-    return sumber_coa, tabel, total_per_sumber, grand_total
+    return sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur
 
 
 @app.route('/admin/laporan/rekap-sumber-infaq')
@@ -895,13 +1234,13 @@ def laporan_rekap_sumber_infaq():
     bahan rapat. Sesuai pengelolaan riil: ketiganya jadi satu saldo, ini murni rekap sumber dana."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
     conn = get_db()
-    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.2.2', tahun)
+    sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur = _rekap_penerimaan_tahunan(conn, '4.2.2', tahun)
 
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst,
+        grand_total=grand_total, grand_total_donatur=grand_total_donatur, tahun=tahun, inst=inst,
         judul='PENERIMAAN INFAQ BEBAS PER SUMBER',
         deskripsi='Rincian sumber penerimaan Infaq Bebas/Tidak Terikat (Kotak Infaq, Kencleng, Tunai) '
                   'untuk bahan rapat — dalam pengelolaan sehari-hari ketiganya tetap satu saldo.',
@@ -914,12 +1253,12 @@ def laporan_rekap_zakat():
     """Rekap tahunan penerimaan Zakat per jenis (Zakat Maal, Fitrah, Fidyah, dst) — bahan rapat."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
     conn = get_db()
-    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.1', tahun)
+    sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur = _rekap_penerimaan_tahunan(conn, '4.1', tahun)
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst,
+        grand_total=grand_total, grand_total_donatur=grand_total_donatur, tahun=tahun, inst=inst,
         judul='PENERIMAAN ZAKAT PER JENIS',
         deskripsi='Rincian penerimaan Zakat per jenis (Zakat Maal, Zakat Fitrah, Zakat Penghasilan/Profesi, '
                   'Fidyah, dst) per bulan selama setahun — bahan rapat.',
@@ -932,12 +1271,12 @@ def laporan_rekap_infaq_terikat():
     """Rekap tahunan penerimaan Infaq Terikat per program (Yatim, Ambulance, Qurban, dst) — bahan rapat."""
     tahun = request.args.get('tahun', get_tanggal_kerja()[:4])
     conn = get_db()
-    sumber_coa, tabel, total_per_sumber, grand_total = _rekap_penerimaan_tahunan(conn, '4.2.1', tahun)
+    sumber_coa, tabel, total_per_sumber, grand_total, grand_total_donatur = _rekap_penerimaan_tahunan(conn, '4.2.1', tahun)
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_rekap_sumber.html',
         sumber_coa=sumber_coa, tabel=tabel, total_per_sumber=total_per_sumber,
-        grand_total=grand_total, tahun=tahun, inst=inst,
+        grand_total=grand_total, grand_total_donatur=grand_total_donatur, tahun=tahun, inst=inst,
         judul='PENERIMAAN INFAQ TERIKAT PER PROGRAM',
         deskripsi='Rincian penerimaan tiap program Infaq Terikat (Yatim, Ambulance, Sunat Sehat Gratis, '
                   'Qurban, dst) per bulan selama setahun — bahan rapat.',
@@ -1439,6 +1778,174 @@ def laporan_rkt_cetak():
         total_target_f=total_target_f, total_target_p=total_target_p, inst=inst)
 
 
+def _laz_program_registry(conn):
+    """Semua program penyaluran (kode bracket, mis. [CY], atau coa{id} kalau akunnya
+    tanpa bracket) apa adanya -- TIDAK digabung jadi 'Infaq Tidak Terikat' spt
+    _program_registry(), krn laporan LAZ MKU perlu tiap program aslinya kelihatan
+    (mis. [SD]/[KD]/[SM] terpisah) spy bisa dikelompokkan ke salah satu dari 6
+    bidang LAZ_BIDANG_LIST. Akun zakat-asnaf/beban-amil/wakaf/hibah dikecualikan."""
+    rows = conn.execute("""
+        SELECT id, kode, nama FROM chart_of_accounts
+        WHERE jenis_transaksi='keluar' AND aktif=1
+    """).fetchall()
+    programs = {}
+    for r in rows:
+        if r['kode'].startswith(LAZ_KODE_DIKECUALIKAN_PREFIX):
+            continue
+        code = _program_code(r['nama'])
+        key = code or f"coa{r['id']}"
+        if key not in programs:
+            label = re.sub(r"\s*\[.*?\]\s*$", '', r['nama']).strip()
+            programs[key] = {'label': label, 'code': code, 'coa_ids': []}
+        programs[key]['coa_ids'].append(r['id'])
+    return programs
+
+
+def _laz_bidang_data(conn, tahun):
+    """Total penyaluran (Rp) & penerima manfaat (orang) per bidang LAZ x bulan
+    utk tabel di halaman Laporan LAZ Pusat. Return (bidang_data, unmapped):
+      - bidang_data: {bidang: {bulan(1-12): {'nominal':.., 'mustahik':..}}}
+      - unmapped: list program yg blm dikelompokkan (bidang IS NULL/tak ada di
+        program_bidang_laz), lengkap dgn total setahun -- ditampilkan sbg
+        peringatan + bahan isi menu Atur Kelompok Program."""
+    programs = _laz_program_registry(conn)
+    bidang_map = {r['program_key']: r['bidang']
+                  for r in conn.execute("SELECT * FROM program_bidang_laz")}
+
+    coa_to_key = {}
+    for key, p in programs.items():
+        for cid in p['coa_ids']:
+            coa_to_key[cid] = key
+
+    rows = conn.execute("""
+        SELECT t.coa_id, CAST(strftime('%m', t.tanggal) AS INTEGER) as bln,
+               SUM(t.jumlah) as nominal, COALESCE(SUM(t.jumlah_mustahik),0) as mustahik
+        FROM transaksi t
+        WHERE t.jenis='keluar' AND strftime('%Y', t.tanggal)=?
+        GROUP BY t.coa_id, bln
+    """, (str(tahun),)).fetchall()
+
+    per_program = {key: {m: {'nominal': 0, 'mustahik': 0} for m in range(1, 13)} for key in programs}
+    for r in rows:
+        key = coa_to_key.get(r['coa_id'])
+        if not key:
+            continue  # akun dikecualikan (zakat-asnaf/beban-amil/wakaf/hibah)
+        per_program[key][r['bln']]['nominal']  += r['nominal'] or 0
+        per_program[key][r['bln']]['mustahik'] += r['mustahik'] or 0
+
+    bidang_data = {b: {m: {'nominal': 0, 'mustahik': 0} for m in range(1, 13)} for b in LAZ_BIDANG_LIST}
+    unmapped = []
+    for key, p in programs.items():
+        bidang = bidang_map.get(key)
+        if bidang in bidang_data:
+            for m in range(1, 13):
+                bidang_data[bidang][m]['nominal']  += per_program[key][m]['nominal']
+                bidang_data[bidang][m]['mustahik'] += per_program[key][m]['mustahik']
+        else:
+            total_nominal  = sum(per_program[key][m]['nominal'] for m in range(1, 13))
+            total_mustahik = sum(per_program[key][m]['mustahik'] for m in range(1, 13))
+            unmapped.append({'key': key, 'label': p['label'], 'code': p['code'],
+                              'total_nominal': total_nominal, 'total_mustahik': total_mustahik})
+    unmapped.sort(key=lambda u: -u['total_nominal'])
+    return bidang_data, unmapped
+
+
+@app.route('/admin/laporan/laz-pusat/kelompok', methods=['GET', 'POST'])
+@admin_required
+def laz_pusat_kelompok():
+    """Atur pengelompokan tiap program penyaluran ke salah satu 6 bidang LAZ MKU
+    Pusat (dipakai tabel di halaman Laporan LAZ Pusat). Satu form, satu tombol
+    simpan utk semua baris."""
+    conn = get_db()
+    if request.method == 'POST':
+        for key in request.form.getlist('program_key'):
+            bidang = request.form.get(f'bidang_{key}', '').strip()
+            tujuan = request.form.get(f'tujuan_{key}', '').strip()
+            asnaf = request.form.get(f'asnaf_{key}', '').strip()
+            bidang_val = bidang if bidang in LAZ_BIDANG_LIST else None
+            conn.execute("""INSERT OR REPLACE INTO program_bidang_laz (program_key, bidang, tujuan, asnaf)
+                VALUES (?,?,?,?)""", (key, bidang_val, tujuan or None, asnaf or None))
+        conn.commit()
+        conn.close()
+        flash('Pengelompokan program berhasil disimpan.', 'success')
+        return redirect(url_for('laz_pusat_kelompok'))
+
+    programs = _laz_program_registry(conn)
+    meta_map = {r['program_key']: r for r in conn.execute("SELECT * FROM program_bidang_laz")}
+    conn.close()
+    rows = [{'key': k, 'label': p['label'], 'code': p['code'],
+             'bidang': meta_map[k]['bidang'] if k in meta_map else None,
+             'tujuan': meta_map[k]['tujuan'] if k in meta_map else None,
+             'asnaf': meta_map[k]['asnaf'] if k in meta_map else None}
+            for k, p in programs.items()]
+    rows.sort(key=lambda r: (r['bidang'] or 'zzz_belum', r['label']))
+    return render_template('admin/laz_pusat_kelompok.html', rows=rows,
+                            bidang_list=LAZ_BIDANG_LIST, bidang_label=LAZ_BIDANG_LABEL)
+
+
+def _laz_kegiatan_data(conn, tahun):
+    """Rincian kegiatan pentasharufan per bidang LAZ x bulan, 1 baris per transaksi
+    keluar (bkn digabung) -- meniru sheet resmi HQ "Program Kegiatan Pentasharufan"
+    (No/Nama Kegiatan/Tujuan/Tanggal/Lokasi/Asnaf/Jumlah/Nominal per bulan, dlm 6
+    bidang). Nama Kegiatan = label program BAM; Tujuan & Asnaf diambil dr
+    program_bidang_laz (diisi manual, lihat laz_pusat_kelompok()); Lokasi dr field
+    lokasi transaksi, default 'Wonogiri' kalau kosong. Return {bidang: {bulan(1-12): [baris,...]}}."""
+    programs = _laz_program_registry(conn)
+    meta_map = {r['program_key']: r for r in conn.execute("SELECT * FROM program_bidang_laz")}
+    coa_to_key = {}
+    for key, p in programs.items():
+        for cid in p['coa_ids']:
+            coa_to_key[cid] = key
+
+    rows = conn.execute("""
+        SELECT t.coa_id, t.tanggal, t.jumlah, t.jumlah_mustahik, t.lokasi
+        FROM transaksi t
+        WHERE t.jenis='keluar' AND strftime('%Y', t.tanggal)=?
+        ORDER BY t.tanggal, t.id
+    """, (str(tahun),)).fetchall()
+
+    kegiatan = {b: {m: [] for m in range(1, 13)} for b in LAZ_BIDANG_LIST}
+    for r in rows:
+        key = coa_to_key.get(r['coa_id'])
+        meta = meta_map.get(key) if key else None
+        bidang = meta['bidang'] if meta else None
+        if bidang not in kegiatan:
+            continue
+        bulan = int(r['tanggal'][5:7])
+        kegiatan[bidang][bulan].append({
+            'tanggal': r['tanggal'],
+            'nama_kegiatan': programs[key]['label'],
+            'tujuan': (meta['tujuan'] or '') if meta else '',
+            'lokasi': r['lokasi'] or 'Wonogiri',
+            'asnaf': (meta['asnaf'] or '') if meta else '',
+            'jumlah': r['jumlah_mustahik'] or 0,
+            'nominal': r['jumlah'],
+        })
+    for b in LAZ_BIDANG_LIST:
+        for m in range(1, 13):
+            for i, item in enumerate(kegiatan[b][m], start=1):
+                item['no'] = i
+    return kegiatan
+
+
+@app.route('/admin/laporan/laz-pusat/kegiatan')
+@admin_required
+def laz_pusat_kegiatan():
+    """Rincian kegiatan pentasharufan per bidang x bulan (sheet 'Program Kegiatan'
+    resmi HQ, tetap diisi manual di file Excel -- ini versi web-nya, dibuat dr data
+    sistem spy tinggal disalin manual ke Excel)."""
+    tahun = int(request.args.get('tahun', get_tanggal_kerja()[:4]))
+    conn = get_db()
+    kegiatan_data = _laz_kegiatan_data(conn, tahun)
+    total_bidang = {b: sum(item['nominal'] for m in range(1, 13) for item in kegiatan_data[b][m])
+                     for b in LAZ_BIDANG_LIST}
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/laz_pusat_kegiatan.html',
+        tahun=tahun, kegiatan_data=kegiatan_data, total_bidang=total_bidang, inst=inst,
+        LAZ_BIDANG_LIST=LAZ_BIDANG_LIST, LAZ_BIDANG_LABEL=LAZ_BIDANG_LABEL, BULAN_IND=BULAN_IND)
+
+
 @app.route('/admin/laporan/laz-pusat')
 @admin_required
 def laporan_laz_pusat():
@@ -1464,12 +1971,15 @@ def laporan_laz_pusat():
     total_penyaluran = sum(sum(pt['bidang'][m].values()) + sum(pt['zakat_asnaf'][m].values())
                             for m in range(1, bulan_sampai + 1))
     kurang_mustahik = laz_pusat_report.hitung_kelengkapan_mustahik(conn, tahun, bulan_sampai)
+    bidang_data, unmapped_program = _laz_bidang_data(conn, tahun)
     inst = get_instansi(conn)
     conn.close()
     return render_template('admin/laporan_laz_pusat.html',
         tahun=tahun, bulan_sampai=bulan_sampai, inst=inst,
         total_penghimpunan=total_penghimpunan, total_penyaluran=total_penyaluran,
-        kurang_mustahik=kurang_mustahik, BULAN_IND=BULAN_IND)
+        kurang_mustahik=kurang_mustahik, BULAN_IND=BULAN_IND,
+        bidang_data=bidang_data, unmapped_program=unmapped_program,
+        LAZ_BIDANG_LIST=LAZ_BIDANG_LIST, LAZ_BIDANG_LABEL=LAZ_BIDANG_LABEL)
 
 
 @app.route('/admin/laporan/arus-kas')
@@ -1486,28 +1996,38 @@ def laporan_arus_kas():
     saldo_awal = saldo_awal_trans + sum(get_saldo_awal(conn).values())
 
     masuk = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total, COUNT(*) as n_donatur
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
-        WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?
+        WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?""" + _not_hibah_sql(conn) + """
         GROUP BY c.id ORDER BY c.kode
     """, (bulan,)).fetchall()
 
     keluar = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total,
+               COALESCE(SUM(t.jumlah_mustahik),0) as n_mustahik
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
-        WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?
+        WHERE t.jenis='keluar' AND strftime('%Y-%m',t.tanggal)=?""" + _not_hibah_sql(conn) + """
         GROUP BY c.id ORDER BY c.kode
     """, (bulan,)).fetchall()
 
     total_masuk  = sum(r['total'] for r in masuk)
     total_keluar = sum(r['total'] for r in keluar)
+
+    # Saldo akhir diambil dari SELURUH transaksi s/d akhir bulan (termasuk leg
+    # transfer antar-dana), supaya tidak pincang thd saldo awal yg juga total.
+    ld = _last_day(bulan)
+    saldo_akhir_trans = conn.execute("""
+        SELECT COALESCE(SUM(CASE WHEN jenis='masuk' THEN jumlah ELSE -jumlah END),0)
+        FROM transaksi WHERE tanggal <= ?
+    """, (ld,)).fetchone()[0]
+    saldo_akhir = saldo_akhir_trans + sum(get_saldo_awal(conn).values())
     conn.close()
 
     inst = get_instansi()
     return render_template('admin/laporan_arus_kas.html',
         masuk=masuk, keluar=keluar,
         total_masuk=total_masuk, total_keluar=total_keluar,
-        saldo_awal=saldo_awal, saldo_akhir=saldo_awal + total_masuk - total_keluar,
+        saldo_awal=saldo_awal, saldo_akhir=saldo_akhir,
         bulan=bulan, inst=inst)
 
 # ── Admin Koleksi ─────────────────────────────────────────────────────────────
@@ -1694,18 +2214,57 @@ def master_coa():
     conn.close()
     return render_template('admin/master/coa.html', coa=coa)
 
+def _normalisasi_parent_coa(conn, kode, parent):
+    """Tentukan kode induk (parent_kode) yang aman untuk CoA.
+
+    Aturan:
+    - induk otomatis = kode tanpa segmen terakhir (4.2.1.20 -> 4.2.1);
+    - induk diabaikan (pakai otomatis) kalau kosong, ATAU sama dengan kode sendiri
+      (penyebab akun "mengaku" header -> tidak muncul di dropdown Tambah Transaksi),
+      ATAU kode induknya tidak ada di CoA.
+    Return string kode induk atau None (akun level teratas).
+    """
+    kode = (kode or '').strip()
+    parent = (parent or '').strip()
+    if '.' not in kode:
+        return None
+
+    def _ada(k):
+        return bool(k) and conn.execute(
+            'SELECT 1 FROM chart_of_accounts WHERE kode=?', (k,)).fetchone() is not None
+
+    otomatis = kode.rsplit('.', 1)[0]
+    if not parent or parent == kode:
+        parent = otomatis
+    if not _ada(parent):
+        parent = otomatis if _ada(otomatis) else None
+    return parent
+
+
 @app.route('/admin/master/coa/tambah', methods=['POST'])
 @admin_required
 def master_coa_tambah():
     data = request.form
     conn = get_db()
+    kode = (data.get('kode') or '').strip()
+    parent = _normalisasi_parent_coa(conn, kode, data.get('parent_kode'))
     try:
         conn.execute('''INSERT INTO chart_of_accounts
             (kode,nama,kelompok,jenis_dana,parent_kode,jenis_transaksi) VALUES (?,?,?,?,?,?)''',
-            (data['kode'].strip(), data['nama'].strip(), data['kelompok'],
-             data.get('jenis_dana') or None, data.get('parent_kode') or None,
+            (kode, (data.get('nama') or '').strip(), data['kelompok'],
+             data.get('jenis_dana') or None, parent,
              data.get('jenis_transaksi') or None))
-        conn.commit(); flash('Akun berhasil ditambahkan.', 'success')
+        conn.commit()
+        flash('Akun berhasil ditambahkan.', 'success')
+        # Peringatan: kalau induknya akun transaksi, induk itu akan hilang dari
+        # pilihan transaksi karena sekarang punya sub-akun.
+        if parent and (data.get('jenis_transaksi') or None):
+            p = conn.execute('SELECT jenis_transaksi FROM chart_of_accounts WHERE kode=?',
+                             (parent,)).fetchone()
+            if p and p['jenis_transaksi']:
+                flash('Catatan: akun induk %s sudah dipakai transaksi, jadi akun itu tidak lagi '
+                      'muncul di pilihan Tambah Transaksi (karena kini punya sub-akun).' % parent,
+                      'warning')
     except sqlite3.IntegrityError:
         flash('Kode akun sudah ada.', 'danger')
     conn.close()
@@ -1774,6 +2333,9 @@ def master_donatur_tambah():
     auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
     flash('Donatur berhasil ditambahkan.', 'success')
+    if lat is None or lng is None:
+        flash('Catatan: koordinat lokasi belum ada — titik donatur ini belum akan muncul di peta. '
+              'Isi lewat tombol "Gunakan Lokasi Saya" / peta, atau tempel link Google Maps.', 'warning')
     return redirect(url_for('master_donatur'))
 
 @app.route('/admin/master/donatur/edit/<int:id>', methods=['POST'])
@@ -1804,17 +2366,40 @@ def master_donatur_edit(id):
     filters = {k[1:]: v for k, v in data.items() if k in ('_q','_sumber','_area','_aktif') and v}
     return redirect(url_for('master_donatur', **filters) + f'#row{id}')
 
+def koleksi_pending_hapus(conn, donatur_id):
+    """Hapus jadwal koleksi yg BELUM ada hasil (tanpa nominal, tanpa kunjungan) sejak bulan ini.
+    Dipakai saat donatur dinonaktifkan supaya tidak nyangkut di peta / daftar target / statistik.
+    Baris yg sudah ada kunjungan atau sudah 'terkumpul' TIDAK dihapus (riwayat & audit)."""
+    bulan = date.today().strftime('%Y-%m')
+    cur = conn.execute("""
+        DELETE FROM koleksi_bulanan
+        WHERE donatur_id=? AND bulan>=? AND status='terjadwal'
+          AND COALESCE(jumlah,0)=0 AND COALESCE(jumlah_kunjungan,0)=0
+          AND transaksi_id IS NULL
+    """, (donatur_id, bulan))
+    return cur.rowcount or 0
+
 @app.route('/admin/master/donatur/toggle/<int:id>', methods=['POST'])
 @admin_required
 def master_donatur_toggle(id):
     conn = get_db()
     conn.execute("UPDATE donatur SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
+    row = conn.execute("SELECT aktif, sumber_infaq, aktif_infaq FROM donatur WHERE id=?", (id,)).fetchone()
+    info = ''
+    if row is not None:
+        if not row['aktif']:
+            n = koleksi_pending_hapus(conn, id)
+            if n:
+                info = f'{n} jadwal koleksi kosong dibersihkan.'
+        elif row['sumber_infaq'] in ('kencleng', 'kotak_infaq') and row['aktif_infaq']:
+            auto_koleksi_donatur_baru(conn, id, row['sumber_infaq'])
+            info = 'Jadwal koleksi bulan ini dibuat ulang.'
     conn.commit()
-    row = conn.execute("SELECT aktif FROM donatur WHERE id=?", (id,)).fetchone()
-    conn.close()
     if row is None:
+        conn.close()
         return jsonify(ok=False, msg='Donatur tidak ditemukan'), 404
-    return jsonify(ok=True, aktif=row['aktif'])
+    conn.close()
+    return jsonify(ok=True, aktif=row['aktif'], info=info)
 
 @app.route('/admin/master/donatur/quick/<int:id>', methods=['POST'])
 @admin_required
@@ -2131,6 +2716,44 @@ def kirim_notifikasi_penyaluran(conn, bulanan_id):
         conn.execute("UPDATE kelompok_penyaluran_bulanan SET wa_status='gagal', wa_error=? WHERE id=?",
                      (error, bulanan_id))
 
+def _kirim_kelompok_bg(ids, jeda=1.5):
+    """Kirim notifikasi WA kelompok di LATAR BELAKANG (thread daemon).
+
+    Sejak 4 Nov 2026: sebelumnya loop sinkron 36 penerima x ~2,5 detik = ~90 detik
+    menabrak proxy_read_timeout nginx (60 detik) -> browser dapat 504 "timeout"
+    padahal pesan tetap terkirim. Sekarang request langsung balik, pesan dikirim
+    bertahap; tiap pesan di-commit sendiri supaya status di tabel cepat terlihat
+    (halaman detail polling status.json).
+    """
+    def _kerja():
+        try:
+            conn = get_db()
+        except Exception:
+            return
+        try:
+            for bid in ids:
+                try:
+                    kirim_notifikasi_penyaluran(conn, bid)
+                    conn.commit()
+                except Exception as e:
+                    try:
+                        conn.execute("UPDATE kelompok_penyaluran_bulanan "
+                                     "SET wa_status='gagal', wa_error=? WHERE id=?",
+                                     (str(e)[:200], bid))
+                        conn.commit()
+                    except Exception:
+                        pass
+                time.sleep(jeda)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    t = threading.Thread(target=_kerja, daemon=True, name='kirim-wa-kelompok')
+    t.start()
+    return t
+
+
 @app.route('/admin/kelompok/<int:id>/<bulan>/simpan', methods=['POST'])
 @admin_required
 def kelompok_bulanan_simpan(id, bulan):
@@ -2179,18 +2802,15 @@ def kelompok_bulanan_simpan(id, bulan):
         if b['wa_status'] != 'terkirim':
             perlu_kirim.append(b['id'])
     conn.commit()
-    # ponytail: kirim WA setelah transaksi ter-commit, satu commit per baris --
-    # supaya gateway yg macet tidak menahan lock DB / menggagalkan seluruh batch
-    # keuangan yg sudah tersimpan. Sinkron dalam request (blocking ~1-2 detik x
-    # jumlah anggota) aman utk skala saat ini (~40 anggota/bulan, sekali sebulan).
-    # Kalau kelompok makin besar, pindah ke background job sebelum ini menabrak
-    # timeout gunicorn (timeout dinaikkan ke 180s sbg jaring pengaman, bukan solusi permanen).
-    for bid in perlu_kirim:
-        kirim_notifikasi_penyaluran(conn, bid)
-        conn.commit()
-        time.sleep(2)
+    # Kirim WA di LATAR BELAKANG (thread) — lihat _kirim_kelompok_bg().
+    kirim_ids = list(perlu_kirim)
     conn.close()
-    flash(f'{disimpan} penyaluran disimpan.', 'success')
+    if kirim_ids:
+        _kirim_kelompok_bg(kirim_ids)
+    flash(f'{disimpan} penyaluran disimpan.' + (
+        f' WA untuk {len(kirim_ids)} penerima sedang dikirim di latar belakang — '
+        'status di tabel diperbarui otomatis (halaman ini bisa ditinggal).'
+        if kirim_ids else ''), 'success')
     return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
 
 @app.route('/admin/kelompok/bulanan/<int:bulanan_id>/kirim-ulang', methods=['POST'])
@@ -2209,6 +2829,50 @@ def kelompok_bulanan_kirim_ulang(bulanan_id):
     kirim_notifikasi_penyaluran(conn, bulanan_id)
     conn.commit(); conn.close()
     return redirect(url_for('kelompok_bulanan_detail', id=row['kelompok_id'], bulan=row['bulan']))
+
+
+@app.route('/admin/kelompok/<int:id>/<bulan>/kirim-ulang-gagal', methods=['POST'])
+@admin_required
+def kelompok_bulanan_kirim_ulang_gagal(id, bulan):
+    """Kirim ulang SEMUA penerima yang belum terkirim/gagal di bulan itu (background)."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT b.id FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE a.kelompok_id=? AND b.bulan=? AND coalesce(b.wa_status,'belum')!='terkirim'
+        ORDER BY b.id
+    """, (id, bulan)).fetchall()
+    ids = [r['id'] for r in rows]
+    conn.close()
+    if ids:
+        _kirim_kelompok_bg(ids)
+        flash(f'{len(ids)} notifikasi dimasukkan ke antrian kirim (latar belakang).', 'success')
+    else:
+        flash('Semua penerima sudah terkirim.', 'warning')
+    return redirect(url_for('kelompok_bulanan_detail', id=id, bulan=bulan))
+
+
+@app.route('/admin/kelompok/<int:id>/<bulan>/status.json')
+@admin_required
+def kelompok_bulanan_status(id, bulan):
+    """Status kirim WA per baris — dipakai polling halaman detail (tanpa reload)."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT b.id, b.status, coalesce(b.wa_status,'belum') AS wa_status, b.wa_error
+        FROM kelompok_penyaluran_bulanan b
+        JOIN kelompok_penyaluran_anggota a ON b.anggota_id=a.id
+        WHERE a.kelompok_id=? AND b.bulan=?
+        ORDER BY b.id
+    """, (id, bulan)).fetchall()
+    conn.close()
+    data = [dict(r) for r in rows]
+    return jsonify({
+        'rows': data,
+        'total': len(data),
+        'terkirim': sum(1 for r in data if r['wa_status'] == 'terkirim'),
+        'gagal': sum(1 for r in data if r['wa_status'] == 'gagal'),
+        'belum': sum(1 for r in data if r['wa_status'] not in ('terkirim', 'gagal')),
+    })
 
 # ── Master: Penerima Manfaat ──────────────────────────────────────────────────
 
@@ -2422,6 +3086,75 @@ def master_area_hapus(id):
     conn.close()
     return redirect(url_for('master_area'))
 
+# ── Master: Akun Kas/Bank ───────────────────────────────────────────────────────
+# Dimensi KEDUA yg independen dr Jenis Dana (Zakat/Infaq/dll) -- lihat catatan di
+# init_db.py & insert_transaksi(). Ini jawab "uangnya fisiknya di mana", dipakai
+# spy saldo per akun bisa dicocokkan ke buku tabungan/rekening koran riil.
+
+AKUN_KAS_JENIS_LABEL = {'tunai': 'Kas Tunai', 'simpanan_bmt': 'Simpanan di BMT',
+                         'bank': 'Bank', 'ewallet': 'E-Wallet'}
+
+@app.route('/admin/master/akun-kas')
+@admin_required
+def master_akun_kas():
+    conn = get_db()
+    akun_list = conn.execute("""
+        SELECT a.*, (SELECT COUNT(*) FROM transaksi t WHERE t.akun_kas_id=a.id) AS jml_transaksi
+        FROM akun_kas a ORDER BY a.urutan, a.nama
+    """).fetchall()
+    conn.close()
+    return render_template('admin/master/akun_kas.html', akun_list=akun_list,
+                            jenis_label=AKUN_KAS_JENIS_LABEL)
+
+@app.route('/admin/master/akun-kas/tambah', methods=['POST'])
+@admin_required
+def master_akun_kas_tambah():
+    nama = request.form.get('nama', '').strip()
+    jenis = request.form.get('jenis', '')
+    if not nama or jenis not in AKUN_KAS_JENIS_LABEL:
+        flash('Nama & jenis akun wajib diisi dengan benar.', 'danger')
+        return redirect(url_for('master_akun_kas'))
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM akun_kas WHERE nama=?", (nama,)).fetchone()
+    if existing:
+        flash('Akun dengan nama itu sudah ada.', 'warning')
+    else:
+        urutan = conn.execute("SELECT COALESCE(MAX(urutan),0)+1 FROM akun_kas").fetchone()[0]
+        conn.execute("INSERT INTO akun_kas (nama, jenis, keterangan, urutan) VALUES (?,?,?,?)",
+                     (nama, jenis, request.form.get('keterangan', '').strip() or None, urutan))
+        conn.commit()
+        flash(f'Akun "{nama}" ditambahkan.', 'success')
+    conn.close()
+    return redirect(url_for('master_akun_kas'))
+
+@app.route('/admin/master/akun-kas/edit/<int:id>', methods=['POST'])
+@admin_required
+def master_akun_kas_edit(id):
+    nama = request.form.get('nama', '').strip()
+    jenis = request.form.get('jenis', '')
+    if not nama or jenis not in AKUN_KAS_JENIS_LABEL:
+        flash('Nama & jenis akun wajib diisi dengan benar.', 'danger')
+        return redirect(url_for('master_akun_kas'))
+    conn = get_db()
+    dup = conn.execute("SELECT id FROM akun_kas WHERE nama=? AND id!=?", (nama, id)).fetchone()
+    if dup:
+        flash('Nama akun sudah dipakai.', 'warning')
+    else:
+        conn.execute("UPDATE akun_kas SET nama=?, jenis=?, keterangan=? WHERE id=?",
+                     (nama, jenis, request.form.get('keterangan', '').strip() or None, id))
+        conn.commit()
+        flash(f'Akun "{nama}" diperbarui.', 'success')
+    conn.close()
+    return redirect(url_for('master_akun_kas'))
+
+@app.route('/admin/master/akun-kas/toggle/<int:id>', methods=['POST'])
+@admin_required
+def master_akun_kas_toggle(id):
+    conn = get_db()
+    conn.execute("UPDATE akun_kas SET aktif = CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return redirect(url_for('master_akun_kas'))
+
 # ── Master: Instansi ─────────────────────────────────────────────────────────
 
 @app.route('/admin/master/instansi')
@@ -2430,7 +3163,8 @@ def master_instansi():
     conn = get_db()
     inst = get_instansi(conn)
     conn.close()
-    return render_template('admin/master/instansi.html', inst=inst)
+    return render_template('admin/master/instansi.html', inst=inst,
+                            default_template_donasi=DEFAULT_TEMPLATE_DONASI)
 
 @app.route('/admin/master/instansi/simpan', methods=['POST'])
 @admin_required
@@ -2440,13 +3174,15 @@ def master_instansi_simpan():
     conn.execute("""UPDATE instansi SET
         nama=?, nama_lembaga=?, alamat=?, telepon=?, email=?, website=?,
         ketua=?, bendahara=?, sekretaris=?, no_izin=?,
+        notif_donasi_aktif=?, template_pesan_donasi=?,
         updated_at=datetime('now','localtime')
         WHERE id=1""",
         (data.get('nama','').strip(), data.get('nama_lembaga','').strip(),
          data.get('alamat','').strip(), data.get('telepon','').strip(),
          data.get('email','').strip(), data.get('website','').strip(),
          data.get('ketua','').strip(), data.get('bendahara','').strip(),
-         data.get('sekretaris','').strip(), data.get('no_izin','').strip()))
+         data.get('sekretaris','').strip(), data.get('no_izin','').strip(),
+         1 if data.get('notif_donasi_aktif') else 0, data.get('template_pesan_donasi','').strip()))
     conn.commit(); conn.close()
     flash('Data instansi berhasil diperbarui.', 'success')
     return redirect(url_for('master_instansi'))
@@ -3123,7 +3859,8 @@ def marketing_koleksi():
         FROM koleksi_bulanan kb
         JOIN donatur d ON kb.donatur_id=d.id
         LEFT JOIN users u ON kb.marketing_kunjungi_terakhir=u.id
-        WHERE kb.bulan=? AND kb.status != 'terkumpul' '''
+        WHERE kb.bulan=? AND kb.status != 'terkumpul'
+              AND d.aktif=1 '''
     params = [bulan]
     if area == '__none__':
         query += " AND (d.area IS NULL OR d.area='')"
@@ -3136,7 +3873,8 @@ def marketing_koleksi():
     koleksi = conn.execute(query, params).fetchall()
     areas = conn.execute(
         "SELECT DISTINCT d.area FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id=d.id "
-        "WHERE kb.bulan=? AND kb.status!='terkumpul' AND d.area IS NOT NULL ORDER BY d.area",
+        "WHERE kb.bulan=? AND kb.status!='terkumpul' AND d.aktif=1 "
+        "AND d.area IS NOT NULL ORDER BY d.area",
         (bulan,)
     ).fetchall()
     stats = conn.execute(
@@ -3247,9 +3985,12 @@ def marketing_donatur_detail(id):
         WHERE kb.donatur_id=? ORDER BY kb.bulan DESC
     ''', (id,)).fetchall()
     areas = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
+    produk_list = conn.execute(
+        "SELECT id, kode, nama, parent_kode FROM chart_of_accounts WHERE parent_kode IN ('4.1','4.2.1','4.4') AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode"
+    ).fetchall()
     conn.close()
     return render_template('marketing/donatur_detail.html', donatur=donatur,
-                           riwayat=riwayat, areas=areas)
+                           riwayat=riwayat, areas=areas, produk_list=produk_list)
 
 # ── Marketing Peta ────────────────────────────────────────────────────────────
 
@@ -3258,11 +3999,15 @@ def marketing_donatur_detail(id):
 def marketing_peta():
     conn = get_db()
     bulan = date.today().strftime('%Y-%m')
-    titik = conn.execute('''
-        SELECT kb.id, kb.status, kb.jumlah_kunjungan,
+    # Default: peta TARGET (yang belum dikoleksi). ?semua=1 menampilkan juga yang
+    # sudah terkumpul (hijau) supaya riwayat kunjungan bulan ini kelihatan.
+    semua = request.args.get('semua') == '1'
+    syarat = '' if semua else " AND kb.status != 'terkumpul'"
+    titik = conn.execute(f'''
+        SELECT kb.id, kb.status, kb.jumlah, kb.tanggal_koleksi, kb.jumlah_kunjungan,
                d.nama, d.sumber_infaq, d.area, d.lokasi_nama, d.lat, d.lng
         FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id=d.id
-        WHERE kb.bulan=? AND kb.status != 'terkumpul'
+        WHERE kb.bulan=? {syarat} AND d.aktif=1
               AND d.lat IS NOT NULL AND d.lng IS NOT NULL
         ORDER BY d.area, d.nama
     ''', (bulan,)).fetchall()
@@ -3275,7 +4020,7 @@ def marketing_peta():
     desa_json = json.dumps([dict(d) for d in desa_points])
     conn.close()
     return render_template('marketing/peta.html', titik_json=titik_json,
-                           desa_json=desa_json, bulan=bulan)
+                           desa_json=desa_json, bulan=bulan, semua=semua)
 
 # ── Marketing Donatur ─────────────────────────────────────────────────────────
 
@@ -3292,8 +4037,11 @@ def marketing_donatur_list():
     query += " ORDER BY nama"
     donatur = conn.execute(query, params).fetchall()
     areas = conn.execute("SELECT nama AS area FROM area WHERE aktif=1 ORDER BY nama").fetchall()
+    produk_list = conn.execute(
+        "SELECT id, kode, nama, parent_kode FROM chart_of_accounts WHERE parent_kode IN ('4.1','4.2.1','4.4') AND jenis_transaksi='masuk' AND aktif=1 ORDER BY kode"
+    ).fetchall()
     conn.close()
-    return render_template('marketing/donatur.html', donatur=donatur, areas=areas, q=q)
+    return render_template('marketing/donatur.html', donatur=donatur, areas=areas, produk_list=produk_list, q=q)
 
 @app.route('/marketing/donatur/tambah', methods=['POST'])
 @login_required
@@ -3312,16 +4060,21 @@ def marketing_donatur_tambah():
     if not nama:
         conn.close(); flash('Nama donatur wajib diisi.', 'danger')
         return redirect(url_for('marketing_donatur_list'))
+    program_id = int(data['program_id']) if data.get('program_id') else None
     cur = conn.execute("""INSERT INTO donatur
-        (nama,no_hp,alamat,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq)
-        VALUES (?,?,?,?,?,?,?,?,?)""",
-        (nama, data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
+        (nama,nik,no_hp,alamat,sumber_infaq,area,lokasi_nama,lat,lng,aktif_infaq,program_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
          sumber,
          data.get('area', '').strip(), data.get('lokasi_nama', '').strip(),
-         lat, lng, 1 if data.get('aktif_infaq') else 0))
+         lat, lng, 1 if data.get('aktif_infaq') else 0, program_id))
     auto_koleksi_donatur_baru(conn, cur.lastrowid, sumber)
     conn.commit(); conn.close()
     flash(f'Donatur "{nama}" berhasil ditambahkan.', 'success')
+    if lat is None or lng is None:
+        flash('Catatan: koordinat lokasi belum ada — titik donatur ini belum akan muncul di peta. '
+              'Buka detail donatur lalu tekan "Gunakan Lokasi Saya" (GPS) / tandai di peta, '
+              'atau tempel link Google Maps.', 'warning')
     return redirect(url_for('marketing_donatur_list'))
 
 @app.route('/marketing/donatur/edit/<int:id>', methods=['POST'])
@@ -3347,17 +4100,89 @@ def marketing_donatur_edit(id):
     if lat is None:
         lat, lng = existing['lat'], existing['lng']
     sumber = data.get('sumber_infaq') or existing['sumber_infaq']
+    program_id = int(data['program_id']) if data.get('program_id') else None
     conn.execute("""UPDATE donatur SET
-        nama=?, no_hp=?, alamat=?, sumber_infaq=?, area=?, lokasi_nama=?,
-        lat=?, lng=?, aktif_infaq=?
+        nama=?, nik=?, no_hp=?, alamat=?, sumber_infaq=?, area=?, lokasi_nama=?,
+        lat=?, lng=?, aktif_infaq=?, program_id=?
         WHERE id=?""",
-        (nama, data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(), data.get('alamat', '').strip(),
          sumber, data.get('area', '').strip(), data.get('lokasi_nama', '').strip(),
-         lat, lng, 1 if data.get('aktif_infaq') else 0, id))
+         lat, lng, 1 if data.get('aktif_infaq') else 0, program_id, id))
     auto_koleksi_donatur_baru(conn, id, sumber)
     conn.commit(); conn.close()
     flash('Data donatur berhasil diperbarui.', 'success')
     return redirect(url_for('marketing_donatur_detail', id=id))
+
+# ── Marketing Mustahik (Penerima Manfaat) ───────────────────────────────────────
+
+@app.route('/marketing/mustahik')
+@login_required
+def marketing_mustahik_list():
+    conn = get_db()
+    q = request.args.get('q', '').strip()
+    query = "SELECT * FROM penerima_manfaat WHERE aktif=1"
+    params = []
+    if q:
+        query += " AND (nama LIKE ? OR nik LIKE ? OR no_hp LIKE ?)"
+        params += [f'%{q}%'] * 3
+    query += " ORDER BY nama"
+    mustahik = conn.execute(query, params).fetchall()
+    conn.close()
+    return render_template('marketing/mustahik.html', mustahik=mustahik, q=q)
+
+@app.route('/marketing/mustahik/tambah', methods=['POST'])
+@login_required
+def marketing_mustahik_tambah():
+    data = request.form
+    nama = (data.get('nama') or '').strip()
+    if not nama:
+        flash('Nama penerima manfaat wajib diisi.', 'danger')
+        return redirect(url_for('marketing_mustahik_list'))
+    conn = get_db()
+    conn.execute("""INSERT INTO penerima_manfaat (nama,nik,no_hp,alamat,asnaf,keterangan)
+        VALUES (?,?,?,?,?,?)""",
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(),
+         data.get('alamat', '').strip(), data.get('asnaf', '') or None, data.get('keterangan', '').strip()))
+    conn.commit(); conn.close()
+    flash(f'Penerima manfaat "{nama}" berhasil ditambahkan.', 'success')
+    return redirect(url_for('marketing_mustahik_list'))
+
+@app.route('/marketing/mustahik/<int:id>')
+@login_required
+def marketing_mustahik_detail(id):
+    conn = get_db()
+    mustahik = conn.execute("SELECT * FROM penerima_manfaat WHERE id=?", (id,)).fetchone()
+    if not mustahik:
+        conn.close(); flash('Penerima manfaat tidak ditemukan.', 'danger')
+        return redirect(url_for('marketing_mustahik_list'))
+    riwayat = conn.execute("""
+        SELECT t.tanggal, t.jumlah, t.jumlah_mustahik, t.keterangan, c.nama AS coa_nama
+        FROM transaksi t JOIN chart_of_accounts c ON t.coa_id = c.id
+        WHERE t.penerima_id=? ORDER BY t.tanggal DESC
+    """, (id,)).fetchall()
+    conn.close()
+    return render_template('marketing/mustahik_detail.html', mustahik=mustahik, riwayat=riwayat)
+
+@app.route('/marketing/mustahik/edit/<int:id>', methods=['POST'])
+@login_required
+def marketing_mustahik_edit(id):
+    data = request.form
+    nama = (data.get('nama') or '').strip()
+    if not nama:
+        flash('Nama penerima manfaat wajib diisi.', 'danger')
+        return redirect(url_for('marketing_mustahik_detail', id=id))
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM penerima_manfaat WHERE id=?", (id,)).fetchone()
+    if not existing:
+        conn.close(); flash('Penerima manfaat tidak ditemukan.', 'danger')
+        return redirect(url_for('marketing_mustahik_list'))
+    conn.execute("""UPDATE penerima_manfaat SET
+        nama=?, nik=?, no_hp=?, alamat=?, asnaf=?, keterangan=? WHERE id=?""",
+        (nama, data.get('nik', '').strip(), data.get('no_hp', '').strip(),
+         data.get('alamat', '').strip(), data.get('asnaf', '') or None, data.get('keterangan', '').strip(), id))
+    conn.commit(); conn.close()
+    flash('Data penerima manfaat berhasil diperbarui.', 'success')
+    return redirect(url_for('marketing_mustahik_detail', id=id))
 
 # ── Marketing Transaksi Tunai ─────────────────────────────────────────────────
 
@@ -3384,7 +4209,8 @@ def marketing_catat():
             data.get('keterangan',''), session['user_id'], data.get('client_uuid'),
             nama_kegiatan=data.get('nama_kegiatan') or None,
             lokasi=data.get('lokasi') or None,
-            jumlah_mustahik=jumlah_mustahik)
+            jumlah_mustahik=jumlah_mustahik,
+            akun_kas_id=data.get('akun_kas_id') or None)
         conn.commit(); conn.close()
         if dup:
             flash('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.', 'warning')
@@ -3397,9 +4223,10 @@ def marketing_catat():
     coa_parents   = conn.execute("SELECT kode, nama FROM chart_of_accounts WHERE parent_kode IS NOT NULL AND aktif=1 ORDER BY kode").fetchall()
     donatur_list  = conn.execute("SELECT id, nama, area FROM donatur WHERE aktif=1 ORDER BY nama").fetchall()
     penerima_list = conn.execute("SELECT * FROM penerima_manfaat WHERE aktif=1 ORDER BY nama").fetchall()
+    akun_kas_list = conn.execute("SELECT * FROM akun_kas WHERE aktif=1 ORDER BY urutan, nama").fetchall()
     conn.close()
     return render_template('marketing/catat.html', coa_list=coa_list,
-        coa_parents=coa_parents,
+        coa_parents=coa_parents, akun_kas_list=akun_kas_list,
         donatur_list=donatur_list, penerima_list=penerima_list,
         hari_ini=date.today().isoformat())
 
@@ -3486,7 +4313,8 @@ def api_marketing_koleksi():
         FROM koleksi_bulanan kb
         JOIN donatur d ON kb.donatur_id=d.id
         LEFT JOIN users u ON kb.marketing_kunjungi_terakhir=u.id
-        WHERE kb.bulan=? AND kb.status != 'terkumpul' '''
+        WHERE kb.bulan=? AND kb.status != 'terkumpul'
+              AND d.aktif=1 '''
     params = [bulan]
     if area:
         query += ' AND d.area=?'; params.append(area)
@@ -3494,7 +4322,8 @@ def api_marketing_koleksi():
     koleksi = conn.execute(query, params).fetchall()
     areas = conn.execute(
         "SELECT DISTINCT d.area FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id=d.id "
-        "WHERE kb.bulan=? AND kb.status!='terkumpul' AND d.area IS NOT NULL ORDER BY d.area",
+        "WHERE kb.bulan=? AND kb.status!='terkumpul' AND d.aktif=1 "
+        "AND d.area IS NOT NULL ORDER BY d.area",
         (bulan,)
     ).fetchall()
     stats = conn.execute(
@@ -3612,7 +4441,8 @@ def api_marketing_transaksi():
         data.get('client_uuid'),
         nama_kegiatan=data.get('nama_kegiatan') or None,
         lokasi=data.get('lokasi') or None,
-        jumlah_mustahik=jumlah_mustahik)
+        jumlah_mustahik=jumlah_mustahik,
+        akun_kas_id=data.get('akun_kas_id') or None)
     conn.commit(); conn.close()
     msg = ('Transaksi ini sudah tercatat sebelumnya — tidak dicatat ganda.'
            if dup else 'Transaksi berhasil dicatat.')
@@ -3660,7 +4490,8 @@ def api_marketing_sync():
                     body.get('client_uuid'),
                     nama_kegiatan=body.get('nama_kegiatan') or None,
                     lokasi=body.get('lokasi') or None,
-                    jumlah_mustahik=jumlah_mustahik)
+                    jumlah_mustahik=jumlah_mustahik,
+                    akun_kas_id=body.get('akun_kas_id') or None)
                 conn.commit(); conn.close()
                 results.append({'id': item.get('id'), 'status': 'ok',
                                 'transaksi_id': trx_id, 'duplicate': dup})
@@ -3878,6 +4709,33 @@ def admin_target():
         SELECT marketing_id, COUNT(*) AS n, COALESCE(SUM(jumlah),0) AS nominal
         FROM koleksi_bulanan WHERE bulan=? AND status='terkumpul'
         GROUP BY marketing_id""", (bulan,)).fetchall()}
+
+    # ── Transaksi yg diinput bukan oleh marketing aktif (biasanya admin) --
+    # tidak masuk baris capaian siapapun di atas; direkap terpisah di sini spy
+    # kelihatan angkanya kemana, bukan sekadar hilang dr laporan.
+    marketing_ids = {u['id'] for u in marketing_users}
+    non_marketing_uids = (set(masuk_map) | set(keluar_map)) - marketing_ids
+    admin_rows = []
+    if non_marketing_uids:
+        uid_list = [uid for uid in non_marketing_uids if uid is not None]
+        nama_map = {}
+        if uid_list:
+            ph = ','.join('?' * len(uid_list))
+            nama_map = {r['id']: r['nama'] for r in conn.execute(
+                f"SELECT id, nama FROM users WHERE id IN ({ph})", uid_list).fetchall()}
+        for uid in non_marketing_uids:
+            m, k = masuk_map.get(uid), keluar_map.get(uid)
+            admin_rows.append({
+                'nama': nama_map.get(uid, 'Tanpa user (data lama)'),
+                'fund_real': m['nominal'] if m else 0, 'fund_n': m['n'] if m else 0,
+                'pent_real': k['nominal'] if k else 0, 'pent_kegiatan': k['kegiatan'] if k else 0,
+            })
+        admin_rows.sort(key=lambda r: -r['fund_real'])
+    admin_total = {
+        'fund_real': sum(r['fund_real'] for r in admin_rows),
+        'fund_n':    sum(r['fund_n'] for r in admin_rows),
+        'pent_real': sum(r['pent_real'] for r in admin_rows),
+    }
     conn.close()
 
     def _persen(real, tgt):
@@ -3889,6 +4747,7 @@ def admin_target():
         tp = tmap.get((u['id'], 'pentasharufan')) or tmap.get((None, 'pentasharufan'))
         m, k, kol = masuk_map.get(u['id']), keluar_map.get(u['id']), koleksi_map.get(u['id'])
         row = {
+            'id': u['id'],
             'nama': u['nama'],
             'fund_real':   m['nominal'] if m else 0,
             'fund_n':      m['n'] if m else 0,
@@ -3918,7 +4777,7 @@ def admin_target():
 
     return render_template('admin/target.html',
         targets=targets, marketing_users=marketing_users, bulan=bulan,
-        capaian=capaian, total=total)
+        capaian=capaian, total=total, admin_rows=admin_rows, admin_total=admin_total)
 
 @app.route('/admin/target/delete/<int:id>', methods=['POST'])
 @admin_required
@@ -3928,6 +4787,90 @@ def admin_target_delete(id):
     conn.commit(); conn.close()
     flash('Target dihapus.', 'success')
     return redirect(url_for('admin_target'))
+
+@app.route('/admin/target/marketing/<int:user_id>')
+@admin_required
+def admin_target_marketing(user_id):
+    """Rincian capaian 1 marketing: donatur/penerimaan & kegiatan/pentasharufan yg dia
+    catat bulan terpilih, plus tren capaian 12 bulan sepanjang tahun tsb."""
+    conn = get_db()
+    user = conn.execute("SELECT id, nama FROM users WHERE id=? AND role='marketing'", (user_id,)).fetchone()
+    if not user:
+        conn.close(); flash('Marketing tidak ditemukan.', 'danger')
+        return redirect(url_for('admin_target'))
+
+    bulan = request.args.get('bulan', date.today().strftime('%Y-%m'))
+    tahun = bulan[:4]
+
+    masuk_rows = conn.execute("""
+        SELECT t.id, t.tanggal, t.jumlah, t.keterangan, d.nama as donatur_nama, c.nama as coa_nama
+        FROM transaksi t
+        LEFT JOIN donatur d ON t.donatur_id = d.id
+        JOIN chart_of_accounts c ON t.coa_id = c.id
+        WHERE t.jenis='masuk' AND t.user_id=? AND strftime('%Y-%m', t.tanggal)=?
+        ORDER BY t.tanggal DESC, t.id DESC
+    """, (user_id, bulan)).fetchall()
+
+    keluar_rows = conn.execute("""
+        SELECT t.id, t.tanggal, t.jumlah, t.jumlah_mustahik, t.nama_kegiatan, t.lokasi,
+               c.nama as coa_nama, pm.nama as penerima_nama
+        FROM transaksi t
+        JOIN chart_of_accounts c ON t.coa_id = c.id
+        LEFT JOIN penerima_manfaat pm ON t.penerima_id = pm.id
+        WHERE t.jenis='keluar' AND t.user_id=? AND strftime('%Y-%m', t.tanggal)=?
+        ORDER BY t.tanggal DESC, t.id DESC
+    """, (user_id, bulan)).fetchall()
+
+    koleksi_rows = conn.execute("""
+        SELECT kb.tanggal_koleksi, kb.jumlah, d.nama as donatur_nama, d.sumber_infaq
+        FROM koleksi_bulanan kb JOIN donatur d ON kb.donatur_id = d.id
+        WHERE kb.marketing_id=? AND kb.bulan=? AND kb.status='terkumpul'
+        ORDER BY kb.tanggal_koleksi DESC
+    """, (user_id, bulan)).fetchall()
+
+    # ── Tren capaian 12 bulan (tahun dr `bulan`) ────────────────────────────
+    trend_masuk = {r['bln']: r for r in conn.execute("""
+        SELECT strftime('%m', tanggal) as bln, COALESCE(SUM(jumlah),0) as nominal, COUNT(*) as n
+        FROM transaksi WHERE jenis='masuk' AND user_id=? AND strftime('%Y', tanggal)=?
+        GROUP BY bln""", (user_id, tahun)).fetchall()}
+    trend_keluar = {r['bln']: r for r in conn.execute("""
+        SELECT strftime('%m', tanggal) as bln, COALESCE(SUM(jumlah),0) as nominal,
+               COUNT(DISTINCT tanggal || coa_id) as kegiatan
+        FROM transaksi WHERE jenis='keluar' AND user_id=? AND strftime('%Y', tanggal)=?
+        GROUP BY bln""", (user_id, tahun)).fetchall()}
+    # Target personal menang atas global (user_id NULL), sama spt di admin_target()
+    tmap_year = {}
+    for t in conn.execute("""
+        SELECT * FROM target_bulanan WHERE strftime('%Y', bulan||'-01')=? AND (user_id=? OR user_id IS NULL)
+        ORDER BY user_id DESC""", (tahun, user_id)).fetchall():
+        tmap_year.setdefault((t['bulan'], t['jenis']), t)
+
+    def _persen(real, tgt):
+        return round(real / tgt * 100, 1) if tgt else None
+
+    trend = []
+    for m in range(1, 13):
+        bln_key = f"{m:02d}"
+        bulan_str = f"{tahun}-{bln_key}"
+        mk, kl = trend_masuk.get(bln_key), trend_keluar.get(bln_key)
+        tf = tmap_year.get((bulan_str, 'fundraising'))
+        tp = tmap_year.get((bulan_str, 'pentasharufan'))
+        fund_real = mk['nominal'] if mk else 0
+        pent_real = kl['nominal'] if kl else 0
+        trend.append({
+            'bulan': bulan_str, 'label': BULAN_IND[m],
+            'fund_real': fund_real, 'fund_target': (tf['target_nominal'] if tf else 0) or 0,
+            'pent_real': pent_real, 'pent_kegiatan': kl['kegiatan'] if kl else 0,
+            'pent_target': (tp['target_nominal'] if tp else 0) or 0,
+        })
+        trend[-1]['fund_persen'] = _persen(trend[-1]['fund_real'], trend[-1]['fund_target'])
+        trend[-1]['pent_persen'] = _persen(trend[-1]['pent_real'], trend[-1]['pent_target'])
+
+    inst = get_instansi(conn)
+    conn.close()
+    return render_template('admin/target_marketing.html',
+        user=user, bulan=bulan, tahun=tahun, inst=inst, LABEL_SUMBER=LABEL_SUMBER,
+        masuk_rows=masuk_rows, keluar_rows=keluar_rows, koleksi_rows=koleksi_rows, trend=trend)
 
 # ── Slip Penerimaan (Cetak Thermal 58mm) ──────────────────────────────────────
 

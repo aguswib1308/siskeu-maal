@@ -64,29 +64,43 @@
   {% if detail %}
   <div class="report-summary">
     <div class="row g-3">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-2">
         <div class="sum-cell">
           <div class="sum-label">Saldo Awal</div>
           <div class="sum-value">{{ detail.saldo_awal|rupiah }}</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-2">
         <div class="sum-cell">
           <div class="sum-label">+ Penerimaan</div>
           <div class="sum-value" style="color:var(--rp-masuk)">{{ detail.total_masuk|rupiah }}</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-2">
         <div class="sum-cell">
           <div class="sum-label">&minus; Penyaluran</div>
           <div class="sum-value" style="color:var(--rp-keluar)">{{ detail.total_keluar|rupiah }}</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-2">
         <div class="sum-cell">
           <div class="sum-label">= Saldo Akhir</div>
           <div class="sum-value big" style="{% if detail.saldo_akhir < 0 %}color:var(--rp-keluar){% endif %}">
             {{ detail.saldo_akhir|rupiah }}
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="sum-cell">
+          <div class="sum-label">Total Nominal</div>
+          <div class="sum-value">{{ (detail.total_masuk + detail.total_keluar)|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="sum-cell">
+          <div class="sum-label">Jumlah Orang</div>
+          <div class="sum-value" style="font-size:.86rem">
+            {{ detail.total_donatur }} donatur<br>{{ detail.total_mustahik }} penerima manfaat
           </div>
         </div>
       </div>
@@ -153,10 +167,12 @@
         <thead class="report-thead-soft">
           <tr>
             <th>Program</th>
-            <th class="text-end" style="width:140px">Saldo Awal</th>
-            <th class="text-end" style="width:140px">Penerimaan</th>
-            <th class="text-end" style="width:140px">Penyaluran</th>
-            <th class="text-end" style="width:150px">Saldo Akhir</th>
+            <th class="text-end" style="width:130px">Saldo Awal</th>
+            <th class="text-end" style="width:130px">Penerimaan</th>
+            <th class="text-end" style="width:130px">Penyaluran</th>
+            <th class="text-end" style="width:140px">Saldo Akhir</th>
+            <th class="text-end" style="width:135px">Total Nominal</th>
+            <th class="text-end" style="width:150px">Jumlah Orang</th>
           </tr>
         </thead>
         <tbody>
@@ -165,7 +181,7 @@
           {% if g.jenis_dana != current_dana.v %}
           {% set current_dana.v = g.jenis_dana %}
           <tr class="report-group d-{{ g.jenis_dana or 'umum' }}">
-            <td colspan="5">{{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
+            <td colspan="7">{{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
           </tr>
           {% endif %}
           <tr class="report-row-link" onclick="location.href='?program={{ g.key }}&dari={{ dari }}&sampai={{ sampai }}'">
@@ -177,6 +193,12 @@
             <td class="report-amount masuk">{{ g.masuk|rupiah }}</td>
             <td class="report-amount keluar">{{ g.keluar|rupiah }}</td>
             <td class="report-amount fw-semibold {{ 'keluar' if g.saldo_akhir < 0 }}">{{ g.saldo_akhir|rupiah }}</td>
+            <td class="report-amount">{{ (g.masuk + g.keluar)|rupiah }}</td>
+            <td class="report-amount">
+              {% if g.n_donatur %}<div class="report-count">{{ g.n_donatur }} donatur</div>{% endif %}
+              {% if g.n_mustahik %}<div class="report-count">{{ g.n_mustahik }} penerima manfaat</div>{% endif %}
+              {% if not g.n_donatur and not g.n_mustahik %}<span class="nol">&mdash;</span>{% endif %}
+            </td>
           </tr>
           {% if loop.nextitem is not defined or loop.nextitem.jenis_dana != g.jenis_dana %}
           {% set st = subtotal_per_dana[g.jenis_dana] %}
@@ -186,10 +208,14 @@
             <td class="report-amount">{{ st.masuk|rupiah }}</td>
             <td class="report-amount">{{ st.keluar|rupiah }}</td>
             <td class="report-amount">{{ st.saldo_akhir|rupiah }}</td>
+            <td class="report-amount">{{ (st.masuk + st.keluar)|rupiah }}</td>
+            <td class="report-amount">
+              <span class="report-count">{{ st.n_donatur }} donatur &middot; {{ st.n_mustahik }} penerima</span>
+            </td>
           </tr>
           {% if g.jenis_dana == 'zakat' %}
           <tr>
-            <td colspan="5" style="border-bottom:0">
+            <td colspan="7" style="border-bottom:0">
               <details class="report-note" style="margin:.35rem 0">
                 <summary><i class="bi bi-info-circle"></i> Kenapa angka Zakat di sini beda dengan Saldo per Program?</summary>
                 <div class="note-body">
@@ -206,7 +232,7 @@
           {% endif %}
           {% endif %}
           {% else %}
-          <tr><td colspan="5" class="report-empty">
+          <tr><td colspan="7" class="report-empty">
             <i class="bi bi-inbox"></i>
             Belum ada data pada periode ini
           </td></tr>

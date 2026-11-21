@@ -121,6 +121,53 @@
     </div>
   </div>
 
+  {# Panel akun kas/bank — dari origin/master (fitur dimensi Akun Kas/Bank) #}
+  <div class="px-4 pb-4">
+    <section class="report-panel d-infak_terikat">
+      <div class="report-panel-head">
+        <span class="report-panel-title">Saldo per Akun Kas/Bank</span>
+        <span class="report-panel-meta">Total <strong>{{ total_akun_kas|rupiah }}</strong></span>
+      </div>
+      <details class="report-note" style="margin:.6rem .9rem 0">
+        <summary><i class="bi bi-info-circle"></i> Bedanya dengan Kas &amp; Setara Kas per Dana</summary>
+        <div class="note-body">
+          <p>Sama-sama aset yang sama, tapi dilihat dari sisi fisiknya &mdash; di mana uangnya benar-benar
+             berada &mdash; supaya bisa dicocokkan ke buku tabungan atau rekening koran riil. Tabel
+             &ldquo;Kas &amp; Setara Kas per Dana&rdquo; di atas menunjukkan uang itu <em>punya siapa dan
+             untuk apa</em>. Atur akunnya di
+             <a href="{{ url_for('master_akun_kas') }}">Master Akun Kas/Bank</a>.</p>
+        </div>
+      </details>
+      <table class="table report-table mb-0">
+        <tbody>
+          {% for a in akun_kas_data %}
+          <tr>
+            <td class="report-item">{{ a.nama }}</td>
+            <td class="report-amount {{ 'keluar' if a.saldo < 0 }}" style="width:200px">{{ a.saldo|rupiah }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="2" class="report-empty">
+            <i class="bi bi-wallet2"></i>
+            Belum ada akun kas/bank terdaftar
+          </td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="report-subtotal">
+            <td>Total Akun Kas/Bank</td>
+            <td class="report-amount">{{ total_akun_kas|rupiah }}</td>
+          </tr>
+          {% if belum_diklasifikasi %}
+          <tr>
+            <td class="report-item text-muted fst-italic">Belum terklasifikasi (jurnal internal)</td>
+            <td class="report-amount text-muted">{{ belum_diklasifikasi|rupiah }}</td>
+          </tr>
+          {% endif %}
+        </tfoot>
+      </table>
+    </section>
+  </div>
+
   {% include 'admin/_report_sign.html' %}
 </div>
 

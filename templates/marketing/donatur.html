@@ -15,6 +15,10 @@
   </div>
 </form>
 
+<a href="/marketing/mustahik" class="d-block text-center mb-3" style="font-size:.8rem">
+  <i class="bi bi-arrow-left-right"></i> Lihat Penerima Manfaat
+</a>
+
 {# ── Tombol tambah ── #}
 <button class="btn btn-success w-100 mb-3" style="border-radius:10px;font-weight:600"
         onclick="var f=document.getElementById('formTambah');
@@ -40,7 +44,7 @@
 
     <div class="mb-3">
       <label class="form-label fw-semibold" style="font-size:.85rem">Kategori</label>
-      <select name="sumber_infaq" class="form-select"
+      <select name="sumber_infaq" id="addSumber" onchange="toggleProgram('add')" class="form-select"
               style="border-radius:10px;border-color:var(--border);font-size:.9rem">
         <option value="tunai">💵 Tunai</option>
         <option value="kencleng">🏠 Kencleng</option>
@@ -48,6 +52,29 @@
         <option value="zakat">🌙 Zakat</option>
         <option value="infaq_terikat">🎯 Infaq Terikat</option>
         <option value="wakaf">🏛️ Wakaf</option>
+      </select>
+    </div>
+
+    <div class="mb-3" id="addProgramWrap" style="display:none">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Program</label>
+      <select name="program_id" class="form-select"
+              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+        <option value="">— Pilih Program —</option>
+        <optgroup label="🌙 Zakat" class="opt-zakat">
+          {% for p in produk_list if p.parent_kode == '4.1' %}
+          <option value="{{ p.id }}">{{ p.nama }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="🎯 Infaq Terikat" class="opt-infaq_terikat">
+          {% for p in produk_list if p.parent_kode == '4.2.1' %}
+          <option value="{{ p.id }}">{{ p.nama }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="🏛️ Wakaf" class="opt-wakaf">
+          {% for p in produk_list if p.parent_kode == '4.4' %}
+          <option value="{{ p.id }}">{{ p.nama }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </div>
 
@@ -64,6 +91,20 @@
         <span class="text-muted fw-normal">(opsional)</span></label>
       <input type="text" name="no_hp" class="form-control" placeholder="628xxx"
              style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">NIK
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <input type="text" name="nik" class="form-control" placeholder="16 digit" maxlength="16"
+             style="border-radius:10px;border-color:var(--border);font-size:.9rem">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold" style="font-size:.85rem">Alamat
+        <span class="text-muted fw-normal">(opsional)</span></label>
+      <textarea name="alamat" class="form-control" rows="2"
+                style="border-radius:10px;border-color:var(--border);font-size:.9rem"></textarea>
     </div>
 
     <div class="mb-3">
@@ -207,4 +248,5 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/js/coord-picker.js"></script>
+<script src="/static/js/program-toggle.js"></script>
 {% endblock %}

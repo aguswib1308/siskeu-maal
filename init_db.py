@@ -21,6 +21,9 @@ def migrate(conn):
         ('nama_kegiatan',   'TEXT'),
         ('lokasi',          'TEXT'),
         ('jumlah_mustahik', 'INTEGER'),
+        ('wa_status',       "TEXT DEFAULT 'belum'"),
+        ('wa_error',        'TEXT'),
+        ('wa_sent_at',      'TEXT'),
     ]:
         if col not in trx:
             c.execute(f"ALTER TABLE transaksi ADD COLUMN {col} {defn}")
@@ -136,6 +139,95 @@ def migrate(conn):
         keterangan TEXT,
         updated_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
+
+    # Notifikasi WA otomatis ke donatur stlh transaksi penerimaan tersimpan
+    inst_cols = {r[1] for r in c.execute("PRAGMA table_info(instansi)")}
+    for col, defn in [
+        ('notif_donasi_aktif',   'INTEGER DEFAULT 0'),
+        ('template_pesan_donasi', 'TEXT'),
+    ]:
+        if col not in inst_cols:
+            c.execute(f"ALTER TABLE instansi ADD COLUMN {col} {defn}")
+
+    # Pengelompokan program penyaluran -> 6 bidang laporan LAZ MKU Pusat (khusus
+    # laporan ini, beda dr bidang_dari_kode() yg dipakai isi Excel resmi). Seed
+    # awal sesuai arahan pengguna 2026-09-08, dilengkapi pengguna sendiri lewat
+    # halaman Atur Kelompok Program utk program yg semula blm dikelompokkan
+    # (coa53/coa56 = akun induk generik "Program Pendidikan"/"Program Sosial/
+    # Kemanusiaan"; sisanya program berkode bracket spt biasa).
+    c.execute('''CREATE TABLE IF NOT EXISTS program_bidang_laz (
+        program_key TEXT PRIMARY KEY,
+        bidang TEXT
+    )''')
+    LAZ_BIDANG_SEED = [
+        ('OTA', 'pendidikan'), ('PTQ', 'pendidikan'), ('coa89', 'pendidikan'),  # Beasiswa Pendidikan
+        ('coa53', 'pendidikan'),  # Program Pendidikan (akun induk)
+        ('SSG', 'kesehatan'),
+        ('CY', 'sosial'), ('SD', 'sosial'), ('IDHU', 'sosial'), ('AM', 'sosial'), ('DI', 'sosial'),
+        ('AB', 'sosial'), ('BW', 'sosial'), ('IKEM', 'sosial'), ('SAT', 'sosial'),
+        ('coa56', 'sosial'),  # Program Sosial/Kemanusiaan (akun induk)
+        ('DAYA', 'ekonomi'),
+        ('ID', 'dakwah'), ('SM', 'dakwah'), ('IL', 'dakwah'), ('KD', 'dakwah'), ('OP', 'dakwah'),
+        ('HM', 'dakwah'), ('IQRA', 'dakwah'), ('ITAH', 'dakwah'), ('MOP', 'dakwah'),
+        ('TQUR', 'qurban'),
+    ]
+    c.executemany("INSERT OR IGNORE INTO program_bidang_laz (program_key, bidang) VALUES (?,?)",
+                  LAZ_BIDANG_SEED)
+
+    # Tujuan (kalimat tetap per program, diisi manual lewat halaman Atur Kelompok
+    # Program -- tdk ada sumber datanya di sistem) & Asnaf (klasifikasi tetap per
+    # program, dipakai sheet "Program Kegiatan" laporan LAZ Pusat) utk tiap program.
+    pblaz_cols = {r[1] for r in c.execute("PRAGMA table_info(program_bidang_laz)")}
+    for col in ('tujuan', 'asnaf'):
+        if col not in pblaz_cols:
+            c.execute(f"ALTER TABLE program_bidang_laz ADD COLUMN {col} TEXT")
+
+    # Default asnaf per bidang (pola dr contoh riil: Kesehatan & Sosial -> Miskin,
+    # Dakwah/Advokasi -> Fisabilillah; Pendidikan/Ekonomi/Qurban blm py contoh,
+    # disamakan ke "Fakir/Miskin" sesuai arahan pengguna 2026-09-08). Cuma isi yg
+    # msh kosong -- tdk pernah menimpa perubahan manual pengguna.
+    ASNAF_DEFAULT_BIDANG = {
+        'kesehatan': 'Miskin', 'sosial': 'Miskin', 'dakwah': 'Fisabilillah',
+        'pendidikan': 'Fakir/Miskin', 'ekonomi': 'Fakir/Miskin', 'qurban': 'Fakir/Miskin',
+    }
+    for bidang, asnaf in ASNAF_DEFAULT_BIDANG.items():
+        c.execute("UPDATE program_bidang_laz SET asnaf=? WHERE bidang=? AND (asnaf IS NULL OR asnaf='')",
+                  (asnaf, bidang))
+
+    # Akun Kas/Bank -- dimensi KEDUA yg independen dr "Jenis Dana" (Zakat/Infaq/dll,
+    # jawab "uang ini punya siapa"). Akun ini jawab "uang ini fisiknya di mana"
+    # (kas tunai / simpanan BMT / rekening bank / e-wallet), spy bisa dicocokkan ke
+    # buku tabungan/rekening koran riil -- sebelumnya sistem sama sekali tak
+    # mencatat ini. Diminta pengguna 2026-09-11.
+    c.execute('''CREATE TABLE IF NOT EXISTS akun_kas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT NOT NULL UNIQUE,
+        jenis TEXT NOT NULL CHECK(jenis IN ('tunai','simpanan_bmt','bank','ewallet')),
+        keterangan TEXT,
+        urutan INTEGER DEFAULT 0,
+        aktif INTEGER DEFAULT 1
+    )''')
+    AKUN_KAS_SEED = [
+        ('Kas Tunai', 'tunai', None, 1),
+        ('Simpanan di BMT', 'simpanan_bmt', None, 2),
+        ('Bank BSI', 'bank', '7227625133 a/n ULAZ MKU AMAL MUSLIM', 3),
+        ('E-Wallet', 'ewallet', None, 4),
+    ]
+    c.executemany("INSERT OR IGNORE INTO akun_kas (nama, jenis, keterangan, urutan) VALUES (?,?,?,?)",
+                  AKUN_KAS_SEED)
+
+    trx_cols2 = {r[1] for r in c.execute("PRAGMA table_info(transaksi)")}
+    if 'akun_kas_id' not in trx_cols2:
+        c.execute("ALTER TABLE transaksi ADD COLUMN akun_kas_id INTEGER REFERENCES akun_kas(id)")
+    # Transaksi lama (sblm field ini ada) dianggap semua Kas Tunai sesuai arahan
+    # pengguna 2026-09-11 -- admin koreksi manual yg ternyata lewat bank/e-wallet
+    # lewat quick-edit di halaman Transaksi. Idempoten: cuma isi yg msh NULL.
+    # Baris Jurnal Non-Tunai (jurnal_id terisi) sengaja DIKECUALIKAN -- itu transfer
+    # antar dana internal, bukan pergerakan uang fisik, jd akun_kas_id tetap NULL.
+    kas_tunai_id = c.execute("SELECT id FROM akun_kas WHERE nama='Kas Tunai'").fetchone()
+    if kas_tunai_id:
+        c.execute("UPDATE transaksi SET akun_kas_id=? WHERE akun_kas_id IS NULL AND jurnal_id IS NULL",
+                  (kas_tunai_id[0],))
 
     conn.commit()
 

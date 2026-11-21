@@ -64,6 +64,7 @@
             <th class="text-end">{{ c.nama }}</th>
             {% endfor %}
             <th class="text-end">Total</th>
+            <th class="text-end">Jml Setoran</th>
           </tr>
         </thead>
         <tbody>
@@ -75,9 +76,10 @@
             <td class="report-amount {{ 'nol' if not v }}">{% if v %}{{ v|rupiah }}{% else %}&mdash;{% endif %}</td>
             {% endfor %}
             <td class="report-amount fw-semibold">{{ baris.total|rupiah }}</td>
+            <td class="report-amount {{ 'nol' if not baris.n_donatur }}">{{ baris.n_donatur or '—' }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="{{ sumber_coa|length + 2 }}" class="report-empty">
+          <tr><td colspan="{{ sumber_coa|length + 3 }}" class="report-empty">
             <i class="bi bi-inbox"></i>
             Belum ada data penerimaan untuk tahun {{ tahun }}
           </td></tr>
@@ -91,6 +93,7 @@
             <td class="report-amount">{{ total_per_sumber.get(c.id, 0)|rupiah }}</td>
             {% endfor %}
             <td class="report-amount">{{ grand_total|rupiah }}</td>
+            <td class="report-amount">{{ grand_total_donatur }}</td>
           </tr>
         </tfoot>
         {% endif %}
