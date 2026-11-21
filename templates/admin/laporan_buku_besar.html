@@ -1,15 +1,14 @@
 {% extends 'admin/base.html' %}
 {% block title %}Buku Besar Program{% endblock %}
-{% block page_title %}<i class="bi bi-journal-text"></i> Buku Besar per Program{% endblock %}
-
-{% set dana_warna = {'zakat':'#166534','infak_tidak_terikat':'#1B3B5A','infak_terikat':'#0e7490','amil':'#6b21a8','wakaf':'#9a3412'} %}
+{% block page_title %}<i class="bi bi-list-columns-reverse"></i> Buku Besar per Program{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start mb-4 no-print flex-wrap gap-2">
+<div class="report-toolbar no-print">
   <div>
-    <form class="d-flex gap-2 flex-wrap align-items-center">
-      <select name="program" class="form-select form-select-sm" style="width:280px">
-        <option value="">— Semua Program (pilih salah satu) —</option>
+    <form>
+      <span class="toolbar-label">Program</span>
+      <select name="program" class="form-select form-select-sm" style="width:260px">
+        <option value="">&mdash; Semua program &mdash;</option>
         {% for dt in dana_types %}
         {% set opts = ringkasan | selectattr('jenis_dana','equalto', dt) | list %}
         {% if opts %}
@@ -23,108 +22,124 @@
         {% endif %}
         {% endfor %}
       </select>
-      <label class="small text-muted mb-0">Dari</label>
-      <input type="date" name="dari" value="{{ dari }}" class="form-control form-control-sm" style="width:150px">
-      <label class="small text-muted mb-0">s/d</label>
-      <input type="date" name="sampai" value="{{ sampai }}" class="form-control form-control-sm" style="width:150px">
+      <span class="toolbar-label">Dari</span>
+      <input type="date" name="dari" value="{{ dari }}" class="form-control form-control-sm" style="width:145px">
+      <span class="toolbar-label">s/d</span>
+      <input type="date" name="sampai" value="{{ sampai }}" class="form-control form-control-sm" style="width:145px">
       <button class="btn btn-sm btn-primary">Tampilkan</button>
     </form>
-    <div class="d-flex gap-3 mt-2">
-      <a href="?{% if program_key %}program={{ program_key }}&{% endif %}dari={{ awal_tahun }}&sampai={{ hari_ini }}"
-         class="small" style="font-size:.76rem">Sejak Awal Tahun</a>
-      <a href="?{% if program_key %}program={{ program_key }}&{% endif %}dari={{ awal_bulan }}&sampai={{ hari_ini }}"
-         class="small" style="font-size:.76rem">Bulan Ini</a>
+    <div class="report-quicklinks">
+      <a href="?{% if program_key %}program={{ program_key }}&{% endif %}dari={{ awal_tahun }}&sampai={{ hari_ini }}">Sejak awal tahun</a>
+      <a href="?{% if program_key %}program={{ program_key }}&{% endif %}dari={{ awal_bulan }}&sampai={{ hari_ini }}">Bulan ini</a>
     </div>
   </div>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-printer"></i> Cetak
-  </button>
+  <div class="toolbar-actions">
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak
+    </button>
+  </div>
 </div>
 
 <div class="card report-card">
-  <div class="report-header">
-    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
-    {% if inst.nama_lembaga %}
-    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
-    {% endif %}
-    <div class="report-line"></div>
-    {% if detail %}
-    <div class="report-title">BUKU BESAR — {{ detail.label|upper }}{% if detail.code %} <span style="color:var(--accent)">[{{ detail.code }}]</span>{% endif %}</div>
-    {% else %}
-    <div class="report-title">BUKU BESAR PER PROGRAM</div>
-    {% endif %}
-    <div class="report-period">Periode: {{ dari }} s/d {{ sampai }}</div>
-    {% if not detail %}
-    <div class="text-muted small mt-1">
-      Rincian mutasi &amp; saldo berjalan tiap program — Zakat, Infaq Tidak Terikat (dikelola 1 saldo
-      gabungan), maupun tiap program Infaq Terikat. Pilih salah satu program di atas, atau klik salah
-      satu baris di bawah untuk melihat buku besarnya.
+  {% if detail %}
+    {% set report_tag = ('Kode ' ~ detail.code) if detail.code else None %}
+    {% set report_title = 'Buku Besar — ' ~ detail.label %}
+  {% else %}
+    {% set report_title = 'Buku Besar per Program' %}
+  {% endif %}
+  {% set report_period = 'Periode ' ~ dari ~ ' s/d ' ~ sampai %}
+  {% include 'admin/_report_head.html' %}
+
+  {% if not detail %}
+  <details class="report-note">
+    <summary><i class="bi bi-info-circle"></i> Cara membaca laporan ini</summary>
+    <div class="note-body">
+      <p>Rincian mutasi dan saldo berjalan tiap program &mdash; Zakat, Infaq Tidak Terikat (dikelola dalam
+         satu saldo gabungan), maupun tiap program Infaq Terikat. Pilih satu program di kotak filter,
+         atau klik salah satu baris di tabel untuk membuka buku besarnya.</p>
     </div>
-    {% endif %}
-  </div>
+  </details>
+  {% endif %}
 
   {% if detail %}
   <div class="report-summary">
     <div class="row g-3">
       <div class="col-6 col-md-3">
-        <div class="sum-label">Saldo Awal</div>
-        <div class="sum-value">{{ detail.saldo_awal|rupiah }}</div>
+        <div class="sum-cell">
+          <div class="sum-label">Saldo Awal</div>
+          <div class="sum-value">{{ detail.saldo_awal|rupiah }}</div>
+        </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="sum-label">Total Penerimaan</div>
-        <div class="sum-value text-success">{{ detail.total_masuk|rupiah }}</div>
+        <div class="sum-cell">
+          <div class="sum-label">+ Penerimaan</div>
+          <div class="sum-value" style="color:var(--rp-masuk)">{{ detail.total_masuk|rupiah }}</div>
+        </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="sum-label">Total Penyaluran</div>
-        <div class="sum-value text-danger">{{ detail.total_keluar|rupiah }}</div>
+        <div class="sum-cell">
+          <div class="sum-label">&minus; Penyaluran</div>
+          <div class="sum-value" style="color:var(--rp-keluar)">{{ detail.total_keluar|rupiah }}</div>
+        </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="sum-label">Saldo Akhir</div>
-        <div class="sum-value {% if detail.saldo_akhir < 0 %}text-danger{% endif %}">{{ detail.saldo_akhir|rupiah }}</div>
+        <div class="sum-cell">
+          <div class="sum-label">= Saldo Akhir</div>
+          <div class="sum-value big" style="{% if detail.saldo_akhir < 0 %}color:var(--rp-keluar){% endif %}">
+            {{ detail.saldo_akhir|rupiah }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="p-4 pt-3">
+  <div class="p-4">
     <a href="?dari={{ dari }}&sampai={{ sampai }}" class="btn btn-sm btn-outline-secondary no-print mb-3">
-      <i class="bi bi-arrow-left"></i> Daftar Program
+      <i class="bi bi-arrow-left"></i> Daftar program
     </a>
     <div class="table-responsive">
-      <table class="table table-sm report-table">
+      <table class="table report-table report-sticky">
         <thead class="report-thead">
           <tr>
-            <th>Tanggal</th>
+            <th style="width:92px">Tanggal</th>
             <th>Akun</th>
             <th>Keterangan</th>
-            <th class="text-end">Debit (Masuk)</th>
-            <th class="text-end">Kredit (Keluar)</th>
-            <th class="text-end">Saldo</th>
+            <th class="text-end" style="width:130px">Debit</th>
+            <th class="text-end" style="width:130px">Kredit</th>
+            <th class="text-end" style="width:150px">Saldo</th>
           </tr>
         </thead>
         <tbody>
           <tr class="report-group">
-            <td colspan="5" class="ps-3">SALDO AWAL (SEBELUM {{ dari }})</td>
-            <td class="text-end pe-3 fw-semibold">{{ detail.saldo_awal|rupiah }}</td>
+            <td colspan="5">Saldo awal (sebelum {{ dari }})</td>
+            <td class="report-amount">{{ detail.saldo_awal|rupiah }}</td>
           </tr>
           {% for b in detail.baris %}
           <tr>
-            <td class="small text-muted">{{ b.tanggal }}</td>
-            <td class="small"><span class="report-kode">{{ b.coa_kode }}</span> {{ b.coa_nama }}</td>
-            <td class="small text-muted">{{ b.donatur_nama or b.penerima_nama or b.keterangan or '—' }}</td>
-            <td class="text-end report-amount text-success">{% if b.jenis=='masuk' %}{{ b.jumlah|rupiah }}{% endif %}</td>
-            <td class="text-end report-amount text-danger">{% if b.jenis=='keluar' %}{{ b.jumlah|rupiah }}{% endif %}</td>
-            <td class="text-end fw-semibold report-amount {% if b.saldo < 0 %}text-danger{% endif %}">{{ b.saldo|rupiah }}</td>
+            <td class="report-kode">{{ b.tanggal }}</td>
+            <td class="report-item"><span class="report-kode">{{ b.coa_kode }}</span> {{ b.coa_nama }}</td>
+            <td class="report-item text-muted">{{ b.donatur_nama or b.penerima_nama or b.keterangan or '—' }}</td>
+            <td class="report-amount {{ 'masuk' if b.jenis=='masuk' else 'nol' }}">
+              {% if b.jenis=='masuk' %}{{ b.jumlah|rupiah }}{% else %}&mdash;{% endif %}
+            </td>
+            <td class="report-amount {{ 'keluar' if b.jenis=='keluar' else 'nol' }}">
+              {% if b.jenis=='keluar' %}{{ b.jumlah|rupiah }}{% else %}&mdash;{% endif %}
+            </td>
+            <td class="report-amount fw-semibold {{ 'keluar' if b.saldo < 0 }}">{{ b.saldo|rupiah }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="text-center text-muted small fst-italic py-4">Tidak ada mutasi pada periode ini</td></tr>
+          <tr><td colspan="6" class="report-empty">
+            <i class="bi bi-inbox"></i>
+            Tidak ada mutasi pada periode ini
+          </td></tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr class="report-total">
-            <td colspan="3" class="ps-3">TOTAL MUTASI &amp; SALDO AKHIR</td>
-            <td class="text-end">{{ detail.total_masuk|rupiah }}</td>
-            <td class="text-end">{{ detail.total_keluar|rupiah }}</td>
-            <td class="text-end pe-3">{{ detail.saldo_akhir|rupiah }}</td>
+            <td colspan="3">Total mutasi &amp; saldo akhir</td>
+            <td class="report-amount">{{ detail.total_masuk|rupiah }}</td>
+            <td class="report-amount">{{ detail.total_keluar|rupiah }}</td>
+            <td class="report-amount">{{ detail.saldo_akhir|rupiah }}</td>
           </tr>
         </tfoot>
       </table>
@@ -134,14 +149,14 @@
   {% else %}
   <div class="p-4">
     <div class="table-responsive">
-      <table class="table table-sm report-table">
-        <thead>
-          <tr style="background:#f8f9fa">
-            <th class="ps-3" style="font-size:.78rem;color:#64748b">Program</th>
-            <th class="text-end" style="font-size:.78rem;color:#64748b">Saldo Awal</th>
-            <th class="text-end" style="font-size:.78rem;color:#64748b">Penerimaan</th>
-            <th class="text-end" style="font-size:.78rem;color:#64748b">Penyaluran</th>
-            <th class="text-end pe-3" style="font-size:.78rem;color:#64748b">Saldo Akhir</th>
+      <table class="table report-table">
+        <thead class="report-thead-soft">
+          <tr>
+            <th>Program</th>
+            <th class="text-end" style="width:140px">Saldo Awal</th>
+            <th class="text-end" style="width:140px">Penerimaan</th>
+            <th class="text-end" style="width:140px">Penyaluran</th>
+            <th class="text-end" style="width:150px">Saldo Akhir</th>
           </tr>
         </thead>
         <tbody>
@@ -149,45 +164,52 @@
           {% for g in ringkasan %}
           {% if g.jenis_dana != current_dana.v %}
           {% set current_dana.v = g.jenis_dana %}
-          <tr class="report-group">
-            <td colspan="5" class="ps-3">{{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya')|upper }}</td>
+          <tr class="report-group d-{{ g.jenis_dana or 'umum' }}">
+            <td colspan="5">{{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
           </tr>
           {% endif %}
-          <tr class="program-row" style="cursor:pointer" onclick="location.href='?program={{ g.key }}&dari={{ dari }}&sampai={{ sampai }}'">
-            <td class="ps-3 report-item">
-              {{ g.label }}{% if g.code %} <span class="text-muted small">[{{ g.code }}]</span>{% endif %}
-              <i class="bi bi-chevron-right text-muted ms-1" style="font-size:.7rem"></i>
+          <tr class="report-row-link" onclick="location.href='?program={{ g.key }}&dari={{ dari }}&sampai={{ sampai }}'">
+            <td class="report-item">
+              {{ g.label }}{% if g.code %} <span class="report-kode">[{{ g.code }}]</span>{% endif %}
+              <i class="bi bi-chevron-right text-muted ms-1" style="font-size:.68rem"></i>
             </td>
-            <td class="text-end report-amount">{{ g.saldo_awal|rupiah }}</td>
-            <td class="text-end report-amount text-success">{{ g.masuk|rupiah }}</td>
-            <td class="text-end report-amount text-danger">{{ g.keluar|rupiah }}</td>
-            <td class="text-end pe-3 fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
-              {{ g.saldo_akhir|rupiah }}
-            </td>
+            <td class="report-amount">{{ g.saldo_awal|rupiah }}</td>
+            <td class="report-amount masuk">{{ g.masuk|rupiah }}</td>
+            <td class="report-amount keluar">{{ g.keluar|rupiah }}</td>
+            <td class="report-amount fw-semibold {{ 'keluar' if g.saldo_akhir < 0 }}">{{ g.saldo_akhir|rupiah }}</td>
           </tr>
           {% if loop.nextitem is not defined or loop.nextitem.jenis_dana != g.jenis_dana %}
           {% set st = subtotal_per_dana[g.jenis_dana] %}
           <tr class="report-subtotal">
-            <td class="ps-3">Subtotal {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
-            <td class="text-end report-amount">{{ st.saldo_awal|rupiah }}</td>
-            <td class="text-end report-amount">{{ st.masuk|rupiah }}</td>
-            <td class="text-end report-amount">{{ st.keluar|rupiah }}</td>
-            <td class="text-end pe-3 report-amount">{{ st.saldo_akhir|rupiah }}</td>
+            <td>Subtotal {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
+            <td class="report-amount">{{ st.saldo_awal|rupiah }}</td>
+            <td class="report-amount">{{ st.masuk|rupiah }}</td>
+            <td class="report-amount">{{ st.keluar|rupiah }}</td>
+            <td class="report-amount">{{ st.saldo_akhir|rupiah }}</td>
           </tr>
           {% if g.jenis_dana == 'zakat' %}
           <tr>
-            <td colspan="5" class="ps-3 pb-2 text-muted fst-italic" style="font-size:.72rem">
-              <i class="bi bi-info-circle"></i> Total di atas SAMA dengan laporan
-              <a href="/admin/laporan/saldo-program?bulan={{ sampai[:7] }}">Saldo per Program</a> — baris per-akun
-              terlihat beda krn di sana penyaluran "Miskin" (di buku besar ini akun tersendiri, sering minus
-              krn tdk py sumber sendiri) dialokasikan tampilannya ke Fidyah → Zakat Fitrah → Zakat Maal.
-              Buku besar ini sengaja menampilkan tiap akun apa adanya (transaksi asli, tanpa alokasi).
+            <td colspan="5" style="border-bottom:0">
+              <details class="report-note" style="margin:.35rem 0">
+                <summary><i class="bi bi-info-circle"></i> Kenapa angka Zakat di sini beda dengan Saldo per Program?</summary>
+                <div class="note-body">
+                  <p>Totalnya <strong>sama</strong> dengan laporan
+                     <a href="/admin/laporan/saldo-program?bulan={{ sampai[:7] }}">Saldo per Program</a>.
+                     Yang berbeda hanya baris per akun: di sana penyaluran &ldquo;Miskin&rdquo; dialokasikan ke
+                     Fidyah &rarr; Zakat Fitrah &rarr; Zakat Maal, karena Miskin tidak punya sumber penerimaan
+                     sendiri sehingga sering tampak minus. Buku besar ini sengaja menampilkan tiap akun apa
+                     adanya &mdash; transaksi asli, tanpa alokasi.</p>
+                </div>
+              </details>
             </td>
           </tr>
           {% endif %}
           {% endif %}
           {% else %}
-          <tr><td colspan="5" class="text-center text-muted small fst-italic py-4">Belum ada data pada periode ini</td></tr>
+          <tr><td colspan="5" class="report-empty">
+            <i class="bi bi-inbox"></i>
+            Belum ada data pada periode ini
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -195,10 +217,6 @@
   </div>
   {% endif %}
 </div>
-
-<style>
-.program-row:hover td { background: rgba(184,146,42,.07) !important; }
-</style>
 
 {% include 'admin/_report_style.html' %}
 {% endblock %}

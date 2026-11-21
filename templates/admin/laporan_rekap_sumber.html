@@ -1,69 +1,96 @@
 {% extends 'admin/base.html' %}
 {% block title %}{{ judul|title }}{% endblock %}
-{% block page_title %}<i class="bi bi-pie-chart-fill"></i> {{ judul|title }}{% endblock %}
+{% block page_title %}<i class="bi bi-grid-3x3-gap"></i> {{ judul|title }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 no-print">
-  <form class="d-flex gap-2 align-items-center">
-    <label class="form-label mb-0 small text-muted">Tahun</label>
+<div class="report-toolbar no-print">
+  <form>
+    <span class="toolbar-label">Tahun</span>
     <input type="number" name="tahun" value="{{ tahun }}" min="2020" max="2100"
            class="form-control form-control-sm" style="width:100px">
     <button class="btn btn-sm btn-primary">Tampilkan</button>
   </form>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-printer"></i> Cetak
-  </button>
+  <div class="toolbar-actions">
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak
+    </button>
+  </div>
 </div>
 
 <div class="card report-card">
-  <div class="report-header">
-    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
-    {% if inst.nama_lembaga %}
-    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
-    {% endif %}
-    <div class="report-line"></div>
-    <div class="report-title">{{ judul }}</div>
-    <div class="report-period">Tahun {{ tahun }}</div>
-    <div class="text-muted small mt-1">
-      {{ deskripsi }}
+  {% set report_title = judul %}
+  {% set report_period = 'Tahun ' ~ tahun %}
+  {% include 'admin/_report_head.html' %}
+
+  {% if deskripsi %}
+  <details class="report-note">
+    <summary><i class="bi bi-info-circle"></i> Keterangan laporan</summary>
+    <div class="note-body"><p>{{ deskripsi }}</p></div>
+  </details>
+  {% endif %}
+
+  {% if tabel %}
+  <div class="report-summary">
+    <div class="row g-3">
+      <div class="col-6 col-md-4">
+        <div class="sum-cell">
+          <div class="sum-label">Total Penerimaan {{ tahun }}</div>
+          <div class="sum-value big" style="color:var(--rp-masuk)">{{ grand_total|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="sum-cell">
+          <div class="sum-label">Jumlah Sumber</div>
+          <div class="sum-value">{{ sumber_coa|length }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="sum-cell">
+          <div class="sum-label">Rata-rata per Bulan</div>
+          <div class="sum-value">{{ (grand_total / 12)|round|int|rupiah }}</div>
+        </div>
+      </div>
     </div>
   </div>
+  {% endif %}
 
   <div class="p-4">
     <div class="table-responsive">
-      <table class="table table-sm report-table">
-        <thead>
-          <tr class="report-thead">
-            <th class="ps-3" style="white-space:nowrap">Bulan</th>
+      <table class="table report-table report-sticky">
+        <thead class="report-thead">
+          <tr>
+            <th>Bulan</th>
             {% for c in sumber_coa %}
-            <th class="text-end" style="white-space:nowrap">{{ c.nama }}</th>
+            <th class="text-end">{{ c.nama }}</th>
             {% endfor %}
-            <th class="text-end pe-3" style="white-space:nowrap">Total</th>
+            <th class="text-end">Total</th>
           </tr>
         </thead>
         <tbody>
           {% for baris in tabel %}
           <tr>
-            <td class="ps-3 report-item" style="white-space:nowrap">{{ baris.label }}</td>
+            <td class="report-item">{{ baris.label }}</td>
             {% for c in sumber_coa %}
-            <td class="text-end report-amount">{{ baris.per_sumber.get(c.id, 0)|rupiah }}</td>
+            {% set v = baris.per_sumber.get(c.id, 0) %}
+            <td class="report-amount {{ 'nol' if not v }}">{% if v %}{{ v|rupiah }}{% else %}&mdash;{% endif %}</td>
             {% endfor %}
-            <td class="text-end pe-3 fw-semibold report-amount">{{ baris.total|rupiah }}</td>
+            <td class="report-amount fw-semibold">{{ baris.total|rupiah }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="{{ sumber_coa|length + 2 }}" class="text-center text-muted py-4 fst-italic">
-            Belum ada data penerimaan utk tahun {{ tahun }}
+          <tr><td colspan="{{ sumber_coa|length + 2 }}" class="report-empty">
+            <i class="bi bi-inbox"></i>
+            Belum ada data penerimaan untuk tahun {{ tahun }}
           </td></tr>
           {% endfor %}
         </tbody>
         {% if tabel %}
         <tfoot>
           <tr class="report-total">
-            <td class="ps-3" style="white-space:nowrap">TOTAL {{ tahun }}</td>
+            <td>Total {{ tahun }}</td>
             {% for c in sumber_coa %}
-            <td class="text-end">{{ total_per_sumber.get(c.id, 0)|rupiah }}</td>
+            <td class="report-amount">{{ total_per_sumber.get(c.id, 0)|rupiah }}</td>
             {% endfor %}
-            <td class="text-end pe-3">{{ grand_total|rupiah }}</td>
+            <td class="report-amount">{{ grand_total|rupiah }}</td>
           </tr>
         </tfoot>
         {% endif %}
@@ -71,22 +98,7 @@
     </div>
   </div>
 
-  {% if inst.ketua or inst.bendahara %}
-  <div class="report-sign">
-    <div class="row">
-      <div class="col-6 text-center">
-        <div class="sign-role">Mengetahui,</div>
-        <div class="sign-name">{{ inst.ketua or '_______________' }}</div>
-        <div class="sign-label">Ketua</div>
-      </div>
-      <div class="col-6 text-center">
-        <div class="sign-role">Dibuat oleh,</div>
-        <div class="sign-name">{{ inst.bendahara or '_______________' }}</div>
-        <div class="sign-label">Bendahara</div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+  {% include 'admin/_report_sign.html' %}
 </div>
 
 {% include 'admin/_report_style.html' %}

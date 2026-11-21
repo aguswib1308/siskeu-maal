@@ -1,0 +1,27 @@
+{# Blok tanda tangan laporan. Tampil hanya bila nama pejabat sudah diisi di
+   Pengaturan Instansi.
+
+   Variabel opsional (set sebelum include bila perlu teks lain):
+     sign_kiri   default 'Mengetahui,'   — mis. 'Mengesahkan,' untuk RKT
+     sign_kanan  default 'Dibuat oleh,'  — mis. 'Menyusun,'
+   Cara pakai: {% include 'admin/_report_sign.html' %}
+   ────────────────────────────────────────────────────────────────────────── #}
+{% if inst.ketua or inst.bendahara %}
+<footer class="report-sign">
+  {% if tanggal_cetak or hari_ini %}
+  <div class="report-sign-place">{{ inst.kota or 'Wonogiri' }}, {{ tanggal_cetak or hari_ini }}</div>
+  {% endif %}
+  <div class="report-sign-grid">
+    <div class="sign-col">
+      <div class="sign-role">{{ sign_kiri or 'Mengetahui,' }}</div>
+      <div class="sign-name">{{ inst.ketua or '' }}</div>
+      <div class="sign-label">Ketua</div>
+    </div>
+    <div class="sign-col">
+      <div class="sign-role">{{ sign_kanan or 'Dibuat oleh,' }}</div>
+      <div class="sign-name">{{ inst.bendahara or '' }}</div>
+      <div class="sign-label">Bendahara</div>
+    </div>
+  </div>
+</footer>
+{% endif %}

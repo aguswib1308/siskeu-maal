@@ -1,0 +1,37 @@
+{# ──────────────────────────────────────────────────────────────────────────────
+   Kop surat laporan. Dipakai semua laporan — jangan menulis ulang blok ini
+   di template masing-masing.
+
+   Variabel yang dibaca dari konteks:
+     report_title   (wajib)  judul laporan, mis. 'NERACA (LAPORAN POSISI KEUANGAN)'
+     report_period  (opsional) keterangan periode, mis. 'Periode Januari 2026'
+     report_tag     (opsional) label kecil di atas judul, mis. 'PSAK 109'
+   Cara pakai:
+     {% set report_title = 'NERACA' %}
+     {% set report_period = 'Per ' ~ last_day %}
+     {% include 'admin/_report_head.html' %}
+   ────────────────────────────────────────────────────────────────────────── #}
+<header class="report-header">
+  <div class="report-letterhead">
+    <div class="report-mark" aria-hidden="true">BM</div>
+    <div class="report-ident">
+      <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
+      {% if inst.nama_lembaga %}
+      <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
+      {% endif %}
+      {% if inst.alamat %}
+      <div class="report-addr">
+        {{ inst.alamat }}{% if inst.telepon %} &middot; Telp {{ inst.telepon }}{% endif %}{% if inst.email %} &middot; {{ inst.email }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="report-rule" role="presentation"></div>
+
+  <div class="report-titleblock">
+    {% if report_tag %}<div class="report-tag">{{ report_tag }}</div>{% endif %}
+    <h1 class="report-title">{{ report_title }}</h1>
+    {% if report_period %}<div class="report-period">{{ report_period }}</div>{% endif %}
+  </div>
+</header>

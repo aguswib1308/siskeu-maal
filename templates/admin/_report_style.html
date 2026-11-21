@@ -1,109 +1,392 @@
 <style>
+/* ══════════════════════════════════════════════════════════════════════════════
+   SISTEM DESAIN LAPORAN — Baitul Maal BMT Amal Muslim
+   Satu-satunya tempat warna & tipografi laporan didefinisikan.
+   JANGAN tulis kode warna (#hex) di template laporan — pakai token di sini.
+
+   Konvensi akuntansi yang dipakai:
+     - angka rata kanan, font tabular (lebar digit sama) biar kolom lurus
+     - subtotal  : garis tunggal di atas angka
+     - total akhir: garis ganda (double rule) — penutup perhitungan
+     - kode akun pakai font mono, dibedakan dari nama akun
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Palet jenis dana (--dana-*), semantik --rp-masuk/--rp-keluar, dan kelas
+   pembantu .d-<jenis> didefinisikan di admin/base.html — satu sumber untuk
+   seluruh aplikasi. Di sini hanya token khusus tampilan laporan. */
+:root {
+  --rp-tint:  rgba(184,146,42,.07);   /* latar baris total    */
+  --rp-group: rgba(27,59,90,.045);    /* latar baris kelompok */
+  --rp-hover: rgba(27,59,90,.035);
+  --rp-paper: #ffffff;
+}
+[data-bs-theme="dark"] {
+  --rp-tint:  rgba(212,169,60,.10);
+  --rp-group: rgba(255,255,255,.035);
+  --rp-hover: rgba(255,255,255,.045);
+  --rp-paper: var(--surface);
+}
+
+/* ── Baris alat (filter + cetak) ─────────────────────────────────────────── */
+.report-toolbar {
+  display: flex; flex-wrap: wrap; gap: .75rem;
+  justify-content: space-between; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: .7rem .9rem; margin-bottom: 1.25rem;
+}
+.report-toolbar form { display: flex; flex-wrap: wrap; gap: .5rem .75rem; align-items: center; margin: 0; }
+/* Label + input dibungkus ini supaya tidak pernah terpisah saat baris membungkus */
+.toolbar-field { display: flex; align-items: center; gap: .4rem; }
+.report-toolbar .toolbar-label {
+  font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); margin: 0; white-space: nowrap;
+}
+.report-toolbar .toolbar-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.report-quicklinks { display: flex; gap: .9rem; flex-wrap: wrap; margin-top: .5rem; }
+.report-quicklinks a {
+  font-size: .76rem; color: var(--text-muted); text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+}
+.report-quicklinks a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Kertas laporan ─────────────────────────────────────────────────────── */
 .report-card {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  background: var(--rp-paper);
+  box-shadow: 0 1px 2px rgba(15,37,55,.05), 0 8px 24px rgba(15,37,55,.05);
 }
-.report-header {
-  text-align: center;
-  padding: 1.75rem 1.5rem .6rem;
-  background: linear-gradient(180deg, rgba(184,146,42,.06), transparent);
+
+/* ── Kop surat ──────────────────────────────────────────────────────────── */
+.report-header { padding: 1.9rem 1.75rem 1.1rem; }
+.report-letterhead {
+  display: flex; align-items: center; justify-content: center; gap: .9rem;
+  text-align: left;
 }
+.report-mark {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 10px;
+  background: var(--primary); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: .88rem; letter-spacing: .04em;
+}
+.report-ident { min-width: 0; }
 .report-inst {
-  font-weight: 800; font-size: 1.2rem; letter-spacing: .05em; text-transform: uppercase;
-  color: var(--text-main);
+  font-weight: 800; font-size: 1.16rem; line-height: 1.2;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-main);
 }
-.report-sub-inst { font-size: .85rem; color: var(--text-muted); margin-top: 2px; }
-.report-addr { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
-.report-line {
-  border: none; border-top: 1px solid var(--border);
-  position: relative; margin: 1rem auto .85rem; max-width: 92%;
+.report-sub-inst { font-size: .84rem; color: var(--text-muted); margin-top: 1px; }
+.report-addr { font-size: .74rem; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+
+/* Garis ganda khas kop surat resmi */
+.report-rule {
+  margin: 1.05rem 0 1rem; height: 4px; position: relative;
+  border-top: 2px solid var(--primary); border-bottom: 1px solid var(--border);
 }
-.report-line::after {
-  content: ''; position: absolute; left: 50%; top: -1.5px; transform: translateX(-50%);
-  width: 56px; height: 3px; background: var(--accent); border-radius: 2px;
+.report-rule::after {
+  content: ''; position: absolute; left: 50%; top: -2px; transform: translateX(-50%);
+  width: 72px; height: 2px; background: var(--accent);
 }
-.report-title { font-weight: 700; font-size: 1.08rem; margin-top: .6rem; letter-spacing: .01em; color: var(--text-main); }
-.report-period { font-size: .84rem; color: var(--text-muted); margin-bottom: .25rem; }
+
+.report-titleblock { text-align: center; }
+.report-tag {
+  display: inline-block; font-size: .64rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px;
+  padding: .12rem .55rem; margin-bottom: .45rem;
+}
+.report-title {
+  font-weight: 700; font-size: 1.1rem; line-height: 1.3; margin: 0;
+  letter-spacing: .02em; color: var(--text-main); text-transform: uppercase;
+}
+.report-period {
+  font-size: .82rem; color: var(--text-muted); margin-top: .3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Catatan / penjelasan laporan (gantinya tembok teks di kop) ─────────── */
+.report-note {
+  margin: 1rem 1.75rem 0; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); font-size: .78rem; color: var(--text-muted);
+}
+.report-note > summary {
+  cursor: pointer; list-style: none; padding: .55rem .85rem;
+  font-weight: 600; color: var(--text-main); font-size: .76rem;
+  display: flex; align-items: center; gap: .4rem;
+}
+.report-note > summary > i:first-child { color: var(--accent); }
+.report-note > summary::-webkit-details-marker { display: none; }
+.report-note > summary::after {
+  content: '\F282'; font-family: 'bootstrap-icons'; font-size: .7rem;
+  margin-left: auto; color: var(--text-muted); transition: transform .15s;
+}
+.report-note[open] > summary::after { transform: rotate(180deg); }
+.report-note .note-body { padding: 0 .85rem .7rem; line-height: 1.65; }
+.report-note .note-body p:last-child { margin-bottom: 0; }
+.report-note a { color: var(--accent); }
+
+/* ── Strip ringkasan (KPI) ──────────────────────────────────────────────── */
+.report-summary {
+  background: var(--bg); border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); padding: 1.1rem 1.75rem;
+}
+.report-summary .sum-label {
+  font-size: .68rem; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .07em; font-weight: 600;
+}
+.report-summary .sum-value {
+  font-weight: 700; font-size: 1.08rem; margin-top: 3px; line-height: 1.25;
+  font-variant-numeric: tabular-nums; color: var(--text-main);
+}
+.report-summary .sum-value.big { font-size: 1.32rem; }
+.report-summary .col + .col,
+.report-summary [class*="col-"] + [class*="col-"] { position: relative; }
+@media (min-width: 768px) {
+  .report-summary .sum-cell { border-left: 1px solid var(--border); padding-left: 1rem; }
+  .report-summary [class*="col-"]:first-child .sum-cell { border-left: 0; padding-left: 0; }
+}
+
+/* ── Tabel laporan ──────────────────────────────────────────────────────── */
 .report-table {
   --bs-table-bg: transparent; --bs-table-color: var(--text-main);
   --bs-table-striped-bg: transparent; --bs-table-hover-bg: transparent;
-  font-size: .85rem; margin-bottom: 0; color: var(--text-main);
+  width: 100%; margin-bottom: 0; font-size: .84rem; color: var(--text-main);
+  border-collapse: separate; border-spacing: 0;
 }
-.report-table th, .report-table td { padding: .5rem .75rem; border-color: var(--border) !important; background-color: transparent; }
-.report-thead th {
-  background: var(--primary); color: #fff; font-weight: 600; font-size: .78rem;
-  letter-spacing: .05em; text-transform: uppercase; border: none !important;
+.report-table th, .report-table td {
+  padding: .46rem .7rem; background-color: transparent; vertical-align: middle;
+  border-color: var(--border) !important;
 }
-.report-group td { font-weight: 600; background: var(--bg) !important; font-size: .78rem; letter-spacing: .03em; color: var(--text-muted) !important; }
+.report-table tbody td { border-bottom: 1px solid var(--border); }
+.report-table tbody tr:last-child td { border-bottom: 0; }
+
+/* Kepala tabel utama — navy, untuk tabel inti laporan keuangan */
+.report-thead th, tr.report-thead th {
+  background: var(--primary); color: #fff; font-weight: 600; font-size: .72rem;
+  letter-spacing: .07em; text-transform: uppercase; border: none !important;
+  padding: .55rem .7rem; white-space: nowrap;
+}
+/* Kepala tabel sekunder — untuk tabel pendukung/daftar. Menggantikan
+   semua `style="background:#f8f9fa"` yang dulu ditulis manual per-file. */
+.report-thead-soft th, tr.report-thead-soft th {
+  background: var(--bg); color: var(--text-muted);
+  font-weight: 600; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase;
+  border-top: 1px solid var(--border) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: .5rem .7rem; white-space: nowrap;
+}
+
+/* Baris kelompok — pakai pita aksen di kiri, bukan blok abu-abu penuh */
+.report-group td {
+  background: var(--rp-group) !important; font-weight: 700; font-size: .72rem;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-main) !important;
+  padding: .45rem .7rem; border-bottom: 1px solid var(--border);
+  box-shadow: inset 3px 0 0 var(--panel-accent, var(--primary-mid));
+}
+
 .report-kode {
-  font-family: 'SFMono-Regular', ui-monospace, Consolas, monospace;
-  font-size: .74rem; color: var(--text-muted) !important; white-space: nowrap; letter-spacing: 0;
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: .72rem; color: var(--text-muted) !important;
+  white-space: nowrap; letter-spacing: 0;
 }
 .report-item { color: var(--text-main) !important; font-size: .82rem; }
-.report-amount { white-space: nowrap; font-size: .82rem; font-variant-numeric: tabular-nums; }
-.report-subtotal td { font-weight: 600; border-top: 1px solid var(--border); font-size: .82rem; }
-.report-total td {
-  font-weight: 700; background: rgba(184,146,42,.09); font-size: .85rem;
-  border-top: 2px solid var(--accent) !important;
+.report-amount {
+  white-space: nowrap; text-align: right; font-size: .82rem;
+  font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
 }
-.report-table tbody tr:hover td { background: rgba(15,37,55,.025); }
-[data-bs-theme="dark"] .report-table tbody tr:hover td { background: rgba(255,255,255,.035); }
-.report-sign { padding: 2.25rem 2rem 1.75rem; }
-.sign-role { font-size: .8rem; color: var(--text-muted); }
-.sign-name {
-  font-weight: 700; margin-top: 3.5rem; border-bottom: 1px solid var(--text-main);
-  display: inline-block; padding: 0 1.25rem; color: var(--text-main);
-}
-.sign-label { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
-.report-summary { background: var(--bg); border-top: 1px solid var(--border); padding: 1.35rem 1.5rem; }
-.report-summary .sum-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
-.report-summary .sum-value { font-weight: 700; font-size: 1.05rem; margin-top: 2px; font-variant-numeric: tabular-nums; color: var(--text-main); }
+.report-amount.masuk, .report-table .masuk  { color: var(--rp-masuk) !important; font-weight: 600; }
+.report-amount.keluar, .report-table .keluar { color: var(--rp-keluar) !important; font-weight: 600; }
+.report-amount.nol { color: var(--text-muted) !important; font-weight: 400; }
 
-/* Panel per-jenis-dana (dipakai LSPD & Arus Kas) — aksen warna di tepi kiri, bukan blok penuh */
-.report-panel {
-  border: 1px solid var(--border); border-left: 3px solid var(--panel-accent, var(--accent));
-  border-radius: 10px; overflow: hidden; background: var(--surface); margin-bottom: 1rem;
+/* Subtotal: garis tunggal. Total akhir: garis ganda (konvensi akuntansi). */
+.report-subtotal td {
+  font-weight: 600; font-size: .82rem; background: transparent;
+  border-top: 1px solid var(--text-muted) !important;
+  border-bottom: 0 !important; font-variant-numeric: tabular-nums;
 }
+.report-total td {
+  font-weight: 800; font-size: .86rem; background: var(--rp-tint) !important;
+  border-top: 1px solid var(--accent) !important;
+  border-bottom: 3px double var(--accent) !important;
+  font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.report-table tbody tr:hover td { background: var(--rp-hover); }
+.report-table tbody tr.report-group:hover td { background: var(--rp-group) !important; }
+.report-table tfoot tr:hover td { background: var(--rp-tint) !important; }
+
+/* Baris bisa diklik (mis. daftar program → buku besar) */
+.report-row-link { cursor: pointer; }
+.report-row-link:hover td { background: rgba(184,146,42,.09) !important; }
+
+/* Header kolom yang bisa diklik untuk mengurutkan */
+.th-sort { padding: 0 !important; }
+.th-sort > a {
+  display: flex; align-items: center; gap: .35rem;
+  padding: .55rem .7rem; color: inherit; text-decoration: none; white-space: nowrap;
+}
+.th-sort.text-end > a { justify-content: flex-end; }
+.th-sort > a:hover { background: rgba(255,255,255,.12); color: #fff; }
+.th-sort > a i { font-size: .68rem; opacity: .45; }
+.th-sort-aktif > a i { opacity: 1; color: var(--accent); }
+.report-thead-soft .th-sort > a:hover { background: var(--border); color: var(--text-main); }
+
+/* Baris nonaktif (mis. donatur sudah tidak aktif) — diredupkan, bukan diblok abu */
+.baris-nonaktif td { opacity: .55; }
+.baris-nonaktif .report-item { font-style: italic; }
+
+/* Kepala tabel menempel saat tabel panjang digulir (layar saja) */
+@media screen {
+  .report-sticky thead th { position: sticky; top: 0; z-index: 2; }
+  /* Kolom pertama menempel — untuk tabel lebar (mis. rekap 12 bulan) */
+  .report-stickycol thead th:first-child,
+  .report-stickycol tfoot td:first-child { position: sticky; left: 0; z-index: 3; }
+  .report-stickycol tbody td:first-child {
+    position: sticky; left: 0; z-index: 1;
+    background: var(--rp-paper); box-shadow: 1px 0 0 var(--border);
+  }
+  .report-stickycol tbody tr:hover td:first-child { background: var(--surface); }
+}
+
+/* ── Panel per jenis dana / per blok ────────────────────────────────────── */
+.report-panel {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: var(--rp-paper); margin-bottom: 1rem;
+}
+.report-panel:last-child { margin-bottom: 0; }
+/* Warna jenis dana dibawa garis bawah kepala panel + warna judulnya, bukan
+   pita tebal di tepi kiri (tepi kiri terbaca sebagai hiasan, bukan data). */
 .report-panel-head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: .65rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+  flex-wrap: wrap; padding: .6rem .9rem;
+  background: var(--bg);
+  border-bottom: 2px solid var(--panel-accent, var(--border));
 }
 .report-panel-title {
-  font-weight: 700; font-size: .84rem; color: var(--panel-accent, var(--text-main));
-  letter-spacing: .02em;
+  font-weight: 700; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--panel-accent, var(--text-main));
 }
-.report-panel-meta { font-size: .76rem; color: var(--text-muted); }
-.report-panel-meta strong { color: var(--text-main); font-variant-numeric: tabular-nums; }
+.report-panel-meta { font-size: .76rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.report-panel-meta strong { color: var(--text-main); }
 .report-panel-foot {
-  display: flex; justify-content: flex-end; gap: 1.5rem; flex-wrap: wrap;
-  padding: .6rem 1rem; background: var(--bg); border-top: 1px solid var(--border); font-size: .8rem;
+  display: flex; justify-content: flex-end; align-items: center; gap: 1.25rem;
+  flex-wrap: wrap; padding: .55rem .9rem;
+  background: var(--bg); border-top: 1px solid var(--border); font-size: .78rem;
 }
 .report-panel-foot .val { font-variant-numeric: tabular-nums; }
-@media print {
-  .report-panel { border-color: #ddd !important; }
-  .report-panel-head, .report-panel-foot { background: #f8f8f8 !important; }
-  .report-panel-title { color: #111 !important; }
+.report-panel-foot .final { font-size: .9rem; font-weight: 700; }
+
+/* Pemisah vertikal untuk tabel 2 sisi (penerimaan | penyaluran) */
+.report-table .split { border-left: 1px solid var(--border) !important; }
+
+/* ── Bar/meter (statistik donatur, renstra) ─────────────────────────────── */
+.report-meter {
+  display: block; width: 100%; background: var(--border);
+  border-radius: 999px; height: 6px; overflow: hidden;
+}
+.report-meter > span {
+  display: block; height: 100%; min-width: 2px; border-radius: 999px;
+  background: var(--panel-accent, var(--accent));
+}
+.report-metric {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+  padding: .6rem .7rem; text-align: center; height: 100%;
+}
+.report-metric .m-value { font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.report-metric .m-label { font-size: .7rem; color: var(--text-muted); line-height: 1.3; margin-top: 2px; }
+
+/* Keadaan kosong */
+.report-empty { text-align: center; padding: 2.25rem 1rem; color: var(--text-muted); }
+.report-empty i { font-size: 2rem; opacity: .22; display: block; margin-bottom: .5rem; }
+.report-empty .hint { font-size: .76rem; font-style: italic; margin-top: .35rem; }
+
+/* ── Tanda tangan ───────────────────────────────────────────────────────── */
+.report-sign { padding: 1.75rem 1.75rem 1.6rem; border-top: 1px solid var(--border); }
+.report-sign-place { text-align: right; font-size: .8rem; color: var(--text-muted); margin-bottom: 1rem; }
+.report-sign-grid { display: flex; gap: 1.5rem; }
+.report-sign-grid .sign-col { flex: 1; text-align: center; }
+.sign-role { font-size: .8rem; color: var(--text-muted); }
+.sign-name {
+  font-weight: 700; margin-top: 3.25rem; border-bottom: 1px solid var(--text-main);
+  display: inline-block; padding: 0 1.5rem; color: var(--text-main); min-width: 160px;
+}
+.sign-label { font-size: .76rem; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Layar kecil ────────────────────────────────────────────────────────── */
+@media (max-width: 575.98px) {
+  .report-header { padding: 1.25rem 1rem .9rem; }
+  .report-letterhead { flex-direction: column; text-align: center; gap: .5rem; }
+  .report-inst { font-size: 1rem; letter-spacing: .04em; }
+  .report-title { font-size: .95rem; }
+  .report-summary, .report-note { padding-left: 1rem; padding-right: 1rem; margin-left: 1rem; margin-right: 1rem; }
+  .report-summary { margin-left: 0; margin-right: 0; }
+  .report-sign { padding: 1.25rem 1rem; }
+  .report-sign-grid { flex-direction: column; gap: 2rem; }
+  .report-table { font-size: .78rem; }
+  .report-table th, .report-table td { padding: .4rem .5rem; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CETAK — A4, hemat tinta, header tabel berulang tiap halaman
+   ══════════════════════════════════════════════════════════════════════════ */
 @media print {
-  .no-print { display: none !important; }
-  .sidebar, .topbar { display: none !important; }
-  .main { margin-left: 0 !important; padding: .5rem !important; }
-  body { background: #fff !important; }
+  @page { size: A4; margin: 12mm 10mm; }
+
+  .no-print, .sidebar, .topbar, .report-toolbar, .report-quicklinks { display: none !important; }
+  .main { margin-left: 0 !important; padding: 0 !important; }
+  body { background: #fff !important; font-size: 10pt; }
+
   .report-card {
-    box-shadow: none !important; border: 1px solid #ddd !important; border-radius: 0 !important;
-    background: #fff !important;
+    box-shadow: none !important; border: 1px solid #c9c9c9 !important;
+    border-radius: 0 !important; background: #fff !important;
   }
-  .report-header { background: none !important; }
-  .report-inst, .report-title, .report-item, .report-amount, .sign-name, .report-table { color: #111 !important; }
-  .report-sub-inst, .report-addr, .report-period, .sum-label, .sign-role, .sign-label, .report-kode { color: #555 !important; }
-  .report-thead th { background: #1a2635 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .report-group td { background: #f4f4f4 !important; color: #333 !important; }
-  .report-total td { background: #f1e7cf !important; border-top-color: #B8922A !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .report-summary { background: #f8f8f8 !important; }
-  .report-sign { page-break-inside: avoid; }
-  .card { box-shadow: none !important; page-break-inside: avoid; }
+  .report-header { padding: 0 0 .6rem !important; }
+  .report-mark { background: #0F2537 !important; color: #B8922A !important;
+                 -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-rule { border-top-color: #0F2537 !important; border-bottom-color: #bbb !important; }
+  .report-rule::after { background: #B8922A !important;
+                        -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-tag { color: #8a6d1f !important; border-color: #8a6d1f !important; }
+
+  .report-inst, .report-title, .report-item, .report-amount,
+  .sign-name, .report-table, .report-panel-meta strong { color: #111 !important; }
+  .report-sub-inst, .report-addr, .report-period, .sum-label,
+  .sign-role, .sign-label, .report-kode, .report-sign-place { color: #555 !important; }
+
+  /* Catatan: dibuka & dibuat teks biasa saat dicetak */
+  .report-note { background: #fafafa !important; border-color: #ccc !important; margin: .4rem 0 !important; }
+  .report-note > summary { color: #111 !important; }
+  .report-note > summary::after { content: none; }
+  .report-note .note-body { display: block !important; }
+
+  .report-thead th { background: #0F2537 !important; color: #fff !important;
+                     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-thead-soft th { background: #f1f1f1 !important; color: #333 !important; }
+  .report-group td { background: #f4f4f4 !important; color: #222 !important; box-shadow: none !important; }
+  .report-subtotal td { border-top-color: #555 !important; }
+  .report-total td {
+    background: #f4ecd8 !important; border-top-color: #B8922A !important;
+    border-bottom: 3px double #B8922A !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .report-amount.masuk  { color: #14532d !important; }
+  .report-amount.keluar { color: #7f1d1d !important; }
+  .report-summary { background: #f8f8f8 !important; border-color: #ccc !important; padding: .6rem 0 !important; }
+  .report-panel { border-color: #ccc !important; break-inside: avoid; }
+  .report-panel-head, .report-panel-foot { background: #f6f6f6 !important; }
+  .report-panel-head { border-bottom-color: #999 !important; }
+  .report-panel-title { color: #111 !important; }
+  .report-meter { background: #e2e2e2 !important; }
+  .report-meter > span { background: #777 !important;
+                         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-metric { background: #f8f8f8 !important; border-color: #ddd !important; }
+
+  /* Header tabel diulang tiap halaman, baris tidak terpotong */
+  .report-table thead { display: table-header-group; }
+  .report-table tfoot { display: table-footer-group; }
+  .report-table tr, .report-table td, .report-table th { break-inside: avoid; }
+  .report-sticky thead th { position: static !important; }
+  .table-responsive { overflow: visible !important; }
+
+  .report-sign { break-inside: avoid; padding: 1.5rem 0 0 !important; }
+  .card { box-shadow: none !important; break-inside: avoid; }
+  a { text-decoration: none !important; color: #111 !important; }
 }
 </style>

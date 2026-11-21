@@ -2,41 +2,62 @@
 {% block title %}Laporan Sumber & Penggunaan Dana{% endblock %}
 {% block page_title %}<i class="bi bi-journal-text"></i> Sumber &amp; Penggunaan Dana ZIS{% endblock %}
 
-{% set dana_color = {
-  'zakat':               '#27ae60',
-  'infak_tidak_terikat': '#2980b9',
-  'infak_terikat':       '#16a085',
-  'amil':                '#8e44ad',
-  'wakaf':               '#e67e22',
-} %}
-
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 no-print">
-  <form class="d-flex gap-2">
-    <input type="month" name="bulan" value="{{ bulan }}"
-           class="form-control form-control-sm" style="width:180px">
+<div class="report-toolbar no-print">
+  <form>
+    <span class="toolbar-label">Periode</span>
+    <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:165px">
     <button class="btn btn-sm btn-primary">Tampilkan</button>
   </form>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-printer"></i> Cetak
-  </button>
+  <div class="toolbar-actions">
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak
+    </button>
+  </div>
 </div>
 
 <div class="card report-card">
-  <div class="report-header">
-    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
-    {% if inst.nama_lembaga %}
-    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
-    {% endif %}
-    {% if inst.alamat %}
-    <div class="report-addr">{{ inst.alamat }}
-      {% if inst.telepon %} · Telp: {{ inst.telepon }}{% endif %}
-      {% if inst.email %} · {{ inst.email }}{% endif %}
+  {% set report_tag = 'PSAK 109' %}
+  {% set report_title = 'Laporan Sumber dan Penggunaan Dana ZIS' %}
+  {% set report_period = 'Periode ' ~ (bulan | bulan_label) %}
+  {% include 'admin/_report_head.html' %}
+
+  {% set ns = namespace(awal=0, masuk=0, keluar=0, akhir=0) %}
+  {% for dana in dana_types %}
+    {% set d = data[dana] %}
+    {% set ns.awal   = ns.awal   + d.saldo_awal %}
+    {% set ns.masuk  = ns.masuk  + d.total_masuk %}
+    {% set ns.keluar = ns.keluar + d.total_keluar %}
+    {% set ns.akhir  = ns.akhir  + d.saldo_akhir %}
+  {% endfor %}
+
+  <div class="report-summary">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="sum-cell">
+          <div class="sum-label">Saldo Awal Seluruh Dana</div>
+          <div class="sum-value">{{ ns.awal|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-cell">
+          <div class="sum-label">+ Total Penerimaan</div>
+          <div class="sum-value" style="color:var(--rp-masuk)">{{ ns.masuk|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-cell">
+          <div class="sum-label">&minus; Total Penyaluran</div>
+          <div class="sum-value" style="color:var(--rp-keluar)">{{ ns.keluar|rupiah }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-cell">
+          <div class="sum-label">= Saldo Akhir</div>
+          <div class="sum-value big">{{ ns.akhir|rupiah }}</div>
+        </div>
+      </div>
     </div>
-    {% endif %}
-    <div class="report-line"></div>
-    <div class="report-title">LAPORAN SUMBER DAN PENGGUNAAN DANA ZIS</div>
-    <div class="report-period">Periode: {{ bulan | bulan_label }}</div>
   </div>
 
   <div class="p-4">
@@ -44,92 +65,78 @@
   {% set d = data[dana] %}
   {% if d.masuk or d.keluar or d.saldo_awal %}
 
-  <div class="report-panel" style="--panel-accent: {{ dana_color.get(dana,'#94a3b8') }}">
+  <section class="report-panel d-{{ dana }}">
     <div class="report-panel-head">
-      <span class="report-panel-title">DANA {{ LABEL_DANA.get(dana, dana)|upper }}</span>
+      <span class="report-panel-title">Dana {{ LABEL_DANA.get(dana, dana) }}</span>
       <span class="report-panel-meta">
         Saldo Awal <strong>{{ d.saldo_awal|rupiah }}</strong>
-        &nbsp;→&nbsp;
+        &nbsp;&rarr;&nbsp;
         Saldo Akhir <strong>{{ d.saldo_akhir|rupiah }}</strong>
       </span>
     </div>
 
-    <table class="table table-sm report-table mb-0">
-      <thead>
-        <tr style="background:var(--bg)">
-          <th class="ps-3" style="width:12%;font-size:.72rem;color:var(--text-muted)">Kode</th>
-          <th style="width:38%;font-size:.72rem;color:var(--text-muted)">Penerimaan</th>
-          <th class="text-end" style="width:15%;font-size:.72rem;color:var(--text-muted)">Jumlah</th>
-          <th class="ps-3" style="width:12%;font-size:.72rem;color:var(--text-muted);border-left:1px solid var(--border)">Kode</th>
-          <th style="width:23%;font-size:.72rem;color:var(--text-muted)">Penyaluran / Penggunaan</th>
-          <th class="text-end pe-3" style="width:15%;font-size:.72rem;color:var(--text-muted)">Jumlah</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% set max_rows = [d.masuk|length, d.keluar|length]|max %}
-        {% for i in range(max_rows if max_rows > 0 else 1) %}
-        <tr>
-          {% if i < d.masuk|length %}
-          <td class="ps-3 report-kode">{{ d.masuk[i].kode }}</td>
-          <td class="report-item">{{ d.masuk[i].nama }}</td>
-          <td class="text-end text-success fw-semibold report-amount">{{ d.masuk[i].total|rupiah }}</td>
+    <div class="table-responsive">
+      <table class="table report-table mb-0">
+        <thead class="report-thead-soft">
+          <tr>
+            <th style="width:80px">Kode</th>
+            <th>Uraian</th>
+            <th class="text-end" style="width:170px">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="report-group"><td colspan="3">Penerimaan</td></tr>
+          {% for r in d.masuk %}
+          <tr>
+            <td class="report-kode">{{ r.kode }}</td>
+            <td class="report-item">{{ r.nama }}</td>
+            <td class="report-amount masuk">{{ r.total|rupiah }}</td>
+          </tr>
           {% else %}
-          <td></td><td></td><td></td>
-          {% endif %}
-          {% if i < d.keluar|length %}
-          <td class="ps-3 report-kode" style="border-left:1px solid var(--border)">{{ d.keluar[i].kode }}</td>
-          <td class="report-item">{{ d.keluar[i].nama }}</td>
-          <td class="text-end pe-3 text-danger fw-semibold report-amount">{{ d.keluar[i].total|rupiah }}</td>
+          <tr><td colspan="3" class="text-muted small fst-italic">Tidak ada penerimaan pada periode ini</td></tr>
+          {% endfor %}
+          <tr class="report-subtotal">
+            <td colspan="2">Jumlah Penerimaan</td>
+            <td class="report-amount masuk">{{ d.total_masuk|rupiah }}</td>
+          </tr>
+
+          <tr class="report-group"><td colspan="3">Penyaluran / Penggunaan</td></tr>
+          {% for r in d.keluar %}
+          <tr>
+            <td class="report-kode">{{ r.kode }}</td>
+            <td class="report-item">{{ r.nama }}</td>
+            <td class="report-amount keluar">{{ r.total|rupiah }}</td>
+          </tr>
           {% else %}
-          <td style="border-left:1px solid var(--border)"></td><td></td><td></td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-        {% if not d.masuk and not d.keluar %}
-        <tr>
-          <td class="ps-3 text-muted small fst-italic" colspan="3">Tidak ada penerimaan</td>
-          <td class="ps-3 text-muted small fst-italic" colspan="3" style="border-left:1px solid var(--border)">Tidak ada penyaluran</td>
-        </tr>
-        {% endif %}
-      </tbody>
-      <tfoot>
-        <tr class="report-subtotal">
-          <td colspan="2" class="ps-3">Total Penerimaan</td>
-          <td class="text-end text-success">{{ d.total_masuk|rupiah }}</td>
-          <td colspan="2" class="ps-3" style="border-left:1px solid var(--border)">Total Penyaluran</td>
-          <td class="text-end pe-3 text-danger">{{ d.total_keluar|rupiah }}</td>
-        </tr>
-      </tfoot>
-    </table>
+          <tr><td colspan="3" class="text-muted small fst-italic">Tidak ada penyaluran pada periode ini</td></tr>
+          {% endfor %}
+          <tr class="report-subtotal">
+            <td colspan="2">Jumlah Penyaluran</td>
+            <td class="report-amount keluar">{{ d.total_keluar|rupiah }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="report-total">
+            <td colspan="2">Saldo Akhir Dana {{ LABEL_DANA.get(dana, dana) }}</td>
+            <td class="report-amount {{ 'keluar' if d.saldo_akhir < 0 }}">{{ d.saldo_akhir|rupiah }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
 
     <div class="report-panel-foot">
-      <span class="text-muted">Saldo Awal: <strong class="val">{{ d.saldo_awal|rupiah }}</strong></span>
-      <span class="text-muted">+ Penerimaan: <strong class="val text-success">{{ d.total_masuk|rupiah }}</strong></span>
-      <span class="text-muted">− Penyaluran: <strong class="val text-danger">{{ d.total_keluar|rupiah }}</strong></span>
-      <span>= Saldo Akhir: <strong class="val {{ 'text-success' if d.saldo_akhir >= 0 else 'text-danger' }}" style="font-size:.92rem">{{ d.saldo_akhir|rupiah }}</strong></span>
+      <span class="text-muted">Saldo Awal <strong class="val">{{ d.saldo_awal|rupiah }}</strong></span>
+      <span class="text-muted">+ Penerimaan <strong class="val" style="color:var(--rp-masuk)">{{ d.total_masuk|rupiah }}</strong></span>
+      <span class="text-muted">&minus; Penyaluran <strong class="val" style="color:var(--rp-keluar)">{{ d.total_keluar|rupiah }}</strong></span>
+      <span class="final">= {{ d.saldo_akhir|rupiah }}</span>
     </div>
-  </div>
+  </section>
 
   {% endif %}
   {% endfor %}
   </div>
 
-  {% if inst.ketua or inst.bendahara %}
-  <div class="report-sign">
-    <div class="row">
-      <div class="col-6 text-center">
-        <div class="sign-role">Mengetahui,</div>
-        <div class="sign-name">{{ inst.ketua or '_______________' }}</div>
-        <div class="sign-label">Ketua</div>
-      </div>
-      <div class="col-6 text-center">
-        <div class="sign-role">Dibuat oleh,</div>
-        <div class="sign-name">{{ inst.bendahara or '_______________' }}</div>
-        <div class="sign-label">Bendahara</div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+  {% include 'admin/_report_sign.html' %}
 </div>
 
 {% include 'admin/_report_style.html' %}

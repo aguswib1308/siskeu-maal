@@ -3,77 +3,82 @@
 {% block page_title %}<i class="bi bi-pie-chart"></i> Saldo per Program{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 no-print">
-  <form class="d-flex gap-2">
-    <input type="month" name="bulan" value="{{ bulan }}"
-           class="form-control form-control-sm" style="width:180px">
+<div class="report-toolbar no-print">
+  <form>
+    <span class="toolbar-label">Periode</span>
+    <input type="month" name="bulan" value="{{ bulan }}" class="form-control form-control-sm" style="width:165px">
     <button class="btn btn-sm btn-primary">Tampilkan</button>
   </form>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-printer"></i> Cetak
-  </button>
+  <div class="toolbar-actions">
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-printer"></i> Cetak
+    </button>
+  </div>
 </div>
 
 <div class="card report-card">
-  <div class="report-header">
-    <div class="report-inst">{{ inst.nama or 'BAITUL MAAL BMT' }}</div>
-    {% if inst.nama_lembaga %}
-    <div class="report-sub-inst">{{ inst.nama_lembaga }}</div>
-    {% endif %}
-    <div class="report-line"></div>
-    <div class="report-title">SALDO PER PROGRAM</div>
-    <div class="report-period">Periode: {{ bulan | bulan_label }}</div>
-    <div class="text-muted small mt-1">
-      Saldo bersih tiap program terikat (penerimaan terikat − penyaluran program itu), digabung dari akun
-      penerimaan &amp; penyaluran berkode sama (mis. akun "[CY]" di sisi penerimaan dan penyaluran).
-      Infaq Tidak Terikat ditampilkan sebagai satu baris gabungan (Kotak Infaq+Kencleng+Tunai di
-      penerimaan, semua program tidak-terikat di penyaluran) karena memang dikelola satu saldo —
-      rincian sumbernya ada di Rekap Tahunan Sumber Infaq. Baris "Miskin" pada Zakat sengaja tidak
-      tampil terpisah di sini — penyalurannya dialokasikan ke Fidyah → Zakat Fitrah → Zakat Maal
-      (krn Miskin tdk py sumber sendiri); utk melihat transaksi mentahnya per-akun (termasuk Miskin
-      apa adanya), lihat <a href="/admin/laporan/buku-besar?bulan={{ bulan }}">Buku Besar Program</a>.
+  {% set report_title = 'Saldo per Program' %}
+  {% set report_period = 'Periode ' ~ (bulan | bulan_label) %}
+  {% include 'admin/_report_head.html' %}
+
+  <details class="report-note">
+    <summary><i class="bi bi-info-circle"></i> Cara membaca laporan ini</summary>
+    <div class="note-body">
+      <p>Saldo bersih tiap program terikat = penerimaan terikat &minus; penyaluran program tersebut,
+         digabung dari akun penerimaan &amp; penyaluran yang berkode sama
+         (mis. akun <span class="report-kode">[CY]</span> di sisi penerimaan dan penyaluran).</p>
+      <p>Infaq Tidak Terikat ditampilkan sebagai <strong>satu baris gabungan</strong> (Kotak Infaq, Kencleng,
+         dan Tunai di sisi penerimaan; semua program tidak terikat di sisi penyaluran) karena memang
+         dikelola dalam satu saldo. Rincian sumbernya ada di Rekap Tahunan Sumber Infaq.</p>
+      <p>Baris <strong>Miskin</strong> pada Zakat sengaja tidak tampil terpisah di sini — penyalurannya
+         dialokasikan ke Fidyah &rarr; Zakat Fitrah &rarr; Zakat Maal karena Miskin tidak punya sumber
+         penerimaan sendiri. Untuk melihat transaksi mentah per akun (termasuk Miskin apa adanya),
+         buka <a href="/admin/laporan/buku-besar?bulan={{ bulan }}">Buku Besar Program</a>.</p>
+    </div>
+  </details>
+
+  <div class="p-4">
+    <div class="table-responsive">
+      <table class="table report-table">
+        <thead class="report-thead-soft">
+          <tr>
+            <th>Program</th>
+            <th class="text-end" style="width:140px">Saldo Awal</th>
+            <th class="text-end" style="width:140px">Penerimaan</th>
+            <th class="text-end" style="width:140px">Penyaluran</th>
+            <th class="text-end" style="width:150px">Saldo Akhir</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set current_dana = namespace(v=None) %}
+          {% for g in data %}
+          {% if g.jenis_dana != current_dana.v %}
+          {% set current_dana.v = g.jenis_dana %}
+          <tr class="report-group d-{{ g.jenis_dana or 'umum' }}">
+            <td colspan="5">{{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya') }}</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <td class="report-item">
+              {{ g.label }}{% if g.code %} <span class="report-kode">[{{ g.code }}]</span>{% endif %}
+            </td>
+            <td class="report-amount">{{ g.saldo_awal|rupiah }}</td>
+            <td class="report-amount masuk">{{ g.masuk|rupiah }}</td>
+            <td class="report-amount keluar">{{ g.keluar|rupiah }}</td>
+            <td class="report-amount fw-semibold {{ 'keluar' if g.saldo_akhir < 0 }}">{{ g.saldo_akhir|rupiah }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="report-empty">
+            <i class="bi bi-pie-chart"></i>
+            Tidak ada aktivitas pada periode ini
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <div class="p-4">
-    {% set current_dana = namespace(v=None) %}
-    <table class="table table-sm report-table">
-      <thead>
-        <tr style="background:#f8f9fa">
-          <th class="ps-3" style="font-size:.78rem;color:#64748b">Program</th>
-          <th class="text-end" style="font-size:.78rem;color:#64748b">Saldo Awal</th>
-          <th class="text-end" style="font-size:.78rem;color:#64748b">Penerimaan</th>
-          <th class="text-end" style="font-size:.78rem;color:#64748b">Penyaluran</th>
-          <th class="text-end pe-3" style="font-size:.78rem;color:#64748b">Saldo Akhir</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for g in data %}
-        {% if g.jenis_dana != current_dana.v %}
-        {% set current_dana.v = g.jenis_dana %}
-        <tr style="background:#eef2f7">
-          <td colspan="5" class="ps-3 fw-bold" style="font-size:.8rem">
-            {{ LABEL_DANA.get(g.jenis_dana, g.jenis_dana or 'Lainnya')|upper }}
-          </td>
-        </tr>
-        {% endif %}
-        <tr>
-          <td class="ps-3 report-item">
-            {{ g.label }}{% if g.code %} <span class="text-muted small">[{{ g.code }}]</span>{% endif %}
-          </td>
-          <td class="text-end report-amount">{{ g.saldo_awal|rupiah }}</td>
-          <td class="text-end report-amount text-success">{{ g.masuk|rupiah }}</td>
-          <td class="text-end report-amount text-danger">{{ g.keluar|rupiah }}</td>
-          <td class="text-end pe-3 fw-semibold report-amount {% if g.saldo_akhir < 0 %}text-danger{% endif %}">
-            {{ g.saldo_akhir|rupiah }}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="text-center text-muted small fst-italic py-3">Tidak ada aktivitas</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% include 'admin/_report_sign.html' %}
 </div>
 
 {% include 'admin/_report_style.html' %}
