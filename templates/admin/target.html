@@ -29,7 +29,11 @@
       <tbody>
         {% for r in capaian %}
         <tr>
-          <td class="fw-semibold">{{ r.nama }}</td>
+          <td class="fw-semibold">
+            <a href="{{ url_for('admin_target_marketing', user_id=r.id, bulan=bulan) }}" class="text-decoration-none">
+              {{ r.nama }} <i class="bi bi-chevron-right small text-muted"></i>
+            </a>
+          </td>
           <td>
             <div class="d-flex justify-content-between small">
               <span class="fw-semibold text-success">{{ r.fund_real|rupiah }}</span>
@@ -87,8 +91,21 @@
     (termasuk hasil koleksi kencleng/kotak infaq) — angka yang sama dengan yang tampil di
     dashboard HP marketing. Kolom <b>Koleksi</b> = jumlah kencleng/kotak terkumpul
     (detail: <a href="/admin/koleksi/capaian?bulan={{ bulan }}">Capaian Koleksi</a>).
-    Transaksi yang diinput admin tidak masuk capaian marketing manapun.
+    Klik nama marketing utk lihat rincian donatur & kegiatan yang dia catat, plus tren 12 bulan.
   </div>
+
+  {% if admin_rows %}
+  <div class="alert alert-secondary mt-3 mb-0 py-2 px-3" style="font-size:.8rem">
+    <i class="bi bi-person-badge"></i>
+    <strong>Rp {{ "{:,.0f}".format(admin_total.fund_real).replace(",", ".") }}</strong> dari
+    {{ admin_total.fund_n }} transaksi penerimaan &amp;
+    <strong>Rp {{ "{:,.0f}".format(admin_total.pent_real).replace(",", ".") }}</strong> penyaluran
+    bulan ini <b>tidak masuk capaian marketing manapun</b> di atas — tercatat atas nama:
+    {% for r in admin_rows %}
+      {{ r.nama }} ({{ r.fund_n }} transaksi, Rp {{ "{:,.0f}".format(r.fund_real).replace(",", ".") }}){% if not loop.last %}, {% endif %}
+    {% endfor %}.
+  </div>
+  {% endif %}
   {% else %}
   <div class="text-muted text-center py-4">Belum ada user marketing aktif.</div>
   {% endif %}
