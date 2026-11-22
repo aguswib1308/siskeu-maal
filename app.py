@@ -743,7 +743,7 @@ def _dana_summary(conn, bulan):
 
     masuk_rows = conn.execute("""
         SELECT c.kode, c.nama, c.jenis_dana, c.parent_kode, SUM(t.jumlah) as total,
-               COUNT(*) as n_donatur
+               COUNT(DISTINCT COALESCE(t.donatur_id, -t.id)) as n_donatur
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
         WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?""" + NOT_HIBAH + """
         GROUP BY c.id ORDER BY c.kode
@@ -1996,7 +1996,8 @@ def laporan_arus_kas():
     saldo_awal = saldo_awal_trans + sum(get_saldo_awal(conn).values())
 
     masuk = conn.execute("""
-        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total, COUNT(*) as n_donatur
+        SELECT c.kode, c.nama, c.jenis_dana, SUM(t.jumlah) as total,
+               COUNT(DISTINCT COALESCE(t.donatur_id, -t.id)) as n_donatur
         FROM transaksi t JOIN chart_of_accounts c ON t.coa_id=c.id
         WHERE t.jenis='masuk' AND strftime('%Y-%m',t.tanggal)=?""" + _not_hibah_sql(conn) + """
         GROUP BY c.id ORDER BY c.kode
@@ -2012,6 +2013,8 @@ def laporan_arus_kas():
 
     total_masuk  = sum(r['total'] for r in masuk)
     total_keluar = sum(r['total'] for r in keluar)
+    total_donatur  = sum(r['n_donatur'] for r in masuk)
+    total_mustahik = sum(r['n_mustahik'] for r in keluar)
 
     # Saldo akhir diambil dari SELURUH transaksi s/d akhir bulan (termasuk leg
     # transfer antar-dana), supaya tidak pincang thd saldo awal yg juga total.
@@ -2027,6 +2030,7 @@ def laporan_arus_kas():
     return render_template('admin/laporan_arus_kas.html',
         masuk=masuk, keluar=keluar,
         total_masuk=total_masuk, total_keluar=total_keluar,
+        total_donatur=total_donatur, total_mustahik=total_mustahik,
         saldo_awal=saldo_awal, saldo_akhir=saldo_akhir,
         bulan=bulan, inst=inst)
 

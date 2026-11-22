@@ -79,59 +79,56 @@
           <tr>
             <th style="width:80px">Kode</th>
             <th>Uraian</th>
+            <th class="text-end" style="width:110px"></th>
             <th class="text-end" style="width:170px">Jumlah</th>
           </tr>
         </thead>
         <tbody>
-          <tr class="report-group"><td colspan="3">Penerimaan</td></tr>
+          <tr class="report-group">
+            <td colspan="2">Penerimaan</td>
+            <td class="text-end">Donatur</td>
+            <td></td>
+          </tr>
           {% for r in d.masuk %}
           <tr>
             <td class="report-kode">{{ r.kode }}</td>
-            <td class="report-item">
-              {{ r.nama }}
-              {% if r.n_donatur %}
-              <div class="report-count"><i class="bi bi-people"></i> {{ r.n_donatur }} donatur</div>
-              {% endif %}
-            </td>
+            <td class="report-item">{{ r.nama }}</td>
+            <td class="report-amount {{ 'nol' if not r.n_donatur }}">{{ r.n_donatur or '&mdash;' }}</td>
             <td class="report-amount masuk">{{ r.total|rupiah }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="3" class="text-muted small fst-italic">Tidak ada penerimaan pada periode ini</td></tr>
+          <tr><td colspan="4" class="text-muted small fst-italic">Tidak ada penerimaan pada periode ini</td></tr>
           {% endfor %}
           <tr class="report-subtotal">
-            <td colspan="2">
-              Jumlah Penerimaan
-              <span class="report-count">({{ d.total_donatur }} donatur)</span>
-            </td>
+            <td colspan="2">Jumlah Penerimaan</td>
+            <td class="report-amount">{{ d.total_donatur }}</td>
             <td class="report-amount masuk">{{ d.total_masuk|rupiah }}</td>
           </tr>
 
-          <tr class="report-group"><td colspan="3">Penyaluran / Penggunaan</td></tr>
+          <tr class="report-group">
+            <td colspan="2">Penyaluran / Penggunaan</td>
+            <td class="text-end">Penerima Manfaat</td>
+            <td></td>
+          </tr>
           {% for r in d.keluar %}
           <tr>
             <td class="report-kode">{{ r.kode }}</td>
-            <td class="report-item">
-              {{ r.nama }}
-              {% if r.n_mustahik %}
-              <div class="report-count"><i class="bi bi-people"></i> {{ r.n_mustahik }} penerima manfaat</div>
-              {% endif %}
-            </td>
+            <td class="report-item">{{ r.nama }}</td>
+            <td class="report-amount {{ 'nol' if not r.n_mustahik }}">{{ r.n_mustahik or '&mdash;' }}</td>
             <td class="report-amount keluar">{{ r.total|rupiah }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="3" class="text-muted small fst-italic">Tidak ada penyaluran pada periode ini</td></tr>
+          <tr><td colspan="4" class="text-muted small fst-italic">Tidak ada penyaluran pada periode ini</td></tr>
           {% endfor %}
           <tr class="report-subtotal">
-            <td colspan="2">
-              Jumlah Penyaluran
-              <span class="report-count">({{ d.total_mustahik }} penerima manfaat)</span>
-            </td>
+            <td colspan="2">Jumlah Penyaluran</td>
+            <td class="report-amount">{{ d.total_mustahik }}</td>
             <td class="report-amount keluar">{{ d.total_keluar|rupiah }}</td>
           </tr>
         </tbody>
         <tfoot>
           <tr class="report-total">
-            <td colspan="2">Saldo Akhir Dana {{ LABEL_DANA.get(dana, dana) }}</td>
+            <td colspan="3">Saldo Akhir Dana {{ LABEL_DANA.get(dana, dana) }}</td>
             <td class="report-amount {{ 'keluar' if d.saldo_akhir < 0 }}">{{ d.saldo_akhir|rupiah }}</td>
           </tr>
         </tfoot>

@@ -68,6 +68,7 @@
                 <tr>
                   <th style="width:72px">Kode</th>
                   <th>Sumber Penerimaan</th>
+                  <th class="text-end" style="width:85px">Donatur</th>
                   <th class="text-end" style="width:150px">Jumlah</th>
                 </tr>
               </thead>
@@ -77,25 +78,22 @@
                   {% set d = r.jenis_dana or 'umum' %}
                   {% if d != ns_masuk.cur %}
                     {% set ns_masuk.cur = d %}
-                    <tr class="report-group d-{{ d }}"><td colspan="3">Dana {{ LABEL_DANA.get(d, d) }}</td></tr>
+                    <tr class="report-group d-{{ d }}"><td colspan="4">Dana {{ LABEL_DANA.get(d, d) }}</td></tr>
                   {% endif %}
                   <tr>
                     <td class="report-kode">{{ r.kode }}</td>
-                    <td class="report-item">
-                      {{ r.nama }}
-                      {% if r.n_donatur %}
-                      <div class="report-count"><i class="bi bi-people"></i> {{ r.n_donatur }} donatur</div>
-                      {% endif %}
-                    </td>
+                    <td class="report-item">{{ r.nama }}</td>
+                    <td class="report-amount {{ 'nol' if not r.n_donatur }}">{{ r.n_donatur or '&mdash;' }}</td>
                     <td class="report-amount masuk">{{ r.total|rupiah }}</td>
                   </tr>
                 {% else %}
-                <tr><td colspan="3" class="report-empty">Tidak ada arus kas masuk</td></tr>
+                <tr><td colspan="4" class="report-empty">Tidak ada arus kas masuk</td></tr>
                 {% endfor %}
               </tbody>
               <tfoot>
                 <tr class="report-subtotal">
                   <td colspan="2">Jumlah Arus Masuk</td>
+                  <td class="report-amount">{{ total_donatur }}</td>
                   <td class="report-amount masuk">{{ total_masuk|rupiah }}</td>
                 </tr>
               </tfoot>
@@ -119,6 +117,7 @@
                 <tr>
                   <th style="width:72px">Kode</th>
                   <th>Penggunaan / Penyaluran</th>
+                  <th class="text-end" style="width:125px">Penerima Manfaat</th>
                   <th class="text-end" style="width:150px">Jumlah</th>
                 </tr>
               </thead>
@@ -128,25 +127,22 @@
                   {% set d = r.jenis_dana or 'umum' %}
                   {% if d != ns_keluar.cur %}
                     {% set ns_keluar.cur = d %}
-                    <tr class="report-group d-{{ d }}"><td colspan="3">Dana {{ LABEL_DANA.get(d, d) }}</td></tr>
+                    <tr class="report-group d-{{ d }}"><td colspan="4">Dana {{ LABEL_DANA.get(d, d) }}</td></tr>
                   {% endif %}
                   <tr>
                     <td class="report-kode">{{ r.kode }}</td>
-                    <td class="report-item">
-                      {{ r.nama }}
-                      {% if r.n_mustahik %}
-                      <div class="report-count"><i class="bi bi-people"></i> {{ r.n_mustahik }} penerima manfaat</div>
-                      {% endif %}
-                    </td>
+                    <td class="report-item">{{ r.nama }}</td>
+                    <td class="report-amount {{ 'nol' if not r.n_mustahik }}">{{ r.n_mustahik or '&mdash;' }}</td>
                     <td class="report-amount keluar">{{ r.total|rupiah }}</td>
                   </tr>
                 {% else %}
-                <tr><td colspan="3" class="report-empty">Tidak ada arus kas keluar</td></tr>
+                <tr><td colspan="4" class="report-empty">Tidak ada arus kas keluar</td></tr>
                 {% endfor %}
               </tbody>
               <tfoot>
                 <tr class="report-subtotal">
                   <td colspan="2">Jumlah Arus Keluar</td>
+                  <td class="report-amount">{{ total_mustahik }}</td>
                   <td class="report-amount keluar">{{ total_keluar|rupiah }}</td>
                 </tr>
               </tfoot>
