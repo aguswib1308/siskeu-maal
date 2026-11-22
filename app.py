@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_file
-import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time, threading
+import sqlite3, hashlib, os, re, json, calendar as cal_mod, io, shutil, glob as glob_mod, time, threading, random
 import uuid as uuid_mod
 from datetime import datetime, date
 from openpyxl import Workbook, load_workbook
@@ -28,7 +28,7 @@ def get_db():
 def parse_jumlah(raw):
     """Parse input jumlah ('1.500.000' / '1500000' / 1500000). None jika tidak valid atau <= 0."""
     try:
-        val = float(str(raw).replace('.', '').replace(',', '').strip())
+        val = float(''.join(c for c in str(raw) if c.isdigit()) or '0')
     except (TypeError, ValueError):
         return None
     return val if val > 0 else None
@@ -2720,7 +2720,7 @@ def kirim_notifikasi_penyaluran(conn, bulanan_id):
         conn.execute("UPDATE kelompok_penyaluran_bulanan SET wa_status='gagal', wa_error=? WHERE id=?",
                      (error, bulanan_id))
 
-def _kirim_kelompok_bg(ids, jeda=1.5):
+def _kirim_kelompok_bg(ids, jeda_min=4.0, jeda_max=10.0):
     """Kirim notifikasi WA kelompok di LATAR BELAKANG (thread daemon).
 
     Sejak 4 Nov 2026: sebelumnya loop sinkron 36 penerima x ~2,5 detik = ~90 detik
@@ -2747,7 +2747,9 @@ def _kirim_kelompok_bg(ids, jeda=1.5):
                         conn.commit()
                     except Exception:
                         pass
-                time.sleep(jeda)
+                # Jitter: jeda acak antar-kirim. Pola lama 36 pesan berjarak
+                # tetap 1,5 dtk diduga memicu deteksi spam WA -> sesi logout 401.
+                time.sleep(random.uniform(jeda_min, jeda_max))
         finally:
             try:
                 conn.close()

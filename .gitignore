@@ -10,3 +10,14 @@ donatur_list.tsv
 wa-gateway/.env
 wa-gateway/node_modules/
 wa-gateway/auth_info_baileys/
+# Semua varian folder sesi Baileys, termasuk cadangan manual spt
+# auth_info_baileys.bak-YYYYMMDD/, auth_info_sesi-rusak.bak-*/ dan
+# auth_info_*.mati-401-*/ yg ada di VPS. Isinya kredensial sesi WhatsApp
+# (bisa dipakai mengirim sebagai nomor koperasi) -- pola lama hanya menangkap
+# folder aktif, jadi satu 'git add -A' bisa mendorongnya ke repo publik ini.
+wa-gateway/auth_info_*
+# Arsip isi pesan terkirim (penjawab retry receipt). Berisi isi pesan ke
+# penerima manfaat, termasuk nomor token listrik -- jangan pernah di-commit.
+wa-gateway/sent_messages.json*
+# Cadangan manual hasil edit langsung di server (app.py.bak-<fitur>-<timestamp>)
+*.bak-*
