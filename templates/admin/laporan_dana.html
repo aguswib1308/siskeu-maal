@@ -65,6 +65,14 @@
   {% set d = data[dana] %}
   {% if d.masuk or d.keluar or d.saldo_awal %}
 
+  {#- Baris "Jumlah Penerimaan" & "Jumlah Penyaluran" harus SEJAJAR. Kedua tabel
+      berdiri sendiri, jadi sisi yang barisnya lebih sedikit diganjal baris
+      kosong sebanyak selisihnya -- cara baku laporan dua kolom. Sisi tanpa
+      isi tetap memakai 1 baris ("Tidak ada ...") sehingga ikut dihitung. -#}
+  {% set n_masuk  = d.masuk|length  or 1 %}
+  {% set n_keluar = d.keluar|length or 1 %}
+  {% set n_baris  = [n_masuk, n_keluar]|max %}
+
   <section class="report-panel d-{{ dana }}">
     <div class="report-panel-head">
       <span class="report-panel-title">Dana {{ LABEL_DANA.get(dana, dana) }}</span>
@@ -99,6 +107,9 @@
               {% else %}
               <tr><td colspan="4" class="report-empty">Tidak ada penerimaan pada periode ini</td></tr>
               {% endfor %}
+              {% for _ in range(n_baris - n_masuk) %}
+              <tr class="report-filler"><td colspan="4">&nbsp;</td></tr>
+              {% endfor %}
             </tbody>
             <tfoot>
               <tr class="report-subtotal">
@@ -132,6 +143,9 @@
               </tr>
               {% else %}
               <tr><td colspan="4" class="report-empty">Tidak ada penyaluran pada periode ini</td></tr>
+              {% endfor %}
+              {% for _ in range(n_baris - n_keluar) %}
+              <tr class="report-filler"><td colspan="4">&nbsp;</td></tr>
               {% endfor %}
             </tbody>
             <tfoot>

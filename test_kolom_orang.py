@@ -96,6 +96,16 @@ n_panel = html.count('report-panel d-')
 assert n_panel >= 1, n_panel
 n_kolom = html.count('class="col-lg-6 report-duo-col"')
 assert n_kolom == 2 * n_panel, (n_kolom, n_panel)
+
+# Baris "Jumlah Penerimaan" & "Jumlah Penyaluran" sejajar: syaratnya kedua
+# tabel dalam satu panel punya jumlah baris tbody yang sama (sisi lebih pendek
+# diganjal baris kosong). Data uji sengaja timpang: 1 akun masuk, 2 akun keluar.
+import re                                                  # noqa: E402
+tbody = [b.count('<tr') for b in re.findall(r'<tbody>(.*?)</tbody>', html, re.S)]
+assert len(tbody) == 2 * n_panel, tbody
+for kiri, kanan in zip(tbody[0::2], tbody[1::2]):
+    assert kiri == kanan, (kiri, kanan)
+assert html.count('report-filler') >= 1, html.count('report-filler')
 assert html.count('<div') == html.count('</div>'), (html.count('<div'), html.count('</div>'))
 
 print('SEMUA UJI LOLOS')
