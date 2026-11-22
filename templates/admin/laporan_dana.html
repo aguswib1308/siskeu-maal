@@ -73,66 +73,77 @@
       </span>
     </div>
 
-    <div class="table-responsive">
-      <table class="table report-table mb-0">
-        <thead class="report-thead-soft">
-          <tr>
-            <th style="width:80px">Kode</th>
-            <th>Uraian</th>
-            <th class="text-end" style="width:110px"></th>
-            <th class="text-end" style="width:170px">Jumlah</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="report-group">
-            <td colspan="2">Penerimaan</td>
-            <td class="text-end">Donatur</td>
-            <td></td>
-          </tr>
-          {% for r in d.masuk %}
-          <tr>
-            <td class="report-kode">{{ r.kode }}</td>
-            <td class="report-item">{{ r.nama }}</td>
-            <td class="report-amount {{ 'nol' if not r.n_donatur }}">{{ r.n_donatur or '&mdash;' }}</td>
-            <td class="report-amount masuk">{{ r.total|rupiah }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="text-muted small fst-italic">Tidak ada penerimaan pada periode ini</td></tr>
-          {% endfor %}
-          <tr class="report-subtotal">
-            <td colspan="2">Jumlah Penerimaan</td>
-            <td class="report-amount">{{ d.total_donatur }}</td>
-            <td class="report-amount masuk">{{ d.total_masuk|rupiah }}</td>
-          </tr>
+    {# Penerimaan & Penyaluran BERDAMPINGAN (kiri-kanan), bukan bertumpuk --
+       bentuk baku LSPD. Bertumpuk sendiri di layar sempit lewat grid Bootstrap;
+       saat cetak dipaksa tetap 50:50 (lihat .report-duo-col di _report_style). #}
+    <div class="row g-0 report-duo">
+      <div class="col-lg-6 report-duo-col">
+        <div class="table-responsive">
+          <table class="table report-table mb-0">
+            <thead class="report-thead-soft">
+              <tr>
+                <th style="width:72px">Kode</th>
+                <th>Penerimaan</th>
+                <th class="text-end" style="width:85px">Donatur</th>
+                <th class="text-end" style="width:150px">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in d.masuk %}
+              <tr>
+                <td class="report-kode">{{ r.kode }}</td>
+                <td class="report-item">{{ r.nama }}</td>
+                <td class="report-amount {{ 'nol' if not r.n_donatur }}">{{ r.n_donatur or '—' }}</td>
+                <td class="report-amount masuk">{{ r.total|rupiah }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="report-empty">Tidak ada penerimaan pada periode ini</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="report-subtotal">
+                <td colspan="2">Jumlah Penerimaan</td>
+                <td class="report-amount">{{ d.total_donatur }}</td>
+                <td class="report-amount masuk">{{ d.total_masuk|rupiah }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
 
-          <tr class="report-group">
-            <td colspan="2">Penyaluran / Penggunaan</td>
-            <td class="text-end">Penerima Manfaat</td>
-            <td></td>
-          </tr>
-          {% for r in d.keluar %}
-          <tr>
-            <td class="report-kode">{{ r.kode }}</td>
-            <td class="report-item">{{ r.nama }}</td>
-            <td class="report-amount {{ 'nol' if not r.n_mustahik }}">{{ r.n_mustahik or '&mdash;' }}</td>
-            <td class="report-amount keluar">{{ r.total|rupiah }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="text-muted small fst-italic">Tidak ada penyaluran pada periode ini</td></tr>
-          {% endfor %}
-          <tr class="report-subtotal">
-            <td colspan="2">Jumlah Penyaluran</td>
-            <td class="report-amount">{{ d.total_mustahik }}</td>
-            <td class="report-amount keluar">{{ d.total_keluar|rupiah }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr class="report-total">
-            <td colspan="3">Saldo Akhir Dana {{ LABEL_DANA.get(dana, dana) }}</td>
-            <td class="report-amount {{ 'keluar' if d.saldo_akhir < 0 }}">{{ d.saldo_akhir|rupiah }}</td>
-          </tr>
-        </tfoot>
-      </table>
+      <div class="col-lg-6 report-duo-col">
+        <div class="table-responsive">
+          <table class="table report-table mb-0">
+            <thead class="report-thead-soft">
+              <tr>
+                <th style="width:72px">Kode</th>
+                <th>Penyaluran / Penggunaan</th>
+                <th class="text-end" style="width:125px">Penerima Manfaat</th>
+                <th class="text-end" style="width:150px">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in d.keluar %}
+              <tr>
+                <td class="report-kode">{{ r.kode }}</td>
+                <td class="report-item">{{ r.nama }}</td>
+                <td class="report-amount {{ 'nol' if not r.n_mustahik }}">{{ r.n_mustahik or '—' }}</td>
+                <td class="report-amount keluar">{{ r.total|rupiah }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="report-empty">Tidak ada penyaluran pada periode ini</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="report-subtotal">
+                <td colspan="2">Jumlah Penyaluran</td>
+                <td class="report-amount">{{ d.total_mustahik }}</td>
+                <td class="report-amount keluar">{{ d.total_keluar|rupiah }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </div>
 
     {# Kaki panel 4 sel — dari origin/master, menggantikan baris teks rata kanan #}
@@ -153,7 +164,6 @@
         <div class="stat-label">= Saldo Akhir</div>
         <div class="stat-value {{ 'keluar' if d.saldo_akhir < 0 }}">{{ d.saldo_akhir|rupiah }}</div>
       </div>
-    </div>
     </div>
   </section>
 

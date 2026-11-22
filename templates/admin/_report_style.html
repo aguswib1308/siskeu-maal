@@ -424,5 +424,15 @@
   .report-sign { break-inside: avoid; padding: 1.5rem 0 0 !important; }
   .card { box-shadow: none !important; break-inside: avoid; }
   a { text-decoration: none !important; color: #111 !important; }
+
+  /* Dua tabel berdampingan tetap 50:50 saat dicetak. Tanpa ini kolom Bootstrap
+     col-lg-6 bertumpuk, sebab lebar kertas A4 (~794px) di bawah breakpoint lg. */
+  .report-duo-col {
+    width: 50% !important; max-width: 50% !important; flex: 0 0 50% !important;
+  }
+  .report-duo-col + .report-duo-col { border-left: 1px solid #ddd !important; }
 }
+
+/* Panel dengan dua tabel berdampingan (LSPD: penerimaan | penyaluran). */
+.report-duo-col + .report-duo-col { border-left: 1px solid var(--border); }
 </style>

@@ -52,6 +52,14 @@ conn.executemany(
 conn.execute(
     "INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,jumlah,nama_kegiatan,jumlah_mustahik) "
     "VALUES (?,'keluar',?,?,300000,'Santunan Uji',12)", (BULAN + '-20', jd_keluar, coa_keluar))
+# Penyaluran tanpa jumlah mustahik -> sel kolom harus berisi em dash, bukan
+# teks mentah "&mdash;" (Jinja meng-escape entitas HTML di dalam ekspresi).
+coa_keluar2 = conn.execute(
+    "SELECT id FROM chart_of_accounts WHERE jenis_transaksi='keluar' AND jenis_dana=? "
+    "AND id<>? AND aktif=1 ORDER BY kode LIMIT 1", (jd_keluar, coa_keluar)).fetchone()[0]
+conn.execute(
+    "INSERT INTO transaksi (tanggal,jenis,jenis_dana,coa_id,jumlah,nama_kegiatan) "
+    "VALUES (?,'keluar',?,?,100000,'Tanpa Mustahik')", (BULAN + '-21', jd_keluar, coa_keluar2))
 conn.commit()
 
 # ── 1. Hitungan orang ────────────────────────────────────────────────────────
@@ -67,14 +75,27 @@ c = maal.app.test_client()
 with c.session_transaction() as s:
     s['user_id'], s['role'], s['nama'] = 1, 'admin', 'Administrator'
 
-for url, judul in (('/admin/laporan/dana?bulan=' + BULAN, 'Donatur'),
-                   ('/admin/laporan/arus-kas?bulan=' + BULAN, 'Donatur')):
+for url in ('/admin/laporan/dana?bulan=' + BULAN,
+            '/admin/laporan/arus-kas?bulan=' + BULAN):
     r = c.get(url)
     assert r.status_code == 200, (url, r.status_code)
     html = r.get_data(as_text=True)
-    assert judul in html, url
+    assert 'Donatur' in html, url
     assert 'Penerima Manfaat' in html, url
     assert '>4<' in html or '>4 ' in html, url            # jumlah donatur tampil
     assert '>12<' in html or '>12 ' in html, url          # jumlah penerima manfaat tampil
+    # Sel kosong = em dash sungguhan, bukan "&mdash;" yang ter-escape jadi teks
+    assert '—' in html, url
+    assert 'mdash' not in html, url
+
+# LSPD: penerimaan & penyaluran harus BERDAMPINGAN -- dua kolom grid per panel
+# dana, bukan satu tabel bertumpuk. Juga pastikan tidak ada </div> nyasar yang
+# menutup pembungkus .p-4 lebih awal.
+html = c.get('/admin/laporan/dana?bulan=' + BULAN).get_data(as_text=True)
+n_panel = html.count('report-panel d-')
+assert n_panel >= 1, n_panel
+n_kolom = html.count('class="col-lg-6 report-duo-col"')
+assert n_kolom == 2 * n_panel, (n_kolom, n_panel)
+assert html.count('<div') == html.count('</div>'), (html.count('<div'), html.count('</div>'))
 
 print('SEMUA UJI LOLOS')
