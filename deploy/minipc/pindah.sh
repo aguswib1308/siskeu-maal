@@ -63,7 +63,7 @@ if [ "$MODE" = siap ]; then
     # Hanya aplikasi web; gateway WA TIDAK dinyalakan (nomor WA masih dipakai VPS)
     systemctl restart bmt-maal
     sleep 2; curl -fsS -o /dev/null -w "login: HTTP %{http_code}\n" http://127.0.0.1:5002/
-    echo "SIAP. Uji di uji-maal.bmtamalmuslim.web.id. Ulangi 'siap' kapan saja; final saat jam sepi."
+    echo "SIAP. Uji lewat hostname uji. Ulangi 'siap' kapan saja; final saat jam sepi."
     exit 0
 fi
 
