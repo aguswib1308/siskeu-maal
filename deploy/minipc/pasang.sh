@@ -16,7 +16,7 @@ D=$APP/deploy/minipc
 echo "== 1. paket sistem"
 apt-get update -qq
 apt-get install -y -qq python3 python3-venv python3-pip nodejs npm nginx rsync git sqlite3 >/dev/null
-node -e 'process.exit(+process.versions.node.split(".")[0] < 20)' || { echo "Node < 20, Baileys butuh >= 20."; exit 1; }
+node -e 'process.exit(+process.versions.node.split(".")[0] < 20 ? 1 : 0)' || { echo "Node < 20, Baileys butuh >= 20."; exit 1; }
 
 echo "== 2. user layanan & folder"
 id "$USR" >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin "$USR"
