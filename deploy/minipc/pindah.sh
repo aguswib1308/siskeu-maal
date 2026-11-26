@@ -15,7 +15,8 @@ SRC=/var/www/bmt-maal
 APP=/srv/bmt-maal
 USR=bmtmaal
 MODE=${1:-}
-R() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$VPS" "$@"; }
+SSH="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
+R() { $SSH "$VPS" "$@"; }
 
 [ "$(id -u)" = 0 ] || { echo "Jalankan sebagai root (sudo)."; exit 1; }
 [ "$MODE" = siap ] || [ "$MODE" = final ] || { echo "Pakai: $0 siap|final"; exit 1; }
@@ -41,9 +42,9 @@ if [ "$MODE" = final ]; then
 fi
 
 echo "== salin data/ (DB + backup) dan sesi WA"
-rsync -a --delete -e "ssh -o BatchMode=yes" "$VPS:$SRC/data/" "$APP/data/"
-rsync -a --delete -e "ssh -o BatchMode=yes" "$VPS:$SRC/wa-gateway/auth_info_baileys/" "$APP/wa-gateway/auth_info_baileys/"
-rsync -a -e "ssh -o BatchMode=yes" "$VPS:$SRC/wa-gateway/sent_messages.json" "$VPS:$SRC/wa-gateway/package-lock.json" "$APP/wa-gateway/"
+rsync -a --delete -e "$SSH" "$VPS:$SRC/data/" "$APP/data/"
+rsync -a --delete -e "$SSH" "$VPS:$SRC/wa-gateway/auth_info_baileys/" "$APP/wa-gateway/auth_info_baileys/"
+rsync -a -e "$SSH" "$VPS:$SRC/wa-gateway/sent_messages.json" "$VPS:$SRC/wa-gateway/package-lock.json" "$APP/wa-gateway/"
 
 echo "== rahasia -> /etc (0600), nilai SAMA dengan VPS (SECRET_KEY = sesi login & kunci API laporan)"
 R "systemctl show bmt-maal -p Environment --value" | tr ' ' '\n' | sed 's/^"//; s/"$//' | grep '=' > /etc/bmt-maal.env
