@@ -1,0 +1,30 @@
+# /etc/systemd/system/bmt-maal.service  -  Baitul Maal di mini PC kantor
+# Rahasia di /etc/bmt-maal.env (0600 root), dibaca systemd, BUKAN ditulis di sini
+# (unit lama di VPS menulis SECRET_KEY dll langsung di Environment=).
+[Unit]
+Description=BMT Keuangan Maal (gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=bmtmaal
+Group=bmtmaal
+WorkingDirectory=/srv/bmt-maal
+EnvironmentFile=/etc/bmt-maal.env
+Environment=TZ=Asia/Jakarta
+# Port 5002 sama dengan VPS; --timeout 180 dipertahankan (laporan & ekspor berat)
+ExecStart=/srv/bmt-maal/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5002 --timeout 180 \
+          --access-logfile - app:app
+Restart=always
+RestartSec=5
+# Pelajaran absensi 21 Nov: tanpa ini restart bisa tersangkut 'deactivating'
+TimeoutStopSec=20
+MemoryMax=400M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/srv/bmt-maal/data
+
+[Install]
+WantedBy=multi-user.target

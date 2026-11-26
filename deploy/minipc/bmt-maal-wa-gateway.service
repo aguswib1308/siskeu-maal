@@ -1,0 +1,26 @@
+# /etc/systemd/system/bmt-maal-wa-gateway.service  -  gateway WA notifikasi penyaluran (Baileys, :3004)
+# SATU nomor WA = SATU instance. Jangan nyalakan selama gateway yang sama di VPS masih hidup.
+[Unit]
+Description=Gateway WA kirim-pesan-saja untuk notifikasi penyaluran Baitul Maal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=bmtmaal
+Group=bmtmaal
+WorkingDirectory=/srv/bmt-maal/wa-gateway
+EnvironmentFile=/etc/bmt-maal-wa-gateway.env
+ExecStart=/usr/bin/node gateway.js
+Restart=always
+RestartSec=10
+TimeoutStopSec=20
+MemoryMax=300M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+# auth_info_baileys/ + sent_messages.json ditulis di sini
+ReadWritePaths=/srv/bmt-maal/wa-gateway
+
+[Install]
+WantedBy=multi-user.target

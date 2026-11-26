@@ -1,0 +1,6 @@
+# /etc/cron.d/bmt-maal  -  dipasang oleh pindah.sh tahap 'final' (BUKAN pasang.sh: jangan dobel dengan VPS)
+# Ganti cron VPS: buka periode tgl 1 + backup bulanan lewat API (yang menaruh backup di disk yang sama).
+# Sekarang: backup HARIAN ke HDD /mnt/backup, simpan 30 hari.
+SHELL=/bin/bash
+10 0 1 * * bmtmaal cd /srv/bmt-maal && venv/bin/python cron_buka_periode.py >> data/cron_buka_periode.log 2>&1
+15 1 * * * root mountpoint -q /mnt/backup && mkdir -p /mnt/backup/bmt-maal && /srv/bmt-maal/venv/bin/python -c "import sqlite3,sys; s=sqlite3.connect('/srv/bmt-maal/data/keuangan.db'); d=sqlite3.connect(sys.argv[1]); s.backup(d); d.close()" /mnt/backup/bmt-maal/keuangan-$(date +\%Y\%m\%d).db && find /mnt/backup/bmt-maal -name 'keuangan-*.db' -mtime +30 -delete
