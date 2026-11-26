@@ -3,3 +3,4 @@ gunicorn
 pywebpush
 py-vapid
 requests
+openpyxl
